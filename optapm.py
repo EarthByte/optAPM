@@ -200,7 +200,6 @@ class ModelSetup():
             model_stop_condition,
             max_iter,
             ref_rotation_plate_id,
-            ref_rotation_fixed_plate_id,
             ref_rotation_start_age,
             ref_rotation_end_age,
             interpolation_resolution,
@@ -220,7 +219,7 @@ class ModelSetup():
             hs_weight,
             include_chains,
             interpolated_hotspot_trails,
-            tm_method) = params[:28]
+            tm_method) = params[:27]
 
         #print fz_weight, nr_weight, tm_weight, hs_weight
 
@@ -1014,7 +1013,7 @@ class ModelSetup():
             ipmag.plot_pole(m, ref_rot_longitude, ref_rot_latitude, geographical_uncertainty, color='red')
 
 
-        startingConditions = [x, opt_n, N, lb, ub, model_stop_condition, max_iter, rotation_file, ref_rotation_start_age, ref_rotation_end_age, ref_rotation_plate_id, ref_rotation_fixed_plate_id,
+        startingConditions = [x, opt_n, N, lb, ub, model_stop_condition, max_iter, rotation_file, ref_rotation_start_age, ref_rotation_end_age, ref_rotation_plate_id,
                               Lats, Lons, spreading_directions, spreading_asymmetries, seafloor_ages, PID, CPID, data_array, nnr_datadir, no_net_rotation_file,
                               reformArray, trail_data, start_seeds, rotation_age_of_interest_age, data_array_labels_short, ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
                               seed_lons, seed_lats, ang_gaussian_array]

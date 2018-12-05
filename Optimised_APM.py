@@ -49,10 +49,10 @@ use_parallel = MPI4PY
 #     hotspot_dispersion : Boolean
 # 
 
-# model_name = "optAPM175"
-model_name = "optAPM1"
+# model_name = "optAPM176"
+model_name = "optAPM2"
 
-start_age = 30
+start_age = 10
 end_age = 0
 interval = 10
 
@@ -96,14 +96,17 @@ include_chains = ['Louisville', 'Tristan', 'Reunion', 'St_Helena', 'Foundation',
 # Rotation file with existing APM rotations removed from 0-250Ma to be used:
 if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
 
+    original_rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/all_rotations.rot'
     rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/all_rotations_' + model_name + '.rot'
 
 elif tm_data_type == 'muller2016':
 
+    original_rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS.rot'
     rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS_' + model_name + '.rot'
 
 elif tm_data_type == 'shephard2013':
 
+    original_rotfile = 'Shephard_etal_ESR2013_Global_EarthByte_2013.rot'
     rotfile = 'Shephard_etal_ESR2013_Global_EarthByte_2013_' + model_name + '.rot'
 
 
@@ -128,8 +131,6 @@ no_auto_ref_rot_latitude = 56.6
 no_auto_ref_rot_angle = -2.28
 
 ref_rotation_plate_id = 701
-# ref_rotation_fixed_plate_id = 1
-ref_rotation_fixed_plate_id = 70
 
 interpolation_resolution = 5
 rotation_age_of_interest = True
@@ -247,6 +248,55 @@ if __name__ == '__main__':
     # When using mpi4py we only print and collect/process results in one process (the one with rank/ID 0).
     if use_parallel != MPI4PY or mpi_rank == 0:
         
+        #
+        # Copy the original rotation file into the optimised version, and zero out the rotations
+        # that we will soon replace with optimised rotations.
+        #
+        original_rotation_file = datadir + original_rotfile
+        rotation_features = pgp.FeatureCollection(original_rotation_file)
+        original_rotation_model = pgp.RotationModel(rotation_features)
+        
+        for rotation_feature in rotation_features:
+            
+            total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
+            if total_reconstruction_pole:
+                
+                fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
+                if moving_plate_id == 701:
+                    
+                    zero_rotation_time_samples_701_rel_fixed = []
+                    
+                    # Start with identity rotation at time 0Ma.
+                    zero_rotation_time_samples_701_rel_fixed.append(
+                        pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'optAPM'))
+                    
+                    for ref_rotation_start_age in age_range:
+                        
+                        # We want our 701 to 001 rotation to be zero.
+                        # However the 701 sequence might have a fixed plate ID that is not 001.
+                        # So convert zero 701 rel 001 rotation to the 701 rel 'fixed_plate_id' rotation to store in rotation feature.
+                        #
+                        #                         R(0->t,001->701) = R(0->t,001->fixed) * R(0->t,fixed->701)
+                        #                                 Identity = R(0->t,001->fixed) * R(0->t,fixed->701)
+                        #   inverse(R(0->t,001->fixed)) * Identity = R(0->t,fixed->701)
+                        #                       R(0->t,fixed->701) = inverse(R(0->t,001->fixed))
+                        #
+                        zero_rotation_701_rel_fixed = original_rotation_model.get_rotation(ref_rotation_start_age, fixed_plate_id, fixed_plate_id=1).get_inverse()
+
+                        zero_rotation_time_samples_701_rel_fixed.append(
+                            pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_701_rel_fixed), ref_rotation_start_age, 'optAPM'))
+                    
+                    # Replace the 701 rotation sequence.
+                    rotation_feature.set_total_reconstruction_pole(
+                        fixed_plate_id,
+                        701,
+                        pgp.GpmlIrregularSampling(zero_rotation_time_samples_701_rel_fixed))
+                    
+                    # Write the rotation file with zero 701-to-anchor rotations.
+                    pgp.FeatureCollection(rotation_features).write(rotation_file)
+                    break
+        
+        
         print "Rotation file to be used: ", rotfile
         print "TM data:", tm_data_type
         print "TM method:", tm_method
@@ -297,7 +347,7 @@ if __name__ == '__main__':
 
             # Gather parameters
             params = [search_radius, rotation_uncertainty, search_type, models, model_stop_condition, max_iter,
-                      ref_rotation_plate_id, ref_rotation_fixed_plate_id, ref_rotation_start_age, ref_rotation_end_age, interpolation_resolution, 
+                      ref_rotation_plate_id, ref_rotation_start_age, ref_rotation_end_age, interpolation_resolution, 
                       rotation_age_of_interest, fracture_zones, net_rotation, trench_migration, hotspot_trails,
                       no_auto_ref_rot_longitude, no_auto_ref_rot_latitude, no_auto_ref_rot_angle, auto_calc_ref_pole, search, 
                       fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
@@ -310,6 +360,7 @@ if __name__ == '__main__':
                                  ridge_file=ridge_file, isochron_file=isochron_file, isocob_file=isocob_file, 
                                  hst_file=hst_file, hs_file=hs_file, interpolated_hotspots=interpolated_hotspots)
 
+            rotation_model = data[0]
 
             # Calculate starting conditions
             startingConditions = ms.modelStartConditions(params, data, plot)
@@ -365,7 +416,7 @@ if __name__ == '__main__':
         (x, opt_n, N, lb, ub,  model_stop_condition, max_iter,
             _,
             ref_rotation_start_age, ref_rotation_end_age,
-            ref_rotation_plate_id, ref_rotation_fixed_plate_id,
+            ref_rotation_plate_id,
             Lats, Lons,
             spreading_directions, spreading_asymmetries, seafloor_ages,
             PID, CPID,
@@ -373,7 +424,7 @@ if __name__ == '__main__':
             nnr_datadir, no_net_rotation_file, reformArray, trail_data,
             start_seeds, rotation_age_of_interest_age, data_array_labels_short,
             ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
-            seed_lons, seed_lats) = startingConditions[:32]
+            seed_lons, seed_lats) = startingConditions[:31]
 
         if auto_calc_ref_pole == False:
 
@@ -397,7 +448,7 @@ if __name__ == '__main__':
         def run_optimisation(x, opt_n, N, lb, ub, model_stop_condition, max_iter, interval, rotation_file, 
                              no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions, 
                              spreading_asymmetries, seafloor_ages, PID, CPID, data_array, nnr_datadir, 
-                             ref_rotation_end_age, ref_rotation_plate_id, ref_rotation_fixed_plate_id, reformArray, trail_data,
+                             ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
                              fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
                              use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method):
 
@@ -419,7 +470,7 @@ if __name__ == '__main__':
             obj_f = ObjectiveFunction(
                     interval, rotation_file, no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions,
                     spreading_asymmetries, seafloor_ages, PID, CPID, data_array, nnr_datadir,
-                    ref_rotation_end_age, ref_rotation_plate_id, ref_rotation_fixed_plate_id, reformArray, trail_data,
+                    ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
                     fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
                     use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method)
             
@@ -456,7 +507,6 @@ if __name__ == '__main__':
                           spreading_asymmetries=spreading_asymmetries, 
                           seafloor_ages=seafloor_ages, PID=PID, CPID=CPID, data_array=data_array, nnr_datadir=nnr_datadir,
                           ref_rotation_end_age=ref_rotation_end_age, ref_rotation_plate_id=ref_rotation_plate_id,
-                          ref_rotation_fixed_plate_id=ref_rotation_fixed_plate_id,
                           reformArray=reformArray, trail_data=trail_data, fracture_zone_weight=fracture_zone_weight,
                           net_rotation_weight=net_rotation_weight, trench_migration_weight=trench_migration_weight,
                           hotspot_trails_weight=hotspot_trails_weight, use_trail_age_uncertainty=use_trail_age_uncertainty,
@@ -582,7 +632,7 @@ if __name__ == '__main__':
 
                     fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
 
-                    if fixed_plate_id == ref_rotation_fixed_plate_id and moving_plate_id == ref_rotation_plate_id:
+                    if moving_plate_id == ref_rotation_plate_id:
                         opt_rotation_feature = rotation_feature
                         break
 
@@ -590,15 +640,13 @@ if __name__ == '__main__':
             # Update existing rotation in the model with result
             if opt_rotation_feature:
 
-                adjustment_time = pgp.GeoTimeInstant(ref_rotation_start_age)
+                # adjustment_time = pgp.GeoTimeInstant(ref_rotation_start_age)
 
-                for finite_rotation_samples in rotation_sequence.get_enabled_time_samples():
+                for finite_rotation_sample in rotation_sequence.get_enabled_time_samples():
 
-                    finite_rotation_time = finite_rotation_samples.get_time()
+                    finite_rotation_time = finite_rotation_sample.get_time()
 
                     if finite_rotation_time == ref_rotation_start_age:
-
-                        finite_rotation = finite_rotation_samples.get_value().get_finite_rotation()
 
                         # new_rotation = pgp.FiniteRotation((np.double(round(min_results[-1][2], 2)), 
                         #                                    np.double(round(min_results[-1][3], 2))), 
@@ -608,7 +656,12 @@ if __name__ == '__main__':
                                                            np.double(round(plon, 2))), 
                                                            np.radians(np.double(round(min_results[-1][1], 2))))
 
-                        finite_rotation_samples.get_value().set_finite_rotation(new_rotation)
+                        # Our new rotation is from 701 to 001 so remove the 'fixed_plate_id' to 001 part to get the
+                        # 701 to 'fixed_plate_id' part that get stored in this rotation feature.
+                        fixed_plate_rotation = rotation_model.get_rotation(ref_rotation_start_age, fixed_plate_id, fixed_plate_id=1)
+                        new_rotation = fixed_plate_rotation.get_inverse() * new_rotation
+                        
+                        finite_rotation_sample.get_value().set_finite_rotation(new_rotation)
 
 
             # Add result rotation pole to rotation file
