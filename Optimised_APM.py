@@ -50,7 +50,7 @@ use_parallel = MPI4PY
 # 
 
 # model_name = "optAPM176"
-model_name = "optAPM2"
+model_name = "optAPM_test"
 
 start_age = 10
 end_age = 0
@@ -69,12 +69,6 @@ fracture_zones   = False
 net_rotation     = True
 trench_migration = True
 hotspot_trails   = False
-
-# # sigma (i.e. cost / sigma = weight)
-fracture_zone_weight    = 1.
-net_rotation_weight     = 1.
-trench_migration_weight = 1.
-hotspot_trails_weight   = 1.
 
 # Trench migration parameters
 tm_method = 'pygplates' # 'pygplates' for new method OR 'convergence' for old method
@@ -296,7 +290,6 @@ if __name__ == '__main__':
                     pgp.FeatureCollection(rotation_features).write(rotation_file)
                     break
         
-        
         print "Rotation file to be used: ", rotfile
         print "TM data:", tm_data_type
         print "TM method:", tm_method
@@ -320,26 +313,49 @@ if __name__ == '__main__':
 
         # Start timer over all time steps.
         main_start = time.time()
-
+    
+    
+    # This is probably not needed but make sure the rotation file has been written
+    # by the rank 0 process above before other rank processes continue.
+    # It's probably not needed because the first part of each iteration of time loop below does
+    # a scatter/broadcast which also synchronises processed before rotation file is read.
+    if use_parallel == MPI4PY:
+        mpi_comm.barrier()
+    
+    
     #
     # Loop through all times.
     #
     
     for i in xrange(0, len(age_range)):
         
+        ref_rotation_start_age = age_range[i]
+        ref_rotation_end_age = ref_rotation_start_age - interval
+        #ref_rotation_end_age = 0.
+        
+        
+        # # Only use hotspot trails for [0-80].
+        # if ref_rotation_start_age <= 80:
+        #     hotspot_trails   = True
+        # else:
+        #     hotspot_trails   = False
+        
+        # # sigma (i.e. cost / sigma = weight)
+        fracture_zone_weight    = 1.0
+        trench_migration_weight = 1.0
+        hotspot_trails_weight   = 1.0
+        
+        # Reduce net rotation weight to half for times older than 80Ma
+        # due to large number of synthetic (uncertain) plates.
+        if ref_rotation_start_age <= 80:
+            net_rotation_weight = 1.0
+        else:
+            net_rotation_weight = 0.5
+        
+        
         # When using mpi4py we only prepare the data in one process (the one with rank/ID 0).
         if use_parallel != MPI4PY or mpi_rank == 0:
             
-            # if fracture_zones == True:
-            #     if age_range[i] <= 40:
-            #         fracture_zones = True
-            #     else:
-            #         fracture_zones = False
-
-            ref_rotation_start_age = age_range[i]
-            ref_rotation_end_age = ref_rotation_start_age - interval
-            #ref_rotation_end_age = 0.
-
             print "Start age:", ref_rotation_start_age, "Ma"
             print ""
 
@@ -704,3 +720,9 @@ if __name__ == '__main__':
         #     data = pickle.load(f)
             
         # print data
+    
+    
+    # This is probably not needed but we're getting garbage written to the rotation output file
+    # for some reason (even though only the rank 0 process writes to the rotation file).
+    if use_parallel == MPI4PY:
+        mpi_comm.barrier()
