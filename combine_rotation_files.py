@@ -111,4 +111,13 @@ for rotation_feature_index, rotation_feature in enumerate(rotation_features):
     if rotation_required[rotation_feature_index]:
         required_rotation_features.append(rotation_feature)
 
+# Add in a zero rotation 005/000 sequence (so we have a path to 000 since we changed 000 to 005 above).
+rotation_feature_005_rel_000 = pygplates.Feature.create_total_reconstruction_sequence(
+    0,
+    5,
+    pygplates.GpmlIrregularSampling([
+        pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), time, 'optAPM')
+            for time in (0.0, 600.0)]))
+required_rotation_features.append(rotation_feature_005_rel_000)
+
 pygplates.FeatureCollection(required_rotation_features).write(output_rotation_filename)

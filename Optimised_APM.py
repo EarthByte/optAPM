@@ -60,7 +60,7 @@ search = "Initial"
 search_radius = 60
 rotation_uncertainty = 30
 auto_calc_ref_pole = True
-models = 20
+models = 100
 
 model_stop_condition = 'threshold'
 max_iter = 5  # Only applies if model_stop_condition != 'threshold'
@@ -285,35 +285,43 @@ if __name__ == '__main__':
         #             pgp.FeatureCollection(rotation_features).write(rotation_file)
         #             break
         
-        zero_rotation_time_samples_005_rel_000 = []
-        
-        # Start with identity rotation at time 0Ma.
-        zero_rotation_time_samples_005_rel_000.append(
-            pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'optAPM'))
-        
-        for ref_rotation_start_age in age_range:
+        for rotation_feature in rotation_features:
             
-            # We want our 701 to 000 rotation to be zero.
-            #
-            #                         R(0->t,000->701) = R(0->t,000->005) * R(0->t,005->701)
-            #                                 Identity = R(0->t,000->005) * R(0->t,005->701)
-            #   inverse(R(0->t,000->005)) * Identity = R(0->t,005->701)
-            #                       R(0->t,000->005) = inverse(R(0->t,005->701))
-            #
-            zero_rotation_005_rel_000 = original_rotation_model.get_rotation(ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=0).get_inverse()
+            total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
+            if total_reconstruction_pole:
+                
+                fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
+                if moving_plate_id == 5 and fixed_plate_id == 0:
+                    
+                    zero_rotation_time_samples_005_rel_000 = []
+                    
+                    # Start with identity rotation at time 0Ma.
+                    zero_rotation_time_samples_005_rel_000.append(
+                        pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'optAPM'))
+                    
+                    for ref_rotation_start_age in age_range:
+                        
+                        # We want our 701 to 000 rotation to be zero.
+                        #
+                        #                         R(0->t,000->701) = R(0->t,000->005) * R(0->t,005->701)
+                        #                                 Identity = R(0->t,000->005) * R(0->t,005->701)
+                        #   inverse(R(0->t,000->005)) * Identity = R(0->t,005->701)
+                        #                       R(0->t,000->005) = inverse(R(0->t,005->701))
+                        #
+                        zero_rotation_005_rel_000 = original_rotation_model.get_rotation(ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=0).get_inverse()
 
-            zero_rotation_time_samples_005_rel_000.append(
-                pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_005_rel_000), ref_rotation_start_age, 'optAPM'))
-        
-        # Add the 005/000 rotation sequence.
-        rotation_feature_005_rel_000 = pgp.Feature.create_total_reconstruction_sequence(
-            0,
-            5,
-            pgp.GpmlIrregularSampling(zero_rotation_time_samples_005_rel_000))
-        rotation_features.append(rotation_feature_005_rel_000)
-        
-        # Write the rotation file with zero 701-to-anchor rotations.
-        pgp.FeatureCollection(rotation_features).write(rotation_file)
+                        zero_rotation_time_samples_005_rel_000.append(
+                            pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_005_rel_000), ref_rotation_start_age, 'optAPM'))
+                    
+                    # Replace the 005/000 rotation sequence.
+                    rotation_feature.set_total_reconstruction_pole(
+                        0,
+                        5,
+                        pgp.GpmlIrregularSampling(zero_rotation_time_samples_005_rel_000))
+                    
+                    # Write the rotation file with zero 701-to-anchor rotations.
+                    pgp.FeatureCollection(rotation_features).write(rotation_file)
+                    break
         
         print "Rotation file to be used: ", rotfile
         print "TM data:", tm_data_type
