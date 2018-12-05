@@ -74,8 +74,8 @@ if len(net_stage_pole_data) < 2:
 # Interval is time difference between first two net rotation times (in first column of first two rows).
 net_stage_rotation_interval = net_stage_pole_data[0][0] - net_stage_pole_data[1][0]
 
-print('Net rotation interval:', net_stage_rotation_interval)
-print('Net rotations:', net_stage_pole_data)
+# print('Net rotation interval:', net_stage_rotation_interval)
+# print('Net rotations:', net_stage_pole_data)
 
 
 # Load the rotation features from rotation files.
@@ -84,6 +84,7 @@ rotation_features = list(pygplates.FeatureCollection(rotation_filename))
 # A rotation model using the rotation features before they are modified.
 rotation_model = pygplates.RotationModel(rotation_features)
 
+# Find the 701 sequence.
 total_reconstruction_pole_701 = None
 for rotation_feature_index, rotation_feature in enumerate(rotation_features):
 
@@ -139,7 +140,7 @@ total_reconstruction_pole_701_rel_fixed = pygplates.GpmlIrregularSampling(pole_t
 # Create the total reconstruction sequence (rotation) feature.
 # rotation_feature_701_rel_fixed = pygplates.Feature(pygplates.FeatureType.gpml_total_reconstruction_sequence)
 # rotation_feature_701_rel_fixed.set_name('INA-AUS Muller et.al 2000')
-# rotation_feature_701_rel_fixed.set_total_reconstruction_pole(701, fixed_plate_id, total_reconstruction_pole_701_rel_fixed)
+# rotation_feature_701_rel_fixed.set_total_reconstruction_pole(fixed_plate_id, 701, total_reconstruction_pole_701_rel_fixed)
 rotation_feature_701_rel_fixed = pygplates.Feature.create_total_reconstruction_sequence(
     fixed_plate_id,
     701,
