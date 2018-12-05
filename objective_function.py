@@ -352,7 +352,7 @@ class ObjectiveFunction(object):
             # 7. trench absolute motion abs vel mean
             #tm_eval_7 = ((np.sum(np.abs(trench_vel)) / len(trench_vel)) * 15) / self.trench_migration_weight
 
-            tm_eval = ((tm_eval_2 + tm_eval_5) * 3) / self.trench_migration_weight
+            tm_eval = (tm_eval_2 + tm_eval_5) * 3
             
             # Original equation
             #tm_eval = ((tm_eval_5 * (trench_numRetreating * trench_sumAbsVel_n)) / \
