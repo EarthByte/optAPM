@@ -100,9 +100,9 @@ def DiffPoles(poleA_lon_degrees,poleA_lat_degrees,angleA_degrees,poleB_lon_degre
 
     diff_lat_degrees, diff_lon_degrees, diff_angle_degrees = diff_rotation.get_lat_lon_euler_pole_and_angle_degrees()
 
-    threshold=0.001
-    if math.fabs(diff_angle_degrees) < threshold:
-        print 'Stage poles almost the same'
+    # threshold=0.001
+    # if math.fabs(diff_angle_degrees) < threshold:
+    #     print 'Stage poles almost the same'
 
     return diff_lon_degrees, diff_lat_degrees, diff_angle_degrees
 
@@ -115,11 +115,7 @@ def GetStagePoleSequenceForPlate(rotation_model,MovPlate,AnchorPlate,TIMELIST):
 
     count=0
     for TIME in TIMELIST:
-        #Build the rotations for the times we want
-        fromTimeRotation=rotation_model.get_reconstruction_tree(TIME+1,AnchorPlate)
-        toTimeRotation=rotation_model.get_reconstruction_tree(TIME,AnchorPlate)
-
-        stageData = pygplates.ReconstructionTree.get_equivalent_stage_rotation(fromTimeRotation,toTimeRotation,MovPlate)
+        stageData = rotation_model.get_rotation(TIME, MovPlate, TIME+1, anchor_plate_id=AnchorPlate)
         pole,angle = stageData.get_euler_pole_and_angle()
         pole = pygplates.convert_point_on_sphere_to_lat_lon_point(pole)
 
