@@ -73,8 +73,6 @@ class ObjectiveFunction(object):
         self.trail_age_uncertainty_ellipse = trail_age_uncertainty_ellipse
         self.tm_method = tm_method
         
-        self.count = 0
-        
         
         #
         # Load/parse the feature collection files up front so we don't have to repeatedly do it in each objective function call.
@@ -105,7 +103,8 @@ class ObjectiveFunction(object):
             if total_reconstruction_pole:
                 
                 fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
-                if moving_plate_id == ref_rotation_plate_id:
+                # if moving_plate_id == ref_rotation_plate_id:
+                if moving_plate_id == 5 and fixed_plate_id == 0:
                     
                     for finite_rotation_sample in rotation_sequence.get_enabled_time_samples():
                         
@@ -116,12 +115,14 @@ class ObjectiveFunction(object):
                             break
                     
                     break
+        
+        self.debug_count = 0
 
 
     def __call__(self, x, grad):
 
-        print self.count
-        self.count += 1
+        # print self.debug_count
+        self.debug_count += 1
         
         #### -----------------------------------------------------------------------------------------
         #### 1. Calculate reconstructed data point locations
@@ -141,13 +142,25 @@ class ObjectiveFunction(object):
 
         new_rotation = pgp.FiniteRotation((np.double(lat_), np.double(lon_)), np.radians(np.double(ang_)))
 
-        # Our new rotation is from 701 to 001 so remove the 'fixed_plate_id' to 001 part to get the
-        # 701 to 'fixed_plate_id' part that get stored in this rotation feature.
-        fixed_plate_rotation = self.rotation_model.get_rotation(
+        # # Our new rotation is from 701 to 001 so remove the 'fixed_plate_id' to 001 part to get the
+        # # 701 to 'fixed_plate_id' part that get stored in this rotation feature.
+        # fixed_plate_rotation = self.rotation_model.get_rotation(
+        #         self.ref_rotation_start_age,
+        #         self.ref_rotation_fixed_plate_id,
+        #         fixed_plate_id=1)
+        # new_rotation = fixed_plate_rotation.get_inverse() * new_rotation
+        
+        # Our new rotation is from 701 to 000 so remove the 701 to 005 part to get the
+        # 005 to 000 part that get stored in this rotation feature.
+        #
+        #                               R(0->t,000->701) = R(0->t,000->005) * R(0->t,005->701)
+        #   R(0->t,000->701) * inverse(R(0->t,005->701)) = R(0->t,000->005)
+        #
+        plate_rotation_701_rel_005 = self.rotation_model.get_rotation(
                 self.ref_rotation_start_age,
-                self.ref_rotation_fixed_plate_id,
-                fixed_plate_id=1)
-        new_rotation = fixed_plate_rotation.get_inverse() * new_rotation
+                self.ref_rotation_plate_id,
+                fixed_plate_id=5)
+        new_rotation = new_rotation * plate_rotation_701_rel_005.get_inverse()
         
         # Update the reference rotation.
         # Note that this modifies the state of 'self.rotation_model_tmp' - in other words,
@@ -402,7 +415,7 @@ class ObjectiveFunction(object):
 
 
         opt_eval = 0
-
+        
         # Fracture zones
         try:
             if fz_eval:
@@ -456,6 +469,6 @@ class ObjectiveFunction(object):
             opt_eval_data.append(opt_eval)
         except:
             pass
-
+        
 
         return opt_eval

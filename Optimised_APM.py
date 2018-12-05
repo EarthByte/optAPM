@@ -50,9 +50,9 @@ use_parallel = MPI4PY
 # 
 
 # model_name = "optAPM176"
-model_name = "optAPM_test"
+model_name = "optAPM6"
 
-start_age = 10
+start_age = 250
 end_age = 0
 interval = 10
 
@@ -60,15 +60,10 @@ search = "Initial"
 search_radius = 60
 rotation_uncertainty = 30
 auto_calc_ref_pole = True
-models = 6
+models = 20
 
 model_stop_condition = 'threshold'
 max_iter = 5  # Only applies if model_stop_condition != 'threshold'
-
-fracture_zones   = False
-net_rotation     = True
-trench_migration = True
-hotspot_trails   = False
 
 # Trench migration parameters
 tm_method = 'pygplates' # 'pygplates' for new method OR 'convergence' for old method
@@ -247,48 +242,78 @@ if __name__ == '__main__':
         # that we will soon replace with optimised rotations.
         #
         original_rotation_file = datadir + original_rotfile
-        rotation_features = pgp.FeatureCollection(original_rotation_file)
+        rotation_features = list(pgp.FeatureCollection(original_rotation_file))
         original_rotation_model = pgp.RotationModel(rotation_features)
         
-        for rotation_feature in rotation_features:
+        # for rotation_feature in rotation_features:
+        #     
+        #     total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
+        #     if total_reconstruction_pole:
+        #         
+        #         fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
+        #         if moving_plate_id == ref_rotation_plate_id:
+        #             
+        #             zero_rotation_time_samples_701_rel_fixed = []
+        #             
+        #             # Start with identity rotation at time 0Ma.
+        #             zero_rotation_time_samples_701_rel_fixed.append(
+        #                 pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'optAPM'))
+        #             
+        #             for ref_rotation_start_age in age_range:
+        #                 
+        #                 # We want our 701 to 001 rotation to be zero.
+        #                 # However the 701 sequence might have a fixed plate ID that is not 001.
+        #                 # So convert zero 701 rel 001 rotation to the 701 rel 'fixed_plate_id' rotation to store in rotation feature.
+        #                 #
+        #                 #                         R(0->t,001->701) = R(0->t,001->fixed) * R(0->t,fixed->701)
+        #                 #                                 Identity = R(0->t,001->fixed) * R(0->t,fixed->701)
+        #                 #   inverse(R(0->t,001->fixed)) * Identity = R(0->t,fixed->701)
+        #                 #                       R(0->t,fixed->701) = inverse(R(0->t,001->fixed))
+        #                 #
+        #                 zero_rotation_701_rel_fixed = original_rotation_model.get_rotation(ref_rotation_start_age, fixed_plate_id, fixed_plate_id=1).get_inverse()
+        # 
+        #                 zero_rotation_time_samples_701_rel_fixed.append(
+        #                     pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_701_rel_fixed), ref_rotation_start_age, 'optAPM'))
+        #             
+        #             # Replace the 701 rotation sequence.
+        #             rotation_feature.set_total_reconstruction_pole(
+        #                 fixed_plate_id,
+        #                 ref_rotation_plate_id,
+        #                 pgp.GpmlIrregularSampling(zero_rotation_time_samples_701_rel_fixed))
+        #             
+        #             # Write the rotation file with zero 701-to-anchor rotations.
+        #             pgp.FeatureCollection(rotation_features).write(rotation_file)
+        #             break
+        
+        zero_rotation_time_samples_005_rel_000 = []
+        
+        # Start with identity rotation at time 0Ma.
+        zero_rotation_time_samples_005_rel_000.append(
+            pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'optAPM'))
+        
+        for ref_rotation_start_age in age_range:
             
-            total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
-            if total_reconstruction_pole:
-                
-                fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
-                if moving_plate_id == 701:
-                    
-                    zero_rotation_time_samples_701_rel_fixed = []
-                    
-                    # Start with identity rotation at time 0Ma.
-                    zero_rotation_time_samples_701_rel_fixed.append(
-                        pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'optAPM'))
-                    
-                    for ref_rotation_start_age in age_range:
-                        
-                        # We want our 701 to 001 rotation to be zero.
-                        # However the 701 sequence might have a fixed plate ID that is not 001.
-                        # So convert zero 701 rel 001 rotation to the 701 rel 'fixed_plate_id' rotation to store in rotation feature.
-                        #
-                        #                         R(0->t,001->701) = R(0->t,001->fixed) * R(0->t,fixed->701)
-                        #                                 Identity = R(0->t,001->fixed) * R(0->t,fixed->701)
-                        #   inverse(R(0->t,001->fixed)) * Identity = R(0->t,fixed->701)
-                        #                       R(0->t,fixed->701) = inverse(R(0->t,001->fixed))
-                        #
-                        zero_rotation_701_rel_fixed = original_rotation_model.get_rotation(ref_rotation_start_age, fixed_plate_id, fixed_plate_id=1).get_inverse()
+            # We want our 701 to 000 rotation to be zero.
+            #
+            #                         R(0->t,000->701) = R(0->t,000->005) * R(0->t,005->701)
+            #                                 Identity = R(0->t,000->005) * R(0->t,005->701)
+            #   inverse(R(0->t,000->005)) * Identity = R(0->t,005->701)
+            #                       R(0->t,000->005) = inverse(R(0->t,005->701))
+            #
+            zero_rotation_005_rel_000 = original_rotation_model.get_rotation(ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=0).get_inverse()
 
-                        zero_rotation_time_samples_701_rel_fixed.append(
-                            pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_701_rel_fixed), ref_rotation_start_age, 'optAPM'))
-                    
-                    # Replace the 701 rotation sequence.
-                    rotation_feature.set_total_reconstruction_pole(
-                        fixed_plate_id,
-                        701,
-                        pgp.GpmlIrregularSampling(zero_rotation_time_samples_701_rel_fixed))
-                    
-                    # Write the rotation file with zero 701-to-anchor rotations.
-                    pgp.FeatureCollection(rotation_features).write(rotation_file)
-                    break
+            zero_rotation_time_samples_005_rel_000.append(
+                pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_005_rel_000), ref_rotation_start_age, 'optAPM'))
+        
+        # Add the 005/000 rotation sequence.
+        rotation_feature_005_rel_000 = pgp.Feature.create_total_reconstruction_sequence(
+            0,
+            5,
+            pgp.GpmlIrregularSampling(zero_rotation_time_samples_005_rel_000))
+        rotation_features.append(rotation_feature_005_rel_000)
+        
+        # Write the rotation file with zero 701-to-anchor rotations.
+        pgp.FeatureCollection(rotation_features).write(rotation_file)
         
         print "Rotation file to be used: ", rotfile
         print "TM data:", tm_data_type
@@ -315,12 +340,12 @@ if __name__ == '__main__':
         main_start = time.time()
     
     
-    # This is probably not needed but make sure the rotation file has been written
-    # by the rank 0 process above before other rank processes continue.
-    # It's probably not needed because the first part of each iteration of time loop below does
-    # a scatter/broadcast which also synchronises processed before rotation file is read.
-    if use_parallel == MPI4PY:
-        mpi_comm.barrier()
+    # # This is probably not needed but make sure the rotation file has been written
+    # # by the rank 0 process above before other rank processes continue.
+    # # It's probably not needed because the first part of each iteration of time loop below does
+    # # a scatter/broadcast which also synchronises processes before rotation file is read.
+    # if use_parallel == MPI4PY:
+    #     mpi_comm.barrier()
     
     
     #
@@ -334,17 +359,19 @@ if __name__ == '__main__':
         #ref_rotation_end_age = 0.
         
         
-        # # Only use hotspot trails for [0-80].
-        # if ref_rotation_start_age <= 80:
-        #     hotspot_trails   = True
-        # else:
-        #     hotspot_trails   = False
+        fracture_zones   = False
+        net_rotation     = True
+        trench_migration = True
+        # # Only use hotspot trails for 0-80Ma.
+        if ref_rotation_start_age <= 80:
+            hotspot_trails   = True
+        else:
+            hotspot_trails   = False
         
         # # sigma (i.e. cost / sigma = weight)
         fracture_zone_weight    = 1.0
         trench_migration_weight = 1.0
         hotspot_trails_weight   = 1.0
-        
         # Reduce net rotation weight to half for times older than 80Ma
         # due to large number of synthetic (uncertain) plates.
         if ref_rotation_start_age <= 80:
@@ -455,6 +482,11 @@ if __name__ == '__main__':
             #print "Number of start seeds generated:", len(start_seeds)
             print "Optimised models to be run:", len(start_seeds)
             print " "
+        
+        
+        # Debugging.
+        # import objective_function
+        # objective_function.opt_ind_data = []
 
 
         # --------------------------------------------------------------------
@@ -569,6 +601,8 @@ if __name__ == '__main__':
             # Calculate serially.
             xopt = [runopt(x_item) for x_item in x]
 
+        # print 'Mean opt_ind_data', np.mean(objective_function.opt_ind_data, axis=0)
+        # print 'Median opt_ind_data', np.median(objective_function.opt_ind_data, axis=0)
 
         # except Exception as e:
         
@@ -648,7 +682,11 @@ if __name__ == '__main__':
 
                     fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
 
-                    if moving_plate_id == ref_rotation_plate_id:
+                    # if moving_plate_id == ref_rotation_plate_id:
+                    #     opt_rotation_feature = rotation_feature
+                    #     break
+
+                    if moving_plate_id == 5 and fixed_plate_id == 0:
                         opt_rotation_feature = rotation_feature
                         break
 
@@ -672,10 +710,20 @@ if __name__ == '__main__':
                                                            np.double(round(plon, 2))), 
                                                            np.radians(np.double(round(min_results[-1][1], 2))))
 
-                        # Our new rotation is from 701 to 001 so remove the 'fixed_plate_id' to 001 part to get the
-                        # 701 to 'fixed_plate_id' part that get stored in this rotation feature.
-                        fixed_plate_rotation = rotation_model.get_rotation(ref_rotation_start_age, fixed_plate_id, fixed_plate_id=1)
-                        new_rotation = fixed_plate_rotation.get_inverse() * new_rotation
+                        # # Our new rotation is from 701 to 001 so remove the 'fixed_plate_id' to 001 part to get the
+                        # # 701 to 'fixed_plate_id' part that get stored in this rotation feature.
+                        # fixed_plate_rotation = rotation_model.get_rotation(ref_rotation_start_age, fixed_plate_id, fixed_plate_id=1)
+                        # new_rotation = fixed_plate_rotation.get_inverse() * new_rotation
+
+                        # Our new rotation is from 701 to 000 so remove the 701 to 005 part to get the
+                        # 005 to 000 part that get stored in this rotation feature.
+                        #
+                        #                               R(0->t,000->701) = R(0->t,000->005) * R(0->t,005->701)
+                        #   R(0->t,000->701) * inverse(R(0->t,005->701)) = R(0->t,000->005)
+                        #
+                        plate_rotation_701_rel_005 = rotation_model.get_rotation(
+                                ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=5)
+                        new_rotation = new_rotation * plate_rotation_701_rel_005.get_inverse()
                         
                         finite_rotation_sample.get_value().set_finite_rotation(new_rotation)
 
@@ -722,7 +770,9 @@ if __name__ == '__main__':
         # print data
     
     
-    # This is probably not needed but we're getting garbage written to the rotation output file
-    # for some reason (even though only the rank 0 process writes to the rotation file).
-    if use_parallel == MPI4PY:
-        mpi_comm.barrier()
+    # # This is probably not needed but we're getting garbage written to the rotation output file
+    # # for some reason (even though only the rank 0 process writes to the rotation file).
+    # #
+    # # UPDATE: Problem was caused by pyGPlates Plates4 rotation writer having trouble with Unicode chars.
+    # if use_parallel == MPI4PY:
+    #     mpi_comm.barrier()
