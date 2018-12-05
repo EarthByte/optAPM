@@ -33,8 +33,13 @@ import math
 import json
 
 from HotSpotLoader import GetHotSpotTrailsFromGeoJSON, GetHotSpotLocationsFromGeoJSON
-from mpl_toolkits.basemap import Basemap
 from IPython.display import display, HTML
+
+try:
+    from mpl_toolkits.basemap import Basemap
+    have_basemap = True
+except ImportError:
+    have_basemap = False
 
 
 class ModelSetup():
@@ -167,7 +172,7 @@ class ModelSetup():
 
 
     @staticmethod
-    def modelStartConditions(params, data):
+    def modelStartConditions(params, data, plot=True):
 
         # Translate data array
         rotation_model = data[0]
@@ -188,33 +193,34 @@ class ModelSetup():
 
 
         # Translate params array
-        geographical_uncertainty = params[0]
-        rotation_uncertainty = params[1]
-        search_type = params[2]
-        models = params[3]
-        model_stop_condition = params[4]
-        max_iter = params[5]
-        ref_rotation_plate_id = params[6]
-        ref_rotation_start_age = params[7]
-        ref_rotation_end_age = params[8]
-        interpolation_resolution = params[9]
-        rotation_age_of_interest = params[10]
-        fracture_zones = params[11]
-        net_rotation = params[12]
-        trench_migration = params[13]
-        hotspot_trails = params[14]
-        ref_rot_longitude = params[15]
-        ref_rot_latitude = params[16]
-        ref_rot_angle = params[17]
-        auto_calc_ref_pole = params[18]
-        search = params[19]
-        fz_weight = params[20]
-        nr_weight = params[21]
-        tm_weight = params[22]
-        hs_weight = params[23]
-        include_chains = params[24]
-        interpolated_hotspot_trails = params[25]
-        tm_method = params[26]
+        (geographical_uncertainty,
+            rotation_uncertainty,
+            search_type,
+            models,
+            model_stop_condition,
+            max_iter,
+            ref_rotation_plate_id,
+            ref_rotation_fixed_plate_id,
+            ref_rotation_start_age,
+            ref_rotation_end_age,
+            interpolation_resolution,
+            rotation_age_of_interest,
+            fracture_zones,
+            net_rotation,
+            trench_migration,
+            hotspot_trails,
+            ref_rot_longitude,
+            ref_rot_latitude,
+            ref_rot_angle,
+            auto_calc_ref_pole,
+            search,
+            fz_weight,
+            nr_weight,
+            tm_weight,
+            hs_weight,
+            include_chains,
+            interpolated_hotspot_trails,
+            tm_method) = params[:28]
 
         #print fz_weight, nr_weight, tm_weight, hs_weight
 
@@ -276,7 +282,7 @@ class ModelSetup():
 
 
         # Prepare rotation model for updates during optimisation - keeps rotations in memory
-        rotation_model_tmp = pgp.FeatureCollection(rotation_file)
+        # rotation_model_tmp = pgp.FeatureCollection(rotation_file)
 
 
         # Calculate initial reference rotation for Africa from selected rotation model
@@ -994,20 +1000,21 @@ class ModelSetup():
 
 
 
-        # Plot start seeds
-        m = Basemap(projection='robin',lat_0=ref_rot_latitude,lon_0=ref_rot_longitude,resolution='c',area_thresh=50000)
-        plt.figure(figsize=(7, 7))
-        #plt.title("Start seed distribution")
-        m.drawcoastlines(linewidth=0.25)
-        m.fillcontinents(color='bisque',zorder=1)
-        m.drawmeridians(np.arange(0,360,30))
-        m.drawparallels(np.arange(-90,90,30))
+        if plot and have_basemap:
+            # Plot start seeds
+            m = Basemap(projection='robin',lat_0=ref_rot_latitude,lon_0=ref_rot_longitude,resolution='c',area_thresh=50000)
+            plt.figure(figsize=(7, 7))
+            #plt.title("Start seed distribution")
+            m.drawcoastlines(linewidth=0.25)
+            m.fillcontinents(color='bisque',zorder=1)
+            m.drawmeridians(np.arange(0,360,30))
+            m.drawparallels(np.arange(-90,90,30))
 
-        ipmag.plot_vgp(m, seed_lons, seed_lats)
-        ipmag.plot_pole(m, ref_rot_longitude, ref_rot_latitude, geographical_uncertainty, color='red')
+            ipmag.plot_vgp(m, seed_lons, seed_lats)
+            ipmag.plot_pole(m, ref_rot_longitude, ref_rot_latitude, geographical_uncertainty, color='red')
 
 
-        startingConditions = [x, opt_n, N, lb, ub, model_stop_condition, max_iter, rotation_file, ref_rotation_start_age, ref_rotation_end_age, ref_rotation_plate_id,
+        startingConditions = [x, opt_n, N, lb, ub, model_stop_condition, max_iter, rotation_file, ref_rotation_start_age, ref_rotation_end_age, ref_rotation_plate_id, ref_rotation_fixed_plate_id,
                               Lats, Lons, spreading_directions, spreading_asymmetries, seafloor_ages, PID, CPID, data_array, nnr_datadir, no_net_rotation_file,
                               reformArray, trail_data, start_seeds, rotation_age_of_interest_age, data_array_labels_short, ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
                               seed_lons, seed_lats, ang_gaussian_array]
@@ -1118,7 +1125,7 @@ class ProcessResults():
         ref_result = results_dataframe.loc[results_dataframe['Model'] == 0]
 
 
-        if plot:
+        if plot and have_basemap:
             
             # Plot results
             fig = plt.figure(figsize=(30,22),dpi=150)

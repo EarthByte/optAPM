@@ -113,7 +113,7 @@ import sys
 import os
 from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap, cm
+#from mpl_toolkits.basemap import Basemap, cm
 
 ### ---------------- INPUTS ---------------- ###
 #Resolution of interpolation (in degrees)

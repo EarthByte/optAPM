@@ -31,7 +31,11 @@ import pmagpy.ipmag as ipmag
 import matplotlib.pyplot as plt
 import pylab
 
-from mpl_toolkits.basemap import Basemap
+try:
+    from mpl_toolkits.basemap import Basemap
+    have_basemap = True
+except ImportError:
+    have_basemap = False
 
 
 """ GEOSCIENCE """
@@ -116,7 +120,7 @@ def global_points_uniform(samples, plotResult=False, projection='robin'):
         lats.append(point.get_latitude())
         lons.append(point.get_longitude())
 
-    if plotResult == True:
+    if plotResult == True and have_basemap:
 
         # Plot start seeds
         m = Basemap(projection=projection,lat_0=0,lon_0=0,resolution='c',area_thresh=50000)
