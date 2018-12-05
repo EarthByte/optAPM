@@ -1,5 +1,6 @@
 import glob
 import os.path
+import pandas
 import pygplates
 
 #
@@ -21,6 +22,9 @@ input_rotation_filenames = glob.glob(os.path.join(rotation_data_dir, '*.rot'))
 
 # Main trench migration data directory.
 tm_data_dir = os.path.join(base_dir, 'data', 'TMData', 'Global_Model_WD_Internal_Release_2016_v3')
+
+# Interpolated hotspots (used when 'interpolated_hotspot_trails' is True in main script).
+interpolated_hotspots_filename = os.path.join(base_dir, 'data', 'interpolated_hotspot_chains_5Myr.xlsx')
 
 
 #
@@ -45,8 +49,15 @@ for time in xrange(0, subduction_times_start):
     for subduction_feature in subduction_features:
         required_plate_ids.add(subduction_feature.get_reconstruction_plate_id())
 
-print sorted(required_plate_ids)
-print len(required_plate_ids)
+# Add plate IDs used for interpolated hotspots.
+interpolated_hotspot_data = pandas.read_excel(interpolated_hotspots_filename)
+
+for plate_id in interpolated_hotspot_data['PlateID']:
+    required_plate_ids.add(int(plate_id))
+
+
+print 'Required plate IDs:', sorted(required_plate_ids)
+# print len(required_plate_ids)
 
 
 # Read all the rotation files.
@@ -71,6 +82,11 @@ for rotation_feature_index, rotation_feature in enumerate(rotation_features):
     
     plate_circuits.setdefault(moving_plate_id, []).append((fixed_plate_id, rotation_feature_index))
     # plate_circuits.setdefault(fixed_plate_id, []).append((moving_plate_id, rotation_feature_index))
+    
+    # Change fixed plate ID 000 to 005.
+    # We will be adding in a 005/000 sequence to store the optimised rotation adjustments.
+    if fixed_plate_id == 0:
+        rotation_feature.set_total_reconstruction_pole(5, moving_plate_id, rotation_sequence)
 
 
 visited_plate_ids = set()
