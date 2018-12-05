@@ -12,6 +12,16 @@ from datetime import datetime, timedelta
 
 
 #
+# Supported parallelisation methods (or None to disable parallelisation, eg, for testing).
+#
+MPI4PY = 0
+IPYPARALLEL = 1
+
+# Choose parallelisation method (or None to disable parallelisation, eg, for testing).
+use_parallel = MPI4PY
+
+
+#
 # Set model parameters, load data, and calculate starting conditions
 # 
 # Sets all user-selected parameters for the mode run
@@ -86,7 +96,7 @@ include_chains = ['Louisville', 'Tristan', 'Reunion', 'St_Helena', 'Foundation',
 # Rotation file with existing APM rotations removed from 0-250Ma to be used:
 if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
 
-    rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/Global_EB_250-0Ma_GK07_2016_v3_' + model_name + '.rot'
+    rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/all_rotations_' + model_name + '.rot'
 
 elif tm_data_type == 'muller2016':
 
@@ -139,7 +149,7 @@ elif tm_method == 'pygplates':
     if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
 
         nnr_relative_datadir = 'TMData/Global_Model_WD_Internal_Release_2016_v3/'
-        nnr_rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/Global_EB_250-0Ma_GK07_2016_v3_NNR.rot'
+        nnr_rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/all_rotations_NNR.rot'
 
     elif tm_data_type == 'muller2016':
 
@@ -167,16 +177,6 @@ else:
 hst_file = 'HotspotTrails.geojson'
 hs_file = 'HotspotCatalogue2.geojson'
 interpolated_hotspots = 'interpolated_hotspot_chains_5Myr.xlsx'
-
-
-#
-# Supported parallelisation methods (or None to disable parallelisation, eg, for testing).
-#
-MPI4PY = 0
-IPYPARALLEL = 1
-
-# Choose parallelisation method (or None to disable parallelisation, eg, for testing).
-use_parallel = MPI4PY
 
 
 # Don't plot in this workflow.
