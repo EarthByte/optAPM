@@ -38,6 +38,7 @@ class ObjectiveFunction(object):
             nnr_datadir,
             ref_rotation_end_age,
             ref_rotation_plate_id,
+            ref_rotation_fixed_plate_id,
             reformArray,
             trail_data,
             fracture_zone_weight,
@@ -76,6 +77,7 @@ class ObjectiveFunction(object):
         self.nnr_datadir = nnr_datadir
         self.ref_rotation_end_age = ref_rotation_end_age
         self.ref_rotation_plate_id = ref_rotation_plate_id
+        self.ref_rotation_fixed_plate_id = ref_rotation_fixed_plate_id
         self.reformArray = reformArray
         self.trail_data = trail_data
         self.fracture_zone_weight = fracture_zone_weight
@@ -115,7 +117,7 @@ class ObjectiveFunction(object):
 
                 fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
 
-                if fixed_plate_id == 001 and moving_plate_id == 701:
+                if fixed_plate_id == self.ref_rotation_fixed_plate_id and moving_plate_id == self.ref_rotation_plate_id:
 
                     opt_rotation_feature = rotation_feature
                     break
@@ -137,7 +139,7 @@ class ObjectiveFunction(object):
                     new_rotation = pgp.FiniteRotation((np.double(lat_), np.double(lon_)), 
                                                       np.radians(np.double(ang_)))
                     finite_rotation_samples.get_value().set_finite_rotation(new_rotation)
-
+        
         rotation_model_updated = pgp.RotationModel(
                 self.rotation_model_tmp,
                 # OPTIMIZATION: We need to be careful setting this to False - we should ensure

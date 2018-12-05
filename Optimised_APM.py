@@ -1,4 +1,5 @@
 import sys
+import os.path
 import numpy as np
 import time
 import pygplates as pgp
@@ -9,18 +10,181 @@ from functools import partial
 import itertools
 from datetime import datetime, timedelta
 
+
 #
-# Suport parallelisation methods (or None to disable parallelisation, eg, for testing).
+# Set model parameters, load data, and calculate starting conditions
+# 
+# Sets all user-selected parameters for the mode run
+# 
+# Arguments:
+# 
+#     geographical_uncertainty : Number that approximately represents geographical uncertainty - 95% confidence limit around ref pole location
+#     rotation_uncertainty : Number that represents the upper and lower bounds of the optimisation's angle variation
+#     sample_space : Selects the sampling method to be used to generate start seeds. "Fisher" (spherical distribution) by default.
+#     models : The total number of models to be produced. 1 model = 1 complete optimisation from 1 starting location
+#     model_stop_condition : Type of condition to be used to terminate optimisation. "threshold" or "max_iter". Threshold by default.
+#     max_iter : IF "max_iter" selected, sets maximum iterations regardless of successful convergence.
+#     ref_rotation_plate_id : Plate to be used as fixed reference. 701 (Africa) by default.
+#     ref_rotation_start_age : Rotation begin age.
+#     ref_rotation_end_age : Rotation end age.
+#     interpolation_resolution : Resolution in degrees used in the Fracture Zone calulcations
+#     rotation_age_of_interest : The result we are interested in. Allows for 'windowed mean' approach. It is the midpoint between the start and end ages by default.
+# 
+# Data to be included in optimisation: True by default.
+# 
+#     fracture_zones : Boolean
+#     net_rotation : Boolean
+#     trench_migration : Boolean
+#     hotspot_reconstruction : Boolean
+#     hotspot_dispersion : Boolean
+# 
+
+# model_name = "optAPM175"
+model_name = "optAPM1"
+
+start_age = 30
+end_age = 0
+interval = 10
+
+search = "Initial"
+search_radius = 60
+rotation_uncertainty = 30
+auto_calc_ref_pole = True
+models = 6
+
+model_stop_condition = 'threshold'
+max_iter = 5  # Only applies if model_stop_condition != 'threshold'
+
+fracture_zones   = False
+net_rotation     = True
+trench_migration = True
+hotspot_trails   = False
+
+# # sigma (i.e. cost / sigma = weight)
+fracture_zone_weight    = 1.
+net_rotation_weight     = 1.
+trench_migration_weight = 1.
+hotspot_trails_weight   = 1.
+
+# Trench migration parameters
+tm_method = 'pygplates' # 'pygplates' for new method OR 'convergence' for old method
+# tm_data_type = 'muller2016' # 'muller2016' or 'shephard2013' or 'Global_Model_WD_Internal_Release_2016_v3'
+tm_data_type = 'Global_Model_WD_Internal_Release_2016_v3' # 'muller2016' or 'shephard2013' or 'Global_Model_WD_Internal_Release_2016_v3'
+
+# Hotspot parameters:
+interpolated_hotspot_trails = True
+use_trail_age_uncertainty = True
+
+# Millions of years - e.g. 2 million years @ 50mm per year = 100km radius uncertainty ellipse
+trail_age_uncertainty_ellipse = 1
+
+include_chains = ['Louisville', 'Tristan', 'Reunion', 'St_Helena', 'Foundation', 'Cobb', 'Samoa', 'Tasmantid', 
+                  'Hawaii']
+#include_chains = ['Louisville', 'Tristan', 'Reunion', 'Hawaii', 'St_Helena', 'Tasmantid']
+
+
+# Rotation file with existing APM rotations removed from 0-250Ma to be used:
+if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
+
+    rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/Global_EB_250-0Ma_GK07_2016_v3_' + model_name + '.rot'
+
+elif tm_data_type == 'muller2016':
+
+    rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS_' + model_name + '.rot'
+
+elif tm_data_type == 'shephard2013':
+
+    rotfile = 'Shephard_etal_ESR2013_Global_EarthByte_2013_' + model_name + '.rot'
+
+
+# Large area grid search to find minima
+if search == 'Initial':
+
+    search_type = 'Random'
+
+# Uses grid search minima as seed for targeted secondary search (optional)
+elif search == 'Secondary':
+
+    search_type = 'Uniform'
+    search_radius = 15
+    rotation_uncertainty = 30
+
+    models = 60
+    auto_calc_ref_pole = False
+
+# Used when auto_calc_ref_pole is False.
+no_auto_ref_rot_longitude = -53.5
+no_auto_ref_rot_latitude = 56.6
+no_auto_ref_rot_angle = -2.28
+
+ref_rotation_plate_id = 701
+# ref_rotation_fixed_plate_id = 1
+ref_rotation_fixed_plate_id = 70
+
+interpolation_resolution = 5
+rotation_age_of_interest = True
+
+pmag_rotfile = 'Palaeomagnetic_Africa_S.rot'
+
+if tm_method == 'convergence':
+
+    if tm_data_type == 'muller2016':
+
+        nnr_relative_datadir = 'TMData/'
+        nnr_rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS_NNR.rot'
+
+
+elif tm_method == 'pygplates':
+
+    if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
+
+        nnr_relative_datadir = 'TMData/Global_Model_WD_Internal_Release_2016_v3/'
+        nnr_rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/Global_EB_250-0Ma_GK07_2016_v3_NNR.rot'
+
+    elif tm_data_type == 'muller2016':
+
+        nnr_relative_datadir = 'TMData/Muller_2016/'
+        nnr_rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS_NNR.rot'
+
+    elif tm_data_type == 'shephard2013':
+
+        nnr_relative_datadir = 'TMData/Shephard_2013/'
+        nnr_rotfile = 'Shephard_etal_ESR2013_Global_EarthByte_NNR_ORIGINAL.rot'
+
+
+if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
+
+    ridge_file = 'Global_Model_WD_Internal_Release_2016_v3/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2016_v3.gpml'
+    isochron_file = 'Global_Model_WD_Internal_Release_2016_v3/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2016_v3.gpml'
+    isocob_file = 'Global_Model_WD_Internal_Release_2016_v3/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2016_v3.gpml'
+
+else:
+
+    ridge_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_Ridges.gpml'
+    isochron_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_Isochrons.gpml'
+    isocob_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_IsoCOB.gpml'
+
+hst_file = 'HotspotTrails.geojson'
+hs_file = 'HotspotCatalogue2.geojson'
+interpolated_hotspots = 'interpolated_hotspot_chains_5Myr.xlsx'
+
+
+#
+# Supported parallelisation methods (or None to disable parallelisation, eg, for testing).
 #
 MPI4PY = 0
 IPYPARALLEL = 1
 
+# Choose parallelisation method (or None to disable parallelisation, eg, for testing).
+use_parallel = MPI4PY
 
-def optimise_APM(
-        use_parallel = None):
-    """
-        use_parallel: Can be MPI4PY, IPYPARALLEL or None (for no parallelisation, eg, for testing).
-    """
+
+# Don't plot in this workflow.
+# This is so it can be run on an HPC cluster with no visualisation node.
+plot = False
+
+
+if __name__ == '__main__':
 
     if use_parallel == IPYPARALLEL:
 
@@ -70,165 +234,35 @@ def optimise_APM(
         mpi_rank = mpi_comm.Get_rank()
     
     # else serial
-    
-    
-    #
-    # Set model parameters, load data, and calculate starting conditions
-    # 
-    # Sets all user-selected parameters for the mode run
-    # 
-    # Arguments:
-    # 
-    #     geographical_uncertainty : Number that approximately represents geographical uncertainty - 95% confidence limit around ref pole location
-    #     rotation_uncertainty : Number that represents the upper and lower bounds of the optimisation's angle variation
-    #     sample_space : Selects the sampling method to be used to generate start seeds. "Fisher" (spherical distribution) by default.
-    #     models : The total number of models to be produced. 1 model = 1 complete optimisation from 1 starting location
-    #     model_stop_condition : Type of condition to be used to terminate optimisation. "threshold" or "max_iter". Threshold by default.
-    #     max_iter : IF "max_iter" selected, sets maximum iterations regardless of successful convergence.
-    #     ref_rotation_plate_id : Plate to be used as fixed reference. 701 (Africa) by default.
-    #     ref_rotation_start_age : Rotation begin age.
-    #     ref_rotation_end_age : Rotation end age.
-    #     interpolation_resolution : Resolution in degrees used in the Fracture Zone calulcations
-    #     rotation_age_of_interest : The result we are interested in. Allows for 'windowed mean' approach. It is the midpoint between the start and end ages by default.
-    # 
-    # Data to be included in optimisation: True by default.
-    # 
-    #     fracture_zones : Boolean
-    #     net_rotation : Boolean
-    #     trench_migration : Boolean
-    #     hotspot_reconstruction : Boolean
-    #     hotspot_dispersion : Boolean
-    # 
-
-    datadir = '/Users/John/Development/Usyd/source_code/other/Artemis/optAPM/data/'
-
-    model_name = "optAPM175"
-
-    start_age = 80
-    end_age = 0
-    interval = 10
-
-    search = "Initial"
-    search_radius = 60
-    rotation_uncertainty = 30
-    auto_calc_ref_pole = True
-    models = 6
-
-    model_stop_condition = 'threshold'
-    max_iter = 5  # Only applies if model_stop_condition != 'threshold'
-
-    fracture_zones   = False
-    net_rotation     = True
-    trench_migration = True
-    hotspot_trails   = False
-
-    # # sigma (i.e. cost / sigma = weight)
-    fracture_zone_weight    = 1.
-    net_rotation_weight     = 1.
-    trench_migration_weight = 1.
-    hotspot_trails_weight   = 1.
-
-    # Trench migration parameters
-    tm_method = 'pygplates' # 'pygplates' for new method OR 'convergence' for old method
-    tm_data_type = 'muller2016' # 'muller2016' or 'shephard2013'
-
-    # Hotspot parameters:
-    interpolated_hotspot_trails = True
-    use_trail_age_uncertainty = True
-
-    # Millions of years - e.g. 2 million years @ 50mm per year = 100km radius uncertainty ellipse
-    trail_age_uncertainty_ellipse = 1
-
-    include_chains = ['Louisville', 'Tristan', 'Reunion', 'St_Helena', 'Foundation', 'Cobb', 'Samoa', 'Tasmantid', 
-                      'Hawaii']
-    #include_chains = ['Louisville', 'Tristan', 'Reunion', 'Hawaii', 'St_Helena', 'Tasmantid']
 
 
     age_range = np.arange(end_age + interval, start_age + interval, interval)
 
-    # Rotation file with existing APM rotations removed from 0-230Ma to be used:
-    if tm_data_type == 'muller2016':
-
-        rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS_' + model_name + '.rot'
-
-    elif tm_data_type == 'shephard2013':
-
-        rotfile = 'Shephard_etal_ESR2013_Global_EarthByte_2013_' + model_name + '.rot'
+    # The main data directory is the 'data' sub-directory of the directory containing this source file.
+    datadir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data', '')
 
     rotation_file = datadir + rotfile
-    
-    print "Rotation file to be used: ", rotfile
-    print "TM data:", tm_data_type
-    print "TM method:", tm_method
-    print "Age range for model:", age_range
-
-    print "-------------------------------------------------------------------"
-    print ""
-    print model_name
-    print ""
-
-    # Large area grid search to find minima
-    if search == 'Initial':
-
-        search_type = 'Random'
-
-    # Uses grid search minima as seed for targeted secondary search (optional)
-    elif search == 'Secondary':
-
-        search_type = 'Uniform'
-        search_radius = 15
-        rotation_uncertainty = 30
-
-        models = 60
-        auto_calc_ref_pole = False
-
-    print "Search type:", search
-    print "Search radius:", search_radius
-    print ""
 
 
-    ref_rot_longitude = -53.5
-    ref_rot_latitude = 56.6
-    ref_rot_angle = -2.28
-
-    ref_rotation_plate_id = 701
-
-    interpolation_resolution = 5
-    rotation_age_of_interest = True
-
-    pmag_rotfile = 'Palaeomagnetic_Africa_S.rot'
-
-    if tm_method == 'convergence':
-
-        if tm_data_type == 'muller2016':
-
-            nnr_relative_datadir = 'TMData/'
-            nnr_rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS_NNR.rot'
-
-
-    elif tm_method == 'pygplates':
-
-        if tm_data_type == 'muller2016':
-
-            nnr_relative_datadir = 'TMData/Muller_2016/'
-            nnr_rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS_NNR.rot'
-
-        elif tm_data_type == 'shephard2013':
-
-            nnr_relative_datadir = 'TMData/Shephard_2013/'
-            nnr_rotfile = 'Shephard_etal_ESR2013_Global_EarthByte_NNR_ORIGINAL.rot'
-
-    ridge_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_Ridges.gpml'
-    isochron_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_Isochrons.gpml'
-    isocob_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_IsoCOB.gpml'
-    hst_file = 'HotspotTrails.geojson'
-    hs_file = 'HotspotCatalogue2.geojson'
-    interpolated_hotspots = 'interpolated_hotspot_chains_5Myr.xlsx'
-
-
-    # When using mpi4py we only collect and process results in one process (the one with rank/ID 0).
+    # When using mpi4py we only print and collect/process results in one process (the one with rank/ID 0).
     if use_parallel != MPI4PY or mpi_rank == 0:
         
+        print "Rotation file to be used: ", rotfile
+        print "TM data:", tm_data_type
+        print "TM method:", tm_method
+        print "Age range for model:", age_range
+
+        print "-------------------------------------------------------------------"
+        print ""
+        print model_name
+        print ""
+
+        print "Search type:", search
+        print "Search radius:", search_radius
+        print ""
+
+
+
         min_results = []
         mean_results = []
 
@@ -237,7 +271,10 @@ def optimise_APM(
         # Start timer over all time steps.
         main_start = time.time()
 
-    # Loop through all times
+    #
+    # Loop through all times.
+    #
+    
     for i in xrange(0, len(age_range)):
         
         # When using mpi4py we only prepare the data in one process (the one with rank/ID 0).
@@ -260,9 +297,9 @@ def optimise_APM(
 
             # Gather parameters
             params = [search_radius, rotation_uncertainty, search_type, models, model_stop_condition, max_iter,
-                      ref_rotation_plate_id, ref_rotation_start_age, ref_rotation_end_age, interpolation_resolution, 
+                      ref_rotation_plate_id, ref_rotation_fixed_plate_id, ref_rotation_start_age, ref_rotation_end_age, interpolation_resolution, 
                       rotation_age_of_interest, fracture_zones, net_rotation, trench_migration, hotspot_trails,
-                      ref_rot_longitude, ref_rot_latitude, ref_rot_angle, auto_calc_ref_pole, search, 
+                      no_auto_ref_rot_longitude, no_auto_ref_rot_latitude, no_auto_ref_rot_angle, auto_calc_ref_pole, search, 
                       fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
                       include_chains, interpolated_hotspot_trails, tm_method]
 
@@ -275,12 +312,15 @@ def optimise_APM(
 
 
             # Calculate starting conditions
-            startingConditions = ms.modelStartConditions(params, data)
+            startingConditions = ms.modelStartConditions(params, data, plot)
         
         
         if use_parallel == MPI4PY:
             
             if mpi_rank == 0:
+                
+                # print 'all startingConditions[0]', startingConditions[0]
+                
                 # Divide the starting condition into two variables since we'll send them differently (to other processes).
                 xStartingCondition = startingConditions[0]  # this is a list of x
                 constantStartingConditions = startingConditions[1:]
@@ -322,46 +362,24 @@ def optimise_APM(
         
         
         # Extract variables from starting conditions.
-        x = startingConditions[0]
-        opt_n = startingConditions[1]
-        N = startingConditions[2]
-        lb = startingConditions[3]
-        ub = startingConditions[4]
-        model_stop_condition = startingConditions[5]
-        max_iter = startingConditions[6]
-        ref_rotation_start_age = startingConditions[8]
-        ref_rotation_end_age = startingConditions[9]
-        ref_rotation_plate_id = startingConditions[10]
-        Lats = startingConditions[11]
-        Lons = startingConditions[12]
-        spreading_directions = startingConditions[13]
-        spreading_asymmetries = startingConditions[14]
-        seafloor_ages = startingConditions[15]
-        PID = startingConditions[16]
-        CPID = startingConditions[17]
-        data_array = startingConditions[18]
-        nnr_datadir = startingConditions[19]
-        no_net_rotation_file = startingConditions[20]
-        reformArray = startingConditions[21]
-        trail_data = startingConditions[22]
-        start_seeds = startingConditions[23]
-        rotation_age_of_interest_age = startingConditions[24]
-        data_array_labels_short = startingConditions[25]
-        
-        if auto_calc_ref_pole == True:
+        (x, opt_n, N, lb, ub,  model_stop_condition, max_iter,
+            _,
+            ref_rotation_start_age, ref_rotation_end_age,
+            ref_rotation_plate_id, ref_rotation_fixed_plate_id,
+            Lats, Lons,
+            spreading_directions, spreading_asymmetries, seafloor_ages,
+            PID, CPID,
+            data_array,
+            nnr_datadir, no_net_rotation_file, reformArray, trail_data,
+            start_seeds, rotation_age_of_interest_age, data_array_labels_short,
+            ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
+            seed_lons, seed_lats) = startingConditions[:32]
 
-            ref_rot_longitude = startingConditions[26]
-            ref_rot_latitude = startingConditions[27]
-            ref_rot_angle = startingConditions[28]
+        if auto_calc_ref_pole == False:
 
-        elif auto_calc_ref_pole == False:
-
-            ref_rot_longitude = ref_rot_longitude
-            ref_rot_latitude = ref_rot_latitude
-            ref_rot_angle = ref_rot_angle
-
-        seed_lons = startingConditions[29]
-        seed_lats = startingConditions[30]
+            ref_rot_longitude = no_auto_ref_rot_longitude
+            ref_rot_latitude = no_auto_ref_rot_latitude
+            ref_rot_angle = no_auto_ref_rot_angle
 
 
         # When using mpi4py we only print in one process (the one with rank/ID 0).
@@ -379,7 +397,7 @@ def optimise_APM(
         def run_optimisation(x, opt_n, N, lb, ub, model_stop_condition, max_iter, interval, rotation_file, 
                              no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions, 
                              spreading_asymmetries, seafloor_ages, PID, CPID, data_array, nnr_datadir, 
-                             ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
+                             ref_rotation_end_age, ref_rotation_plate_id, ref_rotation_fixed_plate_id, reformArray, trail_data,
                              fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
                              use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method):
 
@@ -401,7 +419,7 @@ def optimise_APM(
             obj_f = ObjectiveFunction(
                     interval, rotation_file, no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions,
                     spreading_asymmetries, seafloor_ages, PID, CPID, data_array, nnr_datadir,
-                    ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
+                    ref_rotation_end_age, ref_rotation_plate_id, ref_rotation_fixed_plate_id, reformArray, trail_data,
                     fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
                     use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method)
             
@@ -438,6 +456,7 @@ def optimise_APM(
                           spreading_asymmetries=spreading_asymmetries, 
                           seafloor_ages=seafloor_ages, PID=PID, CPID=CPID, data_array=data_array, nnr_datadir=nnr_datadir,
                           ref_rotation_end_age=ref_rotation_end_age, ref_rotation_plate_id=ref_rotation_plate_id,
+                          ref_rotation_fixed_plate_id=ref_rotation_fixed_plate_id,
                           reformArray=reformArray, trail_data=trail_data, fracture_zone_weight=fracture_zone_weight,
                           net_rotation_weight=net_rotation_weight, trench_migration_weight=trench_migration_weight,
                           hotspot_trails_weight=hotspot_trails_weight, use_trail_age_uncertainty=use_trail_age_uncertainty,
@@ -456,11 +475,15 @@ def optimise_APM(
             
         elif use_parallel == MPI4PY:
             
+            # print '%d:' % mpi_rank, 'x', x
+            
             # Current process runs an optimisation on each element the sub-list it received from the root process.
             #
             # If there's too many processes (ie, not enough tasks to go around) then some processes
             # will have an empty list and hence have nothing to do here.
             xopt = [runopt(x_item) for x_item in x]
+            
+            # print '%d:' % mpi_rank, 'xopt', xopt
             
             # Gather results from all processes into the root (0) process.
             # Gathers a small list from each process, so root process will end up with a list of lists.
@@ -472,7 +495,9 @@ def optimise_APM(
                 # [[x1], [x2], [x3], [x4], []] -> [[x1], [x2], [x3], [x4]]
                 # ...where there were 5 processes but only 4 'x' values to process.
                 xopt = list(itertools.chain.from_iterable(xopt))
-            
+                
+                # print 'all xopt', xopt
+                
         else:
             
             # Calculate serially.
@@ -516,7 +541,7 @@ def optimise_APM(
                                          ref_rot_latitude, ref_rot_angle, seed_lons, seed_lats, 
                                          ref_rotation_plate_id, model_name, models, data_array_labels_short, 
                                          data_array, search_radius,
-                                         plot=False)
+                                         plot)
 
 
             for j in xrange(0, len(xopt)):
@@ -557,7 +582,7 @@ def optimise_APM(
 
                     fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
 
-                    if fixed_plate_id == 001 and moving_plate_id == 701:
+                    if fixed_plate_id == ref_rotation_fixed_plate_id and moving_plate_id == ref_rotation_plate_id:
                         opt_rotation_feature = rotation_feature
                         break
 
@@ -614,20 +639,15 @@ def optimise_APM(
         # Display result arrays
         print np.mean(costs)
 
-        print "Mean of 20 models (0-50Ma)"
-        print ""
-        print "tm_eval =", 47 * 3
-        print "nr_eval =", 143
+        # print "Mean of 20 models (0-50Ma)"
+        # print ""
+        # print "tm_eval =", 47 * 3
+        # print "nr_eval =", 143
 
 
-        import pickle
+        # import pickle
 
-        with open('model_output/optAPM175_10-0Ma_10models_NR_TM_60.pkl', 'rb') as f:
-            data = pickle.load(f)
+        # with open('model_output/optAPM175_10-0Ma_10models_NR_TM_60.pkl', 'rb') as f:
+        #     data = pickle.load(f)
             
-        print data
-
-
-if __name__ == '__main__':
-
-    optimise_APM(MPI4PY)
+        # print data
