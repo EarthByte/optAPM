@@ -161,7 +161,7 @@ if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
 else:
 
     ridge_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_Ridges.gpml'
-    isochron_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_Isochrons.gpml'
+    isochron_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_Isochrons.gpmlz'
     isocob_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_IsoCOB.gpml'
 
 hst_file = 'HotspotTrails.geojson'
