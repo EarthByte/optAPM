@@ -93,20 +93,17 @@ class ModelSetup():
 
         if ridge_file:
 
-            featureCollection_ri = pgp.FeatureCollectionFileFormatRegistry()
-            features_ri = featureCollection_ri.read(datadir + ridge_file)
+            features_ri = pgp.FeatureCollection(datadir + ridge_file)
             RidgeFile_subset = pgp.FeatureCollection()
 
         if isochron_file:
 
-            featureCollection_iso = pgp.FeatureCollectionFileFormatRegistry()
-            features_iso = featureCollection_iso.read(datadir + isochron_file)
+            features_iso = pgp.FeatureCollection(datadir + isochron_file)
             IsochronFile_subset = pgp.FeatureCollection()
 
         if isocob_file:
 
-            featureCollection_isocob = pgp.FeatureCollectionFileFormatRegistry()
-            features_isocob = featureCollection_isocob.read(datadir + isocob_file)
+            features_isocob = pgp.FeatureCollection(datadir + isocob_file)
             IsoCOBFile_subset = pgp.FeatureCollection()
 
         if hst_file:
@@ -278,8 +275,7 @@ class ModelSetup():
 
 
         # Prepare rotation model for updates during optimisation - keeps rotations in memory
-        file_registry = pgp.FeatureCollectionFileFormatRegistry()
-        rotation_model_tmp = file_registry.read(rotation_file)
+        rotation_model_tmp = pgp.FeatureCollection(rotation_file)
 
 
         # Calculate initial reference rotation for Africa from selected rotation model
@@ -314,13 +310,13 @@ class ModelSetup():
 
         # else:
 
-        #   print "Reference rotation type: EarthByte model"
+        #     print "Reference rotation type: EarthByte model"
 
-        #   ref_rot = rotation_model.get_rotation(np.double(ref_rotation_start_age), ref_rotation_plate_id, 0)
-        #   ref_rot_pole, ref_rot_angle = ref_rot.get_euler_pole_and_angle()
+        #     ref_rot = rotation_model.get_rotation(np.double(ref_rotation_start_age), ref_rotation_plate_id, 0)
+        #     ref_rot_pole, ref_rot_angle = ref_rot.get_euler_pole_and_angle()
 
-        #   ref_rot_of_interest = rotation_model.get_rotation(np.double(rotation_age_of_interest_age), ref_rotation_plate_id, 0)
-        #   ref_rot_of_interest_pole, ref_rot_of_interest_angle = ref_rot_of_interest.get_euler_pole_and_angle()
+        #     ref_rot_of_interest = rotation_model.get_rotation(np.double(rotation_age_of_interest_age), ref_rotation_plate_id, 0)
+        #     ref_rot_of_interest_pole, ref_rot_of_interest_angle = ref_rot_of_interest.get_euler_pole_and_angle()
 
 
         # Convert finite rotations to lat, lon and degrees
@@ -631,7 +627,7 @@ class ModelSetup():
 
             elif models == 1000:
 
-                k = geoTools.calcKfromA95(geographical_uncertainty / 22, models)
+                 k = geoTools.calcKfromA95(geographical_uncertainty / 22, models)
 
             else:
 
@@ -1050,7 +1046,8 @@ class ProcessResults():
     @staticmethod
     def sortAndPlot(output_file, ref_rotation_start_age, ref_rotation_end_age, rotation_age_of_interest_age, xopt, rotation_file, ref_rot_longitude,
                     ref_rot_latitude, ref_rot_angle, seed_lons, seed_lats, ref_rotation_plate_id, model_name, models, data_array_labels_short, data_array,
-                    geographical_uncertainty):
+                    geographical_uncertainty,
+                    plot=True):
 
         # Load saved results
         xopt_ = pickle.load(open(output_file, 'rb'))
@@ -1070,12 +1067,12 @@ class ProcessResults():
 
             # if xopt_[i][0][0] > 180:
             #
-            #   xopt_lon = -360 + xopt_[i][0][0]
+            #     xopt_lon = -360 + xopt_[i][0][0]
             #
             # if xopt_[i][0][0] < -180:
             #
-            #   #xopt_lon = -180 + xopt_[i][0][0]
-            #   xopt_lon = xopt_[i][0][0] + 360
+            #     #xopt_lon = -180 + xopt_[i][0][0]
+            #     xopt_lon = xopt_[i][0][0] + 360
             #
             # if xopt_[i][0][0] < 180 and xopt_[i][0][0] > -180:
 
@@ -1120,150 +1117,152 @@ class ProcessResults():
         ref_result = results_dataframe.loc[results_dataframe['Model'] == 0]
 
 
-        # Plot results
-        fig = plt.figure(figsize=(30,22),dpi=150)
+        if plot:
+            
+            # Plot results
+            fig = plt.figure(figsize=(30,22),dpi=150)
 
-        pmap = Basemap(projection='robin', lat_0=0, lon_0=0, resolution='l')
-        pmap.drawmapboundary(fill_color='white')
-        pmap.drawmeridians(np.arange(-180, 180, 30), labels=[0,0,0,1], fontsize=12)
-        pmap.drawparallels(np.arange(-90, 90, 30), labels=[1,0,0,0], fontsize=12)
+            pmap = Basemap(projection='robin', lat_0=0, lon_0=0, resolution='l')
+            pmap.drawmapboundary(fill_color='white')
+            pmap.drawmeridians(np.arange(-180, 180, 30), labels=[0,0,0,1], fontsize=12)
+            pmap.drawparallels(np.arange(-90, 90, 30), labels=[1,0,0,0], fontsize=12)
 
-        pmap.fillcontinents(color='lightgray')
+            pmap.fillcontinents(color='lightgray')
 
-        plt.title('Optimised Africa rotations compared to EarthByte reference rotation for ' \
-                  + str(ref_rotation_start_age) + ' - ' + str(ref_rotation_end_age) + ' Ma')
+            plt.title('Optimised Africa rotations compared to EarthByte reference rotation for ' \
+                      + str(ref_rotation_start_age) + ' - ' + str(ref_rotation_end_age) + ' Ma')
 
-        # Convert results to basmap coords
-        xall, yall = pmap(np.array(results_dataframe['Lon']), np.array(results_dataframe['Lat']))
-        xten, yten = pmap(np.array(top_ten['Lon']), np.array(top_ten['Lat']))
-        xmean, ymean = pmap(np.float(top_ten_mean['Lon']), np.float(top_ten_mean['Lat']))
-        xmin, ymin = pmap(np.float(min_result['Lon']), np.float(min_result['Lat']))
-        xref, yref = pmap(ref_rot_longitude, ref_rot_latitude)
-        slon, slat = pmap(seed_lons, seed_lats)
+            # Convert results to basmap coords
+            xall, yall = pmap(np.array(results_dataframe['Lon']), np.array(results_dataframe['Lat']))
+            xten, yten = pmap(np.array(top_ten['Lon']), np.array(top_ten['Lat']))
+            xmean, ymean = pmap(np.float(top_ten_mean['Lon']), np.float(top_ten_mean['Lat']))
+            xmin, ymin = pmap(np.float(min_result['Lon']), np.float(min_result['Lat']))
+            xref, yref = pmap(ref_rot_longitude, ref_rot_latitude)
+            slon, slat = pmap(seed_lons, seed_lats)
 
-        point_multiplier = 200
-
-
-        # Plot all results
-        for i in xrange(0, len(results_dataframe)):
-
-            if results_dataframe.iloc[i]['Ang'] < 0:
-
-                pmap.scatter(xall[i], yall[i], marker='o', s=abs(results_dataframe.iloc[i]['Ang']) * point_multiplier,
-                             edgecolor='gray', zorder=2, label='All results' if i == 0 else "", facecolor='none',
-                             linewidth=1)
-
-                pmap.scatter(xall[i], yall[i], marker='.', s=5, color='gray', zorder=2)
-
-            elif results_dataframe.iloc[i]['Ang'] > 0:
-
-                pmap.scatter(xall[i], yall[i], marker='o', s=abs(results_dataframe.iloc[i]['Ang']) * point_multiplier, c='gray',
-                             edgecolor='darkgray', zorder=2, label='All results' if i == 0 else "")
-
-                pmap.scatter(xall[i], yall[i], marker='.', s=5, color='white', zorder=2)
-
-        # Plot top 10%
-        for i in xrange(0, len(top_ten)):
-
-            if top_ten.iloc[i]['Ang'] < 0:
-
-                pmap.scatter(xten[i], yten[i], marker='o', s=abs(top_ten.iloc[i]['Ang']) * point_multiplier, c='green', zorder=2,
-                             label='10%' if i == 0 else "", edgecolor='seagreen', facecolor='none', linewidth=2)
-
-                pmap.scatter(xten[i], yten[i], marker='.', s=5, c='green', zorder=2)
+            point_multiplier = 200
 
 
-            elif top_ten.iloc[i]['Ang'] > 0:
+            # Plot all results
+            for i in xrange(0, len(results_dataframe)):
 
-                pmap.scatter(xten[i], yten[i], marker='o', s=abs(top_ten.iloc[i]['Ang']) * point_multiplier, c='green', zorder=2,
-                             label='10%' if i == 0 else "")
+                if results_dataframe.iloc[i]['Ang'] < 0:
 
-                pmap.scatter(xten[i], yten[i], marker='.', s=5, c='k', zorder=2)
+                    pmap.scatter(xall[i], yall[i], marker='o', s=abs(results_dataframe.iloc[i]['Ang']) * point_multiplier,
+                                 edgecolor='gray', zorder=2, label='All results' if i == 0 else "", facecolor='none',
+                                 linewidth=1)
 
+                    pmap.scatter(xall[i], yall[i], marker='.', s=5, color='gray', zorder=2)
 
-        # Plot top 10% mean
-        if np.float(top_ten_mean['Ang']) < 0:
+                elif results_dataframe.iloc[i]['Ang'] > 0:
 
-            pmap.scatter(xmean, ymean, marker='o', s=abs(top_ten_mean['Ang']) * point_multiplier, c='orange', zorder=2,
-                         label='10% mean', facecolor='none', edgecolor='orange', linewidth=2)
+                    pmap.scatter(xall[i], yall[i], marker='o', s=abs(results_dataframe.iloc[i]['Ang']) * point_multiplier, c='gray',
+                                 edgecolor='darkgray', zorder=2, label='All results' if i == 0 else "")
 
-            pmap.scatter(xmean, ymean, marker='.', s=5, c='orange', zorder=2)
+                    pmap.scatter(xall[i], yall[i], marker='.', s=5, color='white', zorder=2)
 
-        elif np.float(top_ten_mean['Minimum']) > 0:
+            # Plot top 10%
+            for i in xrange(0, len(top_ten)):
 
-            pmap.scatter(xmean, ymean, marker='o', s=abs(top_ten_mean['Ang']) * point_multiplier, c='orange', zorder=2,
-                         label='10% mean')
+                if top_ten.iloc[i]['Ang'] < 0:
 
-            pmap.scatter(xmean, ymean, marker='.', s=5, c='k', zorder=2)
+                    pmap.scatter(xten[i], yten[i], marker='o', s=abs(top_ten.iloc[i]['Ang']) * point_multiplier, c='green', zorder=2,
+                                 label='10%' if i == 0 else "", edgecolor='seagreen', facecolor='none', linewidth=2)
 
-
-        # Plot min result
-        if np.float(min_result['Ang']) < 0:
-
-            pmap.scatter(xmin, ymin, marker='o', s=abs(np.float(min_result['Ang'])) * point_multiplier, c='blue', zorder=2,
-                         label='Absolute minimum', facecolor='none', edgecolor='royalblue', linewidth=2)
-
-            pmap.scatter(xmin, ymin, marker='.', s=5, c='blue', zorder=2)
-
-        elif np.float(min_result['Ang']) > 0:
-
-            pmap.scatter(xmin, ymin, marker='o', s=abs(np.float(min_result['Ang'])) * point_multiplier, c='blue', zorder=2,
-                         label='Absolute minimum')
-
-            pmap.scatter(xmin, ymin, marker='.', s=5, c='k', zorder=2)
+                    pmap.scatter(xten[i], yten[i], marker='.', s=5, c='green', zorder=2)
 
 
-        # Plot EarthByte ref result
-        if np.float(ref_rot_angle) < 0:
+                elif top_ten.iloc[i]['Ang'] > 0:
 
-            pmap.scatter(xref, yref, marker='o', s=abs(ref_rot_angle) * point_multiplier, c='crimson', zorder=2,
-                         label='Reference rotation', facecolor='none', edgecolor='crimson', linewidth=2)
+                    pmap.scatter(xten[i], yten[i], marker='o', s=abs(top_ten.iloc[i]['Ang']) * point_multiplier, c='green', zorder=2,
+                                 label='10%' if i == 0 else "")
 
-            pmap.scatter(xref, yref, marker='.', s=5, c='crimson', zorder=2)
-
-        elif np.float(ref_result['Ang']) > 0:
-
-            pmap.scatter(xref, yref, marker='o', s=abs(ref_rot_angle) * point_multiplier, c='crimson', zorder=2,
-                         label='Reference rotation')
-
-            pmap.scatter(xref, yref, marker='.', s=5, c='k', zorder=2)
+                    pmap.scatter(xten[i], yten[i], marker='.', s=5, c='k', zorder=2)
 
 
-        # Plot seed points
-        pmap.scatter(slon, slat, marker='.', s=10, c='k', zorder=2)
+            # Plot top 10% mean
+            if np.float(top_ten_mean['Ang']) < 0:
+
+                pmap.scatter(xmean, ymean, marker='o', s=abs(top_ten_mean['Ang']) * point_multiplier, c='orange', zorder=2,
+                             label='10% mean', facecolor='none', edgecolor='orange', linewidth=2)
+
+                pmap.scatter(xmean, ymean, marker='.', s=5, c='orange', zorder=2)
+
+            elif np.float(top_ten_mean['Minimum']) > 0:
+
+                pmap.scatter(xmean, ymean, marker='o', s=abs(top_ten_mean['Ang']) * point_multiplier, c='orange', zorder=2,
+                             label='10% mean')
+
+                pmap.scatter(xmean, ymean, marker='.', s=5, c='k', zorder=2)
 
 
-        plt.legend(scatterpoints=1, labelspacing=2, borderpad=1)
+            # Plot min result
+            if np.float(min_result['Ang']) < 0:
+
+                pmap.scatter(xmin, ymin, marker='o', s=abs(np.float(min_result['Ang'])) * point_multiplier, c='blue', zorder=2,
+                             label='Absolute minimum', facecolor='none', edgecolor='royalblue', linewidth=2)
+
+                pmap.scatter(xmin, ymin, marker='.', s=5, c='blue', zorder=2)
+
+            elif np.float(min_result['Ang']) > 0:
+
+                pmap.scatter(xmin, ymin, marker='o', s=abs(np.float(min_result['Ang'])) * point_multiplier, c='blue', zorder=2,
+                             label='Absolute minimum')
+
+                pmap.scatter(xmin, ymin, marker='.', s=5, c='k', zorder=2)
 
 
-        constraints = ''
+            # Plot EarthByte ref result
+            if np.float(ref_rot_angle) < 0:
 
-        for i in xrange(0, len(data_array)):
+                pmap.scatter(xref, yref, marker='o', s=abs(ref_rot_angle) * point_multiplier, c='crimson', zorder=2,
+                             label='Reference rotation', facecolor='none', edgecolor='crimson', linewidth=2)
 
-            if data_array[i] == True:
+                pmap.scatter(xref, yref, marker='.', s=5, c='crimson', zorder=2)
 
-                constraints = constraints + '_' + str(data_array_labels_short[i])
+            elif np.float(ref_result['Ang']) > 0:
 
-        plt.savefig('model_output/plots/' + model_name + "_" + str(int(ref_rotation_start_age)) + "-" + str(int(ref_rotation_end_age)) + "Ma_" \
-        + str(models) + "models" + constraints + "_" + str(geographical_uncertainty) + '.jpg', format='jpg', dpi=300)
+                pmap.scatter(xref, yref, marker='o', s=abs(ref_rot_angle) * point_multiplier, c='crimson', zorder=2,
+                             label='Reference rotation')
 
-        plt.show()
+                pmap.scatter(xref, yref, marker='.', s=5, c='k', zorder=2)
 
-        print " "
-        print "Reference rotation from " + str(ref_rotation_start_age) + " - " + str(ref_rotation_end_age) + " for plate ID " + str(ref_rotation_plate_id) + "."
-        print "Plot produced from " + str(len(xopt)) + " models. Size of circles proportional to angle magnitude."
-        print "EarthByte reference model: ", rotation_file
-        print " "
-        print "Absolute minimum rotation:"
-        print display(HTML(min_result.to_html(index=False, columns=['Lon', 'Lat', 'Ang'])))
-        print " "
-        print "10% mean rotation:"
-        print display(HTML(top_ten_mean.to_html(index=False, columns=['Lon', 'Lat', 'Ang'])))
-        print " "
-        print "Starting ref rotation:"
-        print "Lon:", ref_rot_longitude, " - Lat:", ref_rot_latitude, " - Ang:", ref_rot_angle
-        # print " "
-        # print "Minimised value:", min_result('Minimum')
+
+            # Plot seed points
+            pmap.scatter(slon, slat, marker='.', s=10, c='k', zorder=2)
+
+
+            plt.legend(scatterpoints=1, labelspacing=2, borderpad=1)
+
+
+            constraints = ''
+
+            for i in xrange(0, len(data_array)):
+
+                if data_array[i] == True:
+
+                    constraints = constraints + '_' + str(data_array_labels_short[i])
+
+            plt.savefig('model_output/plots/' + model_name + "_" + str(int(ref_rotation_start_age)) + "-" + str(int(ref_rotation_end_age)) + "Ma_" \
+            + str(models) + "models" + constraints + "_" + str(geographical_uncertainty) + '.png', format='png', dpi=300)
+
+            plt.show()
+
+            print " "
+            print "Reference rotation from " + str(ref_rotation_start_age) + " - " + str(ref_rotation_end_age) + " for plate ID " + str(ref_rotation_plate_id) + "."
+            print "Plot produced from " + str(len(xopt)) + " models. Size of circles proportional to angle magnitude."
+            print "EarthByte reference model: ", rotation_file
+            print " "
+            print "Absolute minimum rotation:"
+            print display(HTML(min_result.to_html(index=False, columns=['Lon', 'Lat', 'Ang'])))
+            print " "
+            print "10% mean rotation:"
+            print display(HTML(top_ten_mean.to_html(index=False, columns=['Lon', 'Lat', 'Ang'])))
+            print " "
+            print "Starting ref rotation:"
+            print "Lon:", ref_rot_longitude, " - Lat:", ref_rot_latitude, " - Ang:", ref_rot_angle
+            # print " "
+            # print "Minimised value:", min_result('Minimum')
 
         return min_result, top_ten_mean
 
