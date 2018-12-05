@@ -38,7 +38,6 @@ class ObjectiveFunction(object):
             nnr_datadir,
             ref_rotation_end_age,
             ref_rotation_plate_id,
-            ref_rotation_fixed_plate_id,
             reformArray,
             trail_data,
             fracture_zone_weight,
@@ -48,19 +47,6 @@ class ObjectiveFunction(object):
             use_trail_age_uncertainty,
             trail_age_uncertainty_ellipse,
             tm_method):
-        
-        #
-        # Load/parse the feature collection files up front so we don't have to repeatedly do it in each objective function call.
-        #
-        # Prepare rotation model for updates during optimisation - keeps rotations in memory
-        self.rotation_model_tmp = pgp.FeatureCollection(rotation_file)
-        # Net rotation
-        if data_array[1]:
-            # Prepare no net rotation model for updates during optimisation - keeps rotations in memory
-            self.nn_rotation_model = pgp.RotationModel(no_net_rotation_file)
-        # Trench migration using pyGPlates.
-        if data_array[2] and tm_method == 'pygplates':
-            self.tm_data = pgp.FeatureCollection(nnr_datadir + 'TMData_%sMa.gpml' % (int(ref_rotation_start_age)))
         
         self.interval = interval
         self.rotation_file = rotation_file
@@ -77,7 +63,6 @@ class ObjectiveFunction(object):
         self.nnr_datadir = nnr_datadir
         self.ref_rotation_end_age = ref_rotation_end_age
         self.ref_rotation_plate_id = ref_rotation_plate_id
-        self.ref_rotation_fixed_plate_id = ref_rotation_fixed_plate_id
         self.reformArray = reformArray
         self.trail_data = trail_data
         self.fracture_zone_weight = fracture_zone_weight
@@ -87,10 +72,57 @@ class ObjectiveFunction(object):
         self.use_trail_age_uncertainty = use_trail_age_uncertainty
         self.trail_age_uncertainty_ellipse = trail_age_uncertainty_ellipse
         self.tm_method = tm_method
+        
+        self.count = 0
+        
+        
+        #
+        # Load/parse the feature collection files up front so we don't have to repeatedly do it in each objective function call.
+        #
+        # Prepare rotation model for updates during optimisation - keeps rotations in memory
+        rotation_features = pgp.FeatureCollection(rotation_file)
+        self.rotation_model_tmp = rotation_features
+        # Also keep original rotation model to help when inserting rotation updates.
+        self.rotation_model = pgp.RotationModel(rotation_features)
+        # Net rotation
+        if data_array[1]:
+            # Prepare no net rotation model for updates during optimisation - keeps rotations in memory
+            self.nn_rotation_model = pgp.RotationModel(no_net_rotation_file)
+        # Trench migration using pyGPlates.
+        if data_array[2] and tm_method == 'pygplates':
+            self.tm_data = pgp.FeatureCollection(nnr_datadir + 'TMData_%sMa.gpml' % (int(ref_rotation_start_age)))
+
+
+        #
+        # Find Africa rotation at correct time.
+        #
+        # Store the correct time sample for the Africa rotation as 'self.ref_finite_rotation_sample'
+        # so we don't have to do it every time this objective function is called.
+
+        for rotation_feature in rotation_features:
+            
+            total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
+            if total_reconstruction_pole:
+                
+                fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
+                if moving_plate_id == ref_rotation_plate_id:
+                    
+                    for finite_rotation_sample in rotation_sequence.get_enabled_time_samples():
+                        
+                        if finite_rotation_sample.get_time() == ref_rotation_start_age:
+                            
+                            self.ref_finite_rotation_sample = finite_rotation_sample
+                            self.ref_rotation_fixed_plate_id = fixed_plate_id
+                            break
+                    
+                    break
 
 
     def __call__(self, x, grad):
 
+        print self.count
+        self.count += 1
+        
         #### -----------------------------------------------------------------------------------------
         #### 1. Calculate reconstructed data point locations
 
@@ -104,41 +136,23 @@ class ObjectiveFunction(object):
 
 
         #### -----------------------------------------------------------------------------------------
-        #### 2. Find and update Africa rotation
+        #### 2. Update Africa rotation
 
 
-        # Find existing rotation for Africa at correct time
-        opt_rotation_feature = None
-        for rotation_feature in self.rotation_model_tmp:
+        new_rotation = pgp.FiniteRotation((np.double(lat_), np.double(lon_)), np.radians(np.double(ang_)))
 
-            total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
-
-            if total_reconstruction_pole:
-
-                fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
-
-                if fixed_plate_id == self.ref_rotation_fixed_plate_id and moving_plate_id == self.ref_rotation_plate_id:
-
-                    opt_rotation_feature = rotation_feature
-                    break
-
-
-        # Update rotation file with proposed Africa rotation
-        if opt_rotation_feature:
-
-            adjustment_time = pgp.GeoTimeInstant(self.ref_rotation_start_age)
-
-            for finite_rotation_samples in rotation_sequence.get_enabled_time_samples():
-
-                finite_rotation_time = finite_rotation_samples.get_time()
-
-                if finite_rotation_time == self.ref_rotation_start_age:
-
-                    finite_rotation = finite_rotation_samples.get_value().get_finite_rotation()
-
-                    new_rotation = pgp.FiniteRotation((np.double(lat_), np.double(lon_)), 
-                                                      np.radians(np.double(ang_)))
-                    finite_rotation_samples.get_value().set_finite_rotation(new_rotation)
+        # Our new rotation is from 701 to 001 so remove the 'fixed_plate_id' to 001 part to get the
+        # 701 to 'fixed_plate_id' part that get stored in this rotation feature.
+        fixed_plate_rotation = self.rotation_model.get_rotation(
+                self.ref_rotation_start_age,
+                self.ref_rotation_fixed_plate_id,
+                fixed_plate_id=1)
+        new_rotation = fixed_plate_rotation.get_inverse() * new_rotation
+        
+        # Update the reference rotation.
+        # Note that this modifies the state of 'self.rotation_model_tmp' - in other words,
+        # we're modifying a time sample of one of the rotation features in that list of features.
+        self.ref_finite_rotation_sample.get_value().set_finite_rotation(new_rotation)
         
         rotation_model_updated = pgp.RotationModel(
                 self.rotation_model_tmp,
@@ -146,7 +160,6 @@ class ObjectiveFunction(object):
                 # that we'll never modify the rotation features 'self.rotation_model_tmp' while
                 # 'rotation_model_updated' is being used (ie, calling one of its methods).
                 clone_rotation_features=False)
-
 
 
 
