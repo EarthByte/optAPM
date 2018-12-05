@@ -1,3 +1,3 @@
 Copy the deforming model data (2016_v3) here before running the workflow.
 
-There should be a directory "Global_Model_WD_Internal_Release_2016_v3" with ".gpml" files (for topological plate and deforming networks) and some ".rot" rotation files, as well a "StaticGeometries/" sub-directory (that should also be recursively copied).
+Earthbyte has a "EByteDeformingModels" repository that should have a directory "Global_Model_WD_Internal_Release_2016_v3" with ".gpml" files (for topological plate and deforming networks) and some ".rot" rotation files (as well a "StaticGeometries/" sub-directory, etc). Easiest is to copy everything in that directory into this directory (so that this directory has the '.gpml' and '.rot' files).
