@@ -124,7 +124,12 @@ class ModelSetup():
 
         if interpolated_hotspots:
 
-            interpolated_hotspot_data = pd.read_excel(datadir + interpolated_hotspots)
+            interpolated_hotspot_data = pd.read_excel(
+                datadir + interpolated_hotspots,
+                # pyGPlates (via boost.python) cannot convert numpy.int64 to regular Python float.
+                # Not sure if happens only in 32-bit versions of pyGPlates (ie, on Windows).
+                # So convert here instead...
+                converters = {'Hotspot_lat' : float, 'Hotspot_lon' : float})
 
 
         # Return all loaded data
@@ -983,7 +988,7 @@ class ModelSetup():
                         trail_lons.append(interpolated_hotspot_data['Lon'][j])
                         trail_lats.append(interpolated_hotspot_data['Lat'][j])
                         trail_ages.append(interpolated_hotspot_data['Age'][j])
-                        trail_plateID.append(interpolated_hotspot_data['PlateID'][j])
+                        trail_plateID.append(int(interpolated_hotspot_data['PlateID'][j]))
                         trail_hotspot = [interpolated_hotspot_data['Hotspot_lat'][j], interpolated_hotspot_data['Hotspot_lon'][j]]
 
                 trail_data.append({'Chain': include_chains[i], 'Lon': tuple(trail_lons), 'Lat': tuple(trail_lats), 'Age': tuple(trail_ages),
