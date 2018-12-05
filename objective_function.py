@@ -411,15 +411,18 @@ class ObjectiveFunction(object):
         # Scaling values
         alpha = 10
         beta = 100
-        gamma = 1000
+        gamma = 1000.0 / 4.0
 
 
         opt_eval = 0
         
+        # opt_ind = []
+
         # Fracture zones
         try:
             if fz_eval:
                 opt_eval = opt_eval + (fz_eval * alpha)
+                # opt_ind.append(fz_eval * alpha)
         except:
             pass
 
@@ -428,6 +431,7 @@ class ObjectiveFunction(object):
         try:
             if nr_eval:
                 opt_eval = opt_eval + (nr_eval * gamma)
+                # opt_ind.append(nr_eval * gamma)
         except:
             pass
 
@@ -437,6 +441,7 @@ class ObjectiveFunction(object):
             if tm_eval:
                 #opt_eval = opt_eval + (tm_eval / alpha)
                 opt_eval = opt_eval + tm_eval
+                # opt_ind.append(tm_eval)
         except:
             pass
 
@@ -455,7 +460,8 @@ class ObjectiveFunction(object):
                 #opt_eval = opt_eval + (((hs_kappa_eval * 1e6) + hs_dist_eval) / 1.5)
 
                 # Distance misfit
-                opt_eval = opt_eval + (hs_dist_eval / 2)
+                opt_eval = opt_eval + (hs_dist_eval / 8)
+                # opt_ind.append((hs_dist_eval / 8))
 
         except:
             pass
@@ -470,5 +476,9 @@ class ObjectiveFunction(object):
         except:
             pass
         
+        # try:
+        #     opt_ind_data.append(opt_ind)
+        # except:
+        #     pass
 
         return opt_eval
