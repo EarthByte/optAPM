@@ -69,7 +69,7 @@ class ModelSetup():
 
 
     @staticmethod
-    def dataLoader(datadir, rot_file, pmag_rot_file=None, nnr_datadir=None, nnr_rotfile=None, ridge_file=None, isochron_file=None, isocob_file=None,
+    def dataLoader(datadir, rot_file, pmag_rot_file=None, nnr_relative_datadir=None, nnr_rotfile=None, ridge_file=None, isochron_file=None, isocob_file=None,
                    hst_file=None, hs_file=None, interpolated_hotspots=None):
 
         # Create rotation model
@@ -83,9 +83,10 @@ class ModelSetup():
             pmag_rotation_model = pgp.RotationModel(pmag_rotation_file)
 
         # Check for and load optional arguments
-        if nnr_datadir:
+        nnr_datadir = datadir
+        if nnr_relative_datadir:
 
-            nnr_datadir = datadir + nnr_datadir
+            nnr_datadir += nnr_relative_datadir
 
         if nnr_rotfile:
 

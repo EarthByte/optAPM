@@ -89,9 +89,6 @@ class ObjectiveFunction(object):
 
     def __call__(self, x, grad):
 
-        print "Data array", self.data_array
-
-
         #### -----------------------------------------------------------------------------------------
         #### 1. Calculate reconstructed data point locations
 
@@ -145,7 +142,7 @@ class ObjectiveFunction(object):
                 self.rotation_model_tmp,
                 # OPTIMIZATION: We need to be careful setting this to False - we should ensure
                 # that we'll never modify the rotation features 'self.rotation_model_tmp' while
-                # the 'rotation_model_updated' is being used (ie, calling one of its methods).
+                # 'rotation_model_updated' is being used (ie, calling one of its methods).
                 clone_rotation_features=False)
 
 
