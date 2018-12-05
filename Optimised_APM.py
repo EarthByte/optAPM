@@ -50,7 +50,7 @@ use_parallel = MPI4PY
 # 
 
 # model_name = "optAPM176"
-model_name = "optAPM6"
+model_name = "optAPM7"
 
 start_age = 250
 end_age = 0
@@ -385,7 +385,8 @@ if __name__ == '__main__':
         if ref_rotation_start_age <= 80:
             net_rotation_weight = 1.0
         else:
-            net_rotation_weight = 0.5
+            # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
+            net_rotation_weight = 2.0  # Gives a *multiplicative* weight of 0.5
         
         
         # When using mpi4py we only prepare the data in one process (the one with rank/ID 0).
