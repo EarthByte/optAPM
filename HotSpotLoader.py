@@ -1,5 +1,14 @@
 import json
-import shapefile as shp
+
+# The optimization workflow doesn't actually call the functions below that read from Shapefile
+# so we won't require user to install 'shapefile' module.
+# If that changes then we'll get an AttributeError when the function is called,
+# in which case the try/except part should be removed.
+try:
+    import shapefile as shp
+except ImportError:
+    pass
+
 
 def GetHotSpotTrails(FNAME):
     

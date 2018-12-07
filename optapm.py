@@ -21,7 +21,7 @@
 import pygplates as pgp
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
 import pickle
 import random
 import textwrap
@@ -33,13 +33,15 @@ import math
 import json
 
 from HotSpotLoader import GetHotSpotTrailsFromGeoJSON, GetHotSpotLocationsFromGeoJSON
-from IPython.display import display, HTML
 
+# The optimization workflow doesn't actually need to plot so we won't require user to install these modules.
+# If the user plots then we'll get an AttributeError, in which case the try/except part should be removed.
 try:
+    import matplotlib.pyplot as plt
     from mpl_toolkits.basemap import Basemap
-    have_basemap = True
+    from IPython.display import display, HTML
 except ImportError:
-    have_basemap = False
+    pass
 
 
 class ModelSetup():
@@ -1004,7 +1006,7 @@ class ModelSetup():
 
 
 
-        if plot and have_basemap:
+        if plot:
             # Plot start seeds
             m = Basemap(projection='robin',lat_0=ref_rot_latitude,lon_0=ref_rot_longitude,resolution='c',area_thresh=50000)
             plt.figure(figsize=(7, 7))
@@ -1129,7 +1131,7 @@ class ProcessResults():
         ref_result = results_dataframe.loc[results_dataframe['Model'] == 0]
 
 
-        if plot and have_basemap:
+        if plot:
             
             # Plot results
             fig = plt.figure(figsize=(30,22),dpi=150)

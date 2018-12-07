@@ -28,14 +28,16 @@
 import numpy as np
 import pygplates as pgp
 import pmagpy.ipmag as ipmag
-import matplotlib.pyplot as plt
+
 import pylab
 
+# The optimization workflow doesn't actually need to plot so we won't require user to install these modules.
+# If the user plots then we'll get an AttributeError, in which case the try/except part should be removed.
 try:
+    import matplotlib.pyplot as plt
     from mpl_toolkits.basemap import Basemap
-    have_basemap = True
 except ImportError:
-    have_basemap = False
+    pass
 
 
 """ GEOSCIENCE """
@@ -120,7 +122,7 @@ def global_points_uniform(samples, plotResult=False, projection='robin'):
         lats.append(point.get_latitude())
         lons.append(point.get_longitude())
 
-    if plotResult == True and have_basemap:
+    if plotResult == True:
 
         # Plot start seeds
         m = Basemap(projection=projection,lat_0=0,lon_0=0,resolution='c',area_thresh=50000)
