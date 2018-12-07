@@ -3,9 +3,17 @@ import os.path
 import pandas
 import pygplates
 
-#
-# Script to concatenate all rotation ('.rot') files in a directory.
-#
+#########################################################################
+# Script to concatenate all rotation ('.rot') files in a directory, and #
+# reduce the set of rotations to only those plate circuit paths         #
+# supporting the plate IDs required by the optimization process         #
+# (eg, trenches and hotspots).                                          #
+# Also changes fixed plate references to 000 to reference 005 instead   #
+# and adds in a zero rotation for the plate pair 005/000 to complete    #
+# the plate circuit to 000. The optimisation workflow will store        #
+# optimised rotations in 005/000 so they affect all plates (not just    #
+# those that go through Africa 701).                                    #
+#########################################################################
 
 # The main data directory is the directory containing this source file.
 base_dir = os.path.abspath(os.path.dirname(__file__))

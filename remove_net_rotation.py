@@ -14,9 +14,16 @@ import pygplates
 #             os.path.basename(__file__), pygplates.Version.get_imported_version(), PYGPLATES_VERSION_REQUIRED))
 
 
-#
-# Script to remove net rotation from a rotation file.
-#
+#########################################################
+# Script to remove net rotation from a rotation file.   #
+#                                                       #
+# Note that this removes net rotation from Africa 701.  #
+# This has the undesired effect of bypassing plate      #
+# circuits that don't go through Africa, but this is OK #
+# for the optimisation workflow because, for the net    #
+# rotation part, it only looks at Africa.               #
+#########################################################
+
 
 # The main directory is the directory containing this source file.
 base_dir = os.path.abspath(os.path.dirname(__file__))
