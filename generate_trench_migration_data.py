@@ -14,13 +14,19 @@ if not hasattr(pgp, 'Version') or pgp.Version.get_imported_version() < PYGPLATES
             os.path.basename(__file__), pgp.Version.get_imported_version(), PYGPLATES_VERSION_REQUIRED))
 
 
-######################################################################
-# Generates trench migration data required for optimisation routine. #
-######################################################################
+####################################################################################
+# Generates trench migration data required for optimisation routine.               #
+#                                                                                  #
+# The subducting trenches are reconstructed from 0-250Ma (in 1My intervals)        #
+# and stored in files ready for quick retrieval during the optimization stage.     #
+# This is done as a pre-process because resolving the boundaries of                #
+# continuously-closing plates and deforming networks is relatively time consuming. #
+####################################################################################
 
-# Optimised model
-model = '1'
 timeStart = 251
+
+# If using optimised rotation model to reconstruct/resolve topologies.
+# model = '1'
 
 
 # The main data directory is the 'data' sub-directory of the directory containing this source file.
@@ -67,7 +73,9 @@ tm_data_dir = os.path.join(data_dir, 'TMData')
 output_data_dir = os.path.join(tm_data_dir, 'Global_Model_WD_Internal_Release_2016_v3')
 input_data_dir = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2016_v3')
 topology_files = glob.glob(os.path.join(input_data_dir, '*.gpml'))
-starting_rotfiles = os.path.join(input_data_dir, 'optimisation', 'all_rotations.rot')
+# Gather all '.rot' files in the input directory.
+starting_rotfiles = glob.glob(os.path.join(input_data_dir, '*.rot'))
+# ...or use the optimised rotation file from the most recent model run.
 # starting_rotfiles = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2016_v3', 'optimisation', 'all_rotations_optAPM' + model + '.rot')
 
 
