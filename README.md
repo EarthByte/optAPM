@@ -106,11 +106,11 @@ If you are running on a personal computer that has an MPI runtime installed then
 If you are running on a HPC cluster (such as Artemis) then edit the "Optimise_APM.pbs" PBS script with
 the number of nodes/cores and walltime, etc, and then run:
 
-The "Optimise_APM.pbs" PBS scheduling script was used on the Artemis HPC at the University of Sydney and
-may require modifications for other HPC systems.
-
 ```
   qsub Optimise_APM.pbs
 ```
 
 ...to submit to the job queue. When the job is finished you should have the final optimised rotation file mentioned above.
+
+*NOTE*: The "Optimise_APM.pbs" PBS scheduling script was used on the Artemis HPC at the University of Sydney and
+may require modifications for other HPC systems.
