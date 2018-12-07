@@ -1,7 +1,6 @@
 import numpy as np
 import pygplates as pgp
 import optimisation_methods
-import obj_func_convergence
 import geoTools
 import subduction_convergence_for_absolute_plate_motion as scap
 
@@ -217,7 +216,12 @@ class ObjectiveFunction(object):
 
         # Old method
         if self.data_array[2] == True and self.tm_method == 'convergence':
-
+            
+            # No longer using old path (should use new pygplates path instead).
+            # Have removed 'import obj_func_convergence'.
+            raise NotImplementedError(
+                'Deprecated old convergence path, use new pygplates trench migration path instead.')
+            
             kinArray = obj_func_convergence.kinloop(
                     self.ref_rotation_end_age,
                     self.ref_rotation_start_age,
