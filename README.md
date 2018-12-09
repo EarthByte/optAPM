@@ -114,3 +114,6 @@ the number of nodes/cores and walltime, etc, and then run:
 
 *NOTE*: The "Optimise_APM.pbs" PBS scheduling script was used on the Artemis HPC at the University of Sydney and
 may require modifications for other HPC systems.
+
+**NOTE**: Make sure to copy all directories over to the HPC (even empty directories like "model_output") otherwise an exception
+will get raised during execution and mpirun (or mpiexec) will get terminated abruptly (possibly without an error message).

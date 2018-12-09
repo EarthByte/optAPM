@@ -50,7 +50,7 @@ use_parallel = MPI4PY
 # 
 
 # model_name = "optAPM176"
-model_name = "optAPM7"
+model_name = "optAPM8"
 
 start_age = 250
 end_age = 0
@@ -218,6 +218,29 @@ if __name__ == '__main__':
     elif use_parallel == MPI4PY:
     
         from mpi4py import MPI
+        
+        # It seems that if one process/rank raises an exception then we need to manually
+        # kill the other MPI processes according to:
+        #
+        #   https://groups.google.com/forum/#!topic/mpi4py/RovYzJ8qkbc
+        #
+        # ...otherwise MPI Finalize (in the process that raised exception) will block waiting for
+        # the other processes to finish, but they're waiting for input (gather) from the rank=0 process
+        # resulting in a deadlock.
+        #
+        # This code was obtained from:
+        #
+        #   https://groups.google.com/forum/#!topic/mpi4py/ktAZWIfx8zI
+        #
+        # ...and is the easiest way to do this if we don't care about properly cleaning up the processes.
+        #
+        _excepthook = sys.excepthook
+        def excepthook(t,v,tb):
+            _excepthook(t,v,tb)
+            if (not MPI.Is_finalized()
+                and MPI.Is_initialized()):
+                MPI.COMM_WORLD.Abort(1)
+        sys.excepthook = excepthook
         
         mpi_comm = MPI.COMM_WORLD
         mpi_size = mpi_comm.Get_size()
