@@ -122,7 +122,7 @@ for rotation_feature_index, rotation_feature in enumerate(rotation_features):
 
 
 # Change fixed plate IDs from 000 to 005.
-# And temporarily remove any 005-000 rotation features (we'll add a zero-rotation version later).
+# And remove any 005-000 rotation features (we'll add a zero-rotation version later).
 required_rotation_features_tmp = []
 for rotation_feature in required_rotation_features:
     # Get the rotation feature information.

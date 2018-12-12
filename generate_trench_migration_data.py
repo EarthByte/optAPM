@@ -23,7 +23,7 @@ if not hasattr(pgp, 'Version') or pgp.Version.get_imported_version() < PYGPLATES
 # continuously-closing plates and deforming networks is relatively time consuming. #
 ####################################################################################
 
-timeStart = 251
+timeStart = 411
 
 # If using optimised rotation model to reconstruct/resolve topologies.
 # model = '1'

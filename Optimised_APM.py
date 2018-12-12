@@ -50,9 +50,9 @@ use_parallel = MPI4PY
 # 
 
 # model_name = "optAPM176"
-model_name = "optAPM8"
+model_name = "optAPM9"
 
-start_age = 250
+start_age = 410
 end_age = 0
 interval = 10
 
