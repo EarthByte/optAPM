@@ -7,6 +7,8 @@ import pygplates
 
 # # Check the required pygplates version.
 # # Need the bug fix for crash writing out rotation features to '.rot' files.
+# # UPDATE: Workaround is to just not write out a feature name or description.
+#
 # PYGPLATES_VERSION_REQUIRED = pygplates.Version(20)
 # # Check the imported pygplates version.
 # if not hasattr(pygplates, 'Version') or pygplates.Version.get_imported_version() < PYGPLATES_VERSION_REQUIRED:
@@ -91,9 +93,11 @@ rotation_features = list(pygplates.FeatureCollection(rotation_filename))
 # A rotation model using the rotation features before they are modified.
 rotation_model = pygplates.RotationModel(rotation_features)
 
-# Find the 701 sequence.
-total_reconstruction_pole_701 = None
-for rotation_feature_index, rotation_feature in enumerate(rotation_features):
+
+# Remove any moving plate 701 rotation features (we'll add an NNR version later).
+rotation_features_tmp = []
+total_reconstruction_poles_701 = []
+for rotation_feature in rotation_features:
 
     # Get the rotation feature information.
     total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
@@ -101,17 +105,15 @@ for rotation_feature_index, rotation_feature in enumerate(rotation_features):
         # Not a rotation feature.
         continue
 
-    fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
-    # We're only interested in rotation features with moving plate ID 701.
+    _, moving_plate_id, _ = total_reconstruction_pole
     if moving_plate_id != 701:
-        continue
+        # Add all rotation features except moving plate 701.
+        rotation_features_tmp.append(rotation_feature)
+    else:
+        total_reconstruction_poles_701.append(total_reconstruction_pole)
 
-    total_reconstruction_pole_701 = total_reconstruction_pole
-    break
-
-if not total_reconstruction_pole_701:
-    print("Rotation 701 not found.", file=sys.stderr)
-    sys.exit(1)
+# Rotation features now exclude moving plate 701, but we'll add below.
+rotation_features = rotation_features_tmp
 
 
 pole_time_samples_701_rel_fixed = []
@@ -135,8 +137,21 @@ for time, net_stage_lat, net_stage_lon, net_stage_angle_per_my in reversed(net_s
     # Remove net total rotation at current time from 701 rel 001 rotation.
     no_net_rotation_701_rel_001 = net_total_rotation.get_inverse() * rotation_model.get_rotation(time, 701, fixed_plate_id=1)
 
+    # Find the fixed plate ID for moving plate 701 at the current time.
+    # We do this by searching through the 701 rotation sequences.
+    fixed_plate_id_for_701 = None
+    for fixed_plate_id, _, rotation_sequence in total_reconstruction_poles_701:
+        if rotation_sequence.get_time_samples_bounding_time(time):
+            fixed_plate_id_for_701 = fixed_plate_id
+            break
+    
+    # If not 701 sequences bound the current time then just ignore the current time and print a warning.
+    if fixed_plate_id_for_701 is None:
+        print("Unable to find a moving plate 701 sequence that contains time {0} - so no NNR generated for that time.".format(time), file=sys.stderr)
+        continue
+    
     # Convert 701 rel 001 rotation to the 701 rel 'fixed_plate_id' rotation to store in rotation file.
-    no_net_rotation_701_rel_fixed = rotation_model.get_rotation(time, fixed_plate_id, fixed_plate_id=1).get_inverse() * no_net_rotation_701_rel_001
+    no_net_rotation_701_rel_fixed = rotation_model.get_rotation(time, fixed_plate_id_for_701, fixed_plate_id=1).get_inverse() * no_net_rotation_701_rel_001
 
     pole_time_samples_701_rel_fixed.append(
         pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(no_net_rotation_701_rel_fixed), time, 'NNR'))
@@ -146,15 +161,14 @@ total_reconstruction_pole_701_rel_fixed = pygplates.GpmlIrregularSampling(pole_t
 
 # Create the total reconstruction sequence (rotation) feature.
 # rotation_feature_701_rel_fixed = pygplates.Feature(pygplates.FeatureType.gpml_total_reconstruction_sequence)
-# rotation_feature_701_rel_fixed.set_name('INA-AUS Muller et.al 2000')
 # rotation_feature_701_rel_fixed.set_total_reconstruction_pole(fixed_plate_id, 701, total_reconstruction_pole_701_rel_fixed)
 rotation_feature_701_rel_fixed = pygplates.Feature.create_total_reconstruction_sequence(
     fixed_plate_id,
     701,
     total_reconstruction_pole_701_rel_fixed)
 
-# Replace the original 701 sequence with the new NNR 701 sequence.
-rotation_features[rotation_feature_index] = rotation_feature_701_rel_fixed
+# Add the new NNR 701 sequence.
+rotation_features.append(rotation_feature_701_rel_fixed)
 
 # Write NNR rotation file.
 pygplates.FeatureCollection(rotation_features).write(nnr_rotation_filename)
