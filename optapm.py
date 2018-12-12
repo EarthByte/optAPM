@@ -1457,6 +1457,10 @@ class ObjectiveFunctions():
                                             'Age': trail_data[i]['Age'][j], 'Hotspot_Location': trail_data[i]['Hotspot_Location'],
                                             'PlateID': trail_data[i]['PlateID'][j]})
 
+                # If we have no results then skip the current hotspot.
+                # This happens if none of the current hotspot's sample ages happen to fall with our 10My interval.
+                if not opt_results:
+                    continue
 
                 chain = trail_data[i]['Chain']
 
