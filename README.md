@@ -22,6 +22,7 @@ Other Python module prerequisites are:
 * numpy
 * pandas
 * pmagpy
+* NLopt
 
 ## Pre-processing for the workflow
 
