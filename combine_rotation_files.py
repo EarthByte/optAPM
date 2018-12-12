@@ -122,8 +122,8 @@ for rotation_feature_index, rotation_feature in enumerate(rotation_features):
 
 
 # Change fixed plate IDs from 000 to 005.
-# And remove any 005-000 rotation features (we'll add a zero-rotation version later).
-required_rotation_features_tmp = []
+# But only if necessary (it's possible the input rotations came from a previous optimised run and already reference 005).
+required_rotations_include_005_000 = False
 for rotation_feature in required_rotation_features:
     # Get the rotation feature information.
     total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
@@ -135,25 +135,24 @@ for rotation_feature in required_rotation_features:
     
     # Change fixed plate ID 000 to 005 (unless it's the 005-000 plate pair).
     # We want everything that references 000 to now reference 005.
-    # Later we'll add a 005-000 sequence to store optimised rotation adjustments.
-    if fixed_plate_id == 0 and moving_plate_id != 5:
-        rotation_feature.set_total_reconstruction_pole(5, moving_plate_id, rotation_sequence)
-    
-    if not (moving_plate_id == 5 and fixed_plate_id == 0):
-        # Add all rotation features except 005-000.
-        required_rotation_features_tmp.append(rotation_feature)
-
-# Rotation features now exclude 005-000, but we'll add below.
-required_rotation_features = required_rotation_features_tmp
+    # Later we'll add a 005-000 sequence to store optimised rotation adjustments (if there isn't already one).
+    if fixed_plate_id == 0:
+        if moving_plate_id == 5:
+            required_rotations_include_005_000 = True
+        else:
+            rotation_feature.set_total_reconstruction_pole(5, moving_plate_id, rotation_sequence)
 
 # If the rotation features don't already contain a 005-000 plate pair then add one
-# (so that we have a path to 000 since we changed 000 to 005 above).
-rotation_feature_005_rel_000 = pygplates.Feature.create_total_reconstruction_sequence(
-    0,
-    5,
-    pygplates.GpmlIrregularSampling([
-        pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), time, 'optAPM')
-            for time in (0.0, 600.0)]))
-required_rotation_features.append(rotation_feature_005_rel_000)
+# so that we have a path to 000 since we changed 000 to 005 above.
+# We'll add a zero rotation so that we don't modify the absolute rotations (of the various plate IDs)
+# because this file will be used as input when subtracting out net rotations to produce a NNR rotation file.
+if not required_rotations_include_005_000:
+    rotation_feature_005_rel_000 = pygplates.Feature.create_total_reconstruction_sequence(
+        0,
+        5,
+        pygplates.GpmlIrregularSampling([
+            pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), time, 'optAPM')
+                for time in (0.0, 600.0)]))
+    required_rotation_features.append(rotation_feature_005_rel_000)
 
 pygplates.FeatureCollection(required_rotation_features).write(output_rotation_filename)
