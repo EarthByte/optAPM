@@ -94,7 +94,7 @@ rotation_features = list(pygplates.FeatureCollection(rotation_filename))
 rotation_model = pygplates.RotationModel(rotation_features)
 
 
-# Remove any moving plate 701 rotation features (we'll add an NNR version later).
+# Remove any moving plate 701 rotation features (we'll add an NNR 701 rotation feature later).
 rotation_features_tmp = []
 total_reconstruction_poles_701 = []
 for rotation_feature in rotation_features:
