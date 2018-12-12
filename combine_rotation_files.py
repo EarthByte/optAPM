@@ -15,6 +15,10 @@ import pygplates
 # those that go through Africa 701).                                    #
 #########################################################################
 
+# Optimising for 0-410Ma.
+# Currently only used for pre-resolved subduction zones.
+times_start = 411
+
 # The main data directory is the directory containing this source file.
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
@@ -45,8 +49,7 @@ required_plate_ids = set()
 required_plate_ids.add(701)
 
 # Add plate IDs are pre-resolved subduction zones.
-subduction_times_start = 251
-for time in xrange(0, subduction_times_start):
+for time in xrange(0, times_start):
     
     # print time
     
@@ -74,31 +77,28 @@ for input_rotation_filename in input_rotation_filenames:
     rotation_features.extend(
         pygplates.FeatureCollection.read(input_rotation_filename))
 
-rotation_required = [False] * len(rotation_features)
-
 plate_circuits = {}
 
+# Create the plate circuits paths (dictionary of moving->fixed plate edges of plate circuit graph).
 for rotation_feature_index, rotation_feature in enumerate(rotation_features):
-
     # Get the rotation feature information.
     total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
     if not total_reconstruction_pole:
         # Not a rotation feature.
         continue
 
-    fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
+    fixed_plate_id, moving_plate_id, _ = total_reconstruction_pole
     
+    # Can add both direction of edge in plate circuit graph.
+    # But currently only adding the usual forward direction since rotation files currently assume that
+    # and we're moving towards the anchor (0) plate which is at the root of rotation files.
     plate_circuits.setdefault(moving_plate_id, []).append((fixed_plate_id, rotation_feature_index))
     # plate_circuits.setdefault(fixed_plate_id, []).append((moving_plate_id, rotation_feature_index))
-    
-    # Change fixed plate ID 000 to 005.
-    # We will be adding in a 005/000 sequence to store the optimised rotation adjustments.
-    if fixed_plate_id == 0:
-        rotation_feature.set_total_reconstruction_pole(5, moving_plate_id, rotation_sequence)
 
+
+rotation_required = [False] * len(rotation_features)
 
 visited_plate_ids = set()
-
 def visit_plate_circuit(moving_plate_id):
     if moving_plate_id in visited_plate_ids:
         return
@@ -108,18 +108,46 @@ def visit_plate_circuit(moving_plate_id):
     if moving_plate_circuits:
         for fixed_plate_id, rotation_feature_index in moving_plate_circuits:
             rotation_required[rotation_feature_index] = True
+            # TODO: Should be terminate (ie, not visit) when fixed_plate_id==0 ?
             visit_plate_circuit(fixed_plate_id)
 
+# Find those fixed/moving rotation pairs required to support plate circuit from require plate IDs to anchor 000.
 for required_plate_id in required_plate_ids:
     visit_plate_circuit(required_plate_id)
-
 
 required_rotation_features = []
 for rotation_feature_index, rotation_feature in enumerate(rotation_features):
     if rotation_required[rotation_feature_index]:
         required_rotation_features.append(rotation_feature)
 
-# Add in a zero rotation 005/000 sequence (so we have a path to 000 since we changed 000 to 005 above).
+
+# Change fixed plate IDs from 000 to 005.
+# And temporarily remove any 005-000 rotation features (we'll add a zero-rotation version later).
+required_rotation_features_tmp = []
+for rotation_feature in required_rotation_features:
+    # Get the rotation feature information.
+    total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
+    if not total_reconstruction_pole:
+        # Not a rotation feature.
+        continue
+
+    fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
+    
+    # Change fixed plate ID 000 to 005 (unless it's the 005-000 plate pair).
+    # We want everything that references 000 to now reference 005.
+    # Later we'll add a 005-000 sequence to store optimised rotation adjustments.
+    if fixed_plate_id == 0 and moving_plate_id != 5:
+        rotation_feature.set_total_reconstruction_pole(5, moving_plate_id, rotation_sequence)
+    
+    if not (moving_plate_id == 5 and fixed_plate_id == 0):
+        # Add all rotation features except 005-000.
+        required_rotation_features_tmp.append(rotation_feature)
+
+# Rotation features now exclude 005-000, but we'll add below.
+required_rotation_features = required_rotation_features_tmp
+
+# If the rotation features don't already contain a 005-000 plate pair then add one
+# (so that we have a path to 000 since we changed 000 to 005 above).
 rotation_feature_005_rel_000 = pygplates.Feature.create_total_reconstruction_sequence(
     0,
     5,
