@@ -23,7 +23,8 @@ if not hasattr(pgp, 'Version') or pgp.Version.get_imported_version() < PYGPLATES
 # continuously-closing plates and deforming networks is relatively time consuming. #
 ####################################################################################
 
-timeStart = 411
+timeStart = 410
+time_interval = 10
 
 # If using optimised rotation model to reconstruct/resolve topologies.
 # model = '1'
@@ -83,7 +84,7 @@ starting_rotfiles = glob.glob(os.path.join(input_data_dir, '*.rot'))
 topologies = [pgp.FeatureCollection(topology_file) for topology_file in topology_files]
 starting_rotation_model = pgp.RotationModel(starting_rotfiles)
 
-for time in xrange(0, timeStart):
+for time in xrange(0, timeStart+1, time_interval):
     
     print time
     

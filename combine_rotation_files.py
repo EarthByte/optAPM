@@ -17,7 +17,8 @@ import pygplates
 
 # Optimising for 0-410Ma.
 # Currently only used for pre-resolved subduction zones.
-times_start = 411
+times_start = 410
+time_interval = 10
 
 # The main data directory is the directory containing this source file.
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -49,7 +50,7 @@ required_plate_ids = set()
 required_plate_ids.add(701)
 
 # Add plate IDs are pre-resolved subduction zones.
-for time in xrange(0, times_start):
+for time in xrange(0, times_start+1, time_interval):
     
     # print time
     
