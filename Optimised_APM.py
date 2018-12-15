@@ -50,11 +50,11 @@ use_parallel = MPI4PY
 # 
 
 # model_name = "optAPM176"
-model_name = "optAPM12"
+model_name = "optAPM15"
 
 start_age = 410
 end_age = 0
-interval = 10
+interval = 5
 
 search = "Initial"
 search_radius = 60

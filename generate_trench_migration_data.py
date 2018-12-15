@@ -24,7 +24,6 @@ if not hasattr(pgp, 'Version') or pgp.Version.get_imported_version() < PYGPLATES
 ####################################################################################
 
 timeStart = 410
-time_interval = 10
 
 # If using optimised rotation model to reconstruct/resolve topologies.
 # model = '1'
@@ -84,7 +83,7 @@ starting_rotfiles = glob.glob(os.path.join(input_data_dir, '*.rot'))
 topologies = [pgp.FeatureCollection(topology_file) for topology_file in topology_files]
 starting_rotation_model = pgp.RotationModel(starting_rotfiles)
 
-for time in xrange(0, timeStart+1, time_interval):
+for time in xrange(0, timeStart+1):
     
     print time
     
