@@ -280,7 +280,7 @@ if __name__ == '__main__':
         #             
         #             # Start with identity rotation at time 0Ma.
         #             zero_rotation_time_samples_701_rel_fixed.append(
-        #                 pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'optAPM'))
+        #                 pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'Absolute Reference Frame Optimisation'))
         #             
         #             for ref_rotation_start_age in age_range:
         #                 
@@ -296,7 +296,7 @@ if __name__ == '__main__':
         #                 zero_rotation_701_rel_fixed = original_rotation_model.get_rotation(ref_rotation_start_age, fixed_plate_id, fixed_plate_id=1).get_inverse()
         # 
         #                 zero_rotation_time_samples_701_rel_fixed.append(
-        #                     pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_701_rel_fixed), ref_rotation_start_age, 'optAPM'))
+        #                     pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_701_rel_fixed), ref_rotation_start_age, 'Absolute Reference Frame Optimisation'))
         #             
         #             # Replace the 701 rotation sequence.
         #             rotation_feature.set_total_reconstruction_pole(
@@ -329,7 +329,7 @@ if __name__ == '__main__':
         
         # Start with identity rotation at time 0Ma.
         zero_rotation_time_samples_005_rel_000.append(
-            pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'optAPM'))
+            pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'Absolute Reference Frame Optimisation'))
         
         for ref_rotation_start_age in age_range:
             
@@ -343,7 +343,7 @@ if __name__ == '__main__':
             zero_rotation_005_rel_000 = original_rotation_model.get_rotation(ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=5).get_inverse()
 
             zero_rotation_time_samples_005_rel_000.append(
-                pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_005_rel_000), ref_rotation_start_age, 'optAPM'))
+                pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_005_rel_000), ref_rotation_start_age, 'Absolute Reference Frame Optimisation'))
         
         # Create a new 005/000 rotation sequence.
         rotation_feature_005_000 = pgp.Feature.create_total_reconstruction_sequence(

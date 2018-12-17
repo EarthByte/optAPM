@@ -151,7 +151,7 @@ if not required_rotations_include_005_000:
         0,
         5,
         pygplates.GpmlIrregularSampling([
-            pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), time, 'optAPM')
+            pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), time, 'Absolute Reference Frame Optimisation')
                 for time in (0.0, 600.0)]))
     required_rotation_features.append(rotation_feature_005_rel_000)
 
