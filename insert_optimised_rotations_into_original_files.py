@@ -26,7 +26,7 @@ if not optimised_model_name:
 #
 # So we have the option to remove 005-000 and set all fixed plate ids that are 005 back to 000.
 # It's an option because the owner of the original rotation files might want to keep 005-000 for some reason.
-remove_005_000_from_original_rotations = False
+remove_005_000_from_original_rotations = True
 
 # The main data directory is the directory containing this source file.
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -72,16 +72,17 @@ for rotation_feature in optimised_rotation_features:
         fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
         if fixed_plate_id == 0 and moving_plate_id == 5:
             if absolute_plate_motion_rotation_feature:
-                raise ValueError('Expected a single 005-000 sequence in output rotation file of optimisation workflow')
+                raise ValueError('Expected a single 005-000 sequence, but got multiple, in output rotation file of optimisation workflow')
             absolute_plate_motion_rotation_feature = rotation_feature
             absolute_plate_motion_rotation_sample_times = [pygplates.GeoTimeInstant(sample.get_time())
                 for sample in rotation_sequence.get_enabled_time_samples()]
 
 if absolute_plate_motion_rotation_feature is None:
-    raise ValueError('Output rotation file of optimisation workflow does not contain a 005-000 sequence')
+    raise ValueError('Expected a single 005-000 sequence, but got none, in output rotation file of optimisation workflow')
 
 absolute_plate_motion_rotation_model = pygplates.RotationModel(absolute_plate_motion_rotation_feature)
 
+COMMENT_OPTIMISED_ABSOLUTE_PLATE_MOTION = 'Adjusted to include optimized absolute plate motion'
 
 # For any rotation features referencing fixed plate 005, merge the optimised 005-000 sequence into it and have it reference 000.
 for rotation_feature_collection_index, rotation_feature_collection in enumerate(original_rotation_feature_collections):
@@ -99,6 +100,22 @@ for rotation_feature_collection_index, rotation_feature_collection in enumerate(
             # We also include plate 5 if we're removing 005-000 (since we'll need to change it to 000).
             if (fixed_plate_id == 0 or (remove_005_000_from_original_rotations and fixed_plate_id == 5)) and moving_plate_id != 999:
                 rotation_samples = rotation_sequence.get_enabled_time_samples()
+                
+                # For the current rotation samples prefix their comments to notify rotation has been
+                # adjusted to include the optimized absolute plate motion.
+                for rotation_sample in rotation_samples:
+                    description = rotation_sample.get_description()
+                    if description is None:
+                        # No description yet. Just use the optimised absolute plate motion comment.
+                        new_description = COMMENT_OPTIMISED_ABSOLUTE_PLATE_MOTION
+                    elif description.lstrip().startswith(COMMENT_OPTIMISED_ABSOLUTE_PLATE_MOTION):
+                        # Description already has the optimised absolute plate motion prefix.
+                        new_description = description
+                    else:
+                        # First time prefixing description.
+                        new_description = COMMENT_OPTIMISED_ABSOLUTE_PLATE_MOTION + ': ' + description
+                    rotation_sample.set_description(new_description)
+                
                 # Record the current sample times (as GeoTimeInstant so we can compare them within an epsilon).
                 rotation_sample_times = [pygplates.GeoTimeInstant(sample.get_time()) for sample in rotation_samples]
                 min_rotation_sample_time, max_rotation_sample_time = rotation_sample_times[0], rotation_sample_times[-1]
@@ -115,14 +132,14 @@ for rotation_feature_collection_index, rotation_feature_collection in enumerate(
                             absolute_plate_motion_sample_time,
                             moving_plate_id,
                             # Note that we're using 'fixed_plate_id' here and not '0'.
-                            # This is because, if fixed_plate_id==5 and we're removing 005-000,
+                            # This is because if fixed_plate_id==5 and we're removing 005-000 then
                             # we're going to be adding the optimized 005-000 to this later...
                             fixed_plate_id=fixed_plate_id)
                         interpolated_rotation_sample = pygplates.GpmlTimeSample(
                             # Note that we'll add in the optimized absolute rotation later...
                             pygplates.GpmlFiniteRotation(interpolated_original_rotation),
                             absolute_plate_motion_sample_time,
-                            'Optimized absolute plate motion')
+                            COMMENT_OPTIMISED_ABSOLUTE_PLATE_MOTION)
                         new_rotation_samples.append(interpolated_rotation_sample)
                 
                 # Need to re-sort the rotation samples because we essentially merged two sequences.
