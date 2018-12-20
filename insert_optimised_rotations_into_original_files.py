@@ -11,12 +11,13 @@ import pygplates
 #########################################################################
 
 optimised_model_name = None
+#optimised_model_name = 'optAPM_r1228'
 
 # If model name not manually specified above then read it from the main 'Optimised_APM' module.
 if not optimised_model_name:
     import Optimised_APM  # To get 'model_name'
     optimised_model_name = Optimised_APM.model_name
-    
+
 # The main data directory is the directory containing this source file.
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
@@ -86,20 +87,24 @@ for rotation_feature_collection_index, rotation_feature_collection in enumerate(
                 rotation_samples = rotation_sequence.get_enabled_time_samples()
                 # Record the current sample times (as GeoTimeInstant so we can compare them within an epsilon).
                 rotation_sample_times = [pygplates.GeoTimeInstant(sample.get_time()) for sample in rotation_samples]
+                min_rotation_sample_time, max_rotation_sample_time = rotation_sample_times[0], rotation_sample_times[-1]
                 
                 # Add in new samples corresponding to sample times of 005-000 that do not coincide with the current sequence.
                 # We don't want to generate duplicate samples (ie, with the same time).
+                # Also don't add sample times outside the time range of the current rotation samples.
                 new_rotation_samples = list(rotation_samples)
-                for sample_time in absolute_plate_motion_rotation_sample_times:
-                    if sample_time not in rotation_sample_times:
+                for absolute_plate_motion_sample_time in absolute_plate_motion_rotation_sample_times:
+                    if (absolute_plate_motion_sample_time not in rotation_sample_times and
+                        absolute_plate_motion_sample_time >= min_rotation_sample_time and
+                        absolute_plate_motion_sample_time <= max_rotation_sample_time):
                         interpolated_original_rotation = original_rotation_model.get_rotation(
-                            sample_time,
+                            absolute_plate_motion_sample_time,
                             moving_plate_id,
                             fixed_plate_id=0)
                         interpolated_rotation_sample = pygplates.GpmlTimeSample(
                             # Note that we'll add in the optimized absolute rotation later...
                             pygplates.GpmlFiniteRotation(interpolated_original_rotation),
-                            sample_time,
+                            absolute_plate_motion_sample_time,
                             'Optimized absolute plate motion')
                         new_rotation_samples.append(interpolated_rotation_sample)
                 
