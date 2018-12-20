@@ -18,6 +18,16 @@ if not optimised_model_name:
     import Optimised_APM  # To get 'model_name'
     optimised_model_name = Optimised_APM.model_name
 
+# In some cases the original rotation files already have a 005-000 sequence.
+# Presumably because they are the output of an old version of the
+# optimization workflow that did not remove 005-000 from its output.
+# Note: the new workflow introduces 005-000 only during the optimization workflow, and this
+# script is supposed to remove it after the workflow has run.
+#
+# So we have the option to remove 005-000 and set all fixed plate ids that are 005 back to 000.
+# It's an option because the owner of the original rotation files might want to keep 005-000 for some reason.
+remove_005_000_from_original_rotations = False
+
 # The main data directory is the directory containing this source file.
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
@@ -77,13 +87,17 @@ absolute_plate_motion_rotation_model = pygplates.RotationModel(absolute_plate_mo
 for rotation_feature_collection_index, rotation_feature_collection in enumerate(original_rotation_feature_collections):
     modified_rotation_feature_collection = False
     
+    if remove_005_000_from_original_rotations:
+        rotation_features_minus_005_000 = []
+    
     for rotation_feature in rotation_feature_collection:
         total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
         if total_reconstruction_pole:
             fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
             # If the current rotation feature references plate 000 then we need to adjust using the
             # optimized absolute rotations (005-000).
-            if fixed_plate_id == 0 and moving_plate_id != 999:
+            # We also include plate 5 if we're removing 005-000 (since we'll need to change it to 000).
+            if (fixed_plate_id == 0 or (remove_005_000_from_original_rotations and fixed_plate_id == 5)) and moving_plate_id != 999:
                 rotation_samples = rotation_sequence.get_enabled_time_samples()
                 # Record the current sample times (as GeoTimeInstant so we can compare them within an epsilon).
                 rotation_sample_times = [pygplates.GeoTimeInstant(sample.get_time()) for sample in rotation_samples]
@@ -100,7 +114,10 @@ for rotation_feature_collection_index, rotation_feature_collection in enumerate(
                         interpolated_original_rotation = original_rotation_model.get_rotation(
                             absolute_plate_motion_sample_time,
                             moving_plate_id,
-                            fixed_plate_id=0)
+                            # Note that we're using 'fixed_plate_id' here and not '0'.
+                            # This is because, if fixed_plate_id==5 and we're removing 005-000,
+                            # we're going to be adding the optimized 005-000 to this later...
+                            fixed_plate_id=fixed_plate_id)
                         interpolated_rotation_sample = pygplates.GpmlTimeSample(
                             # Note that we'll add in the optimized absolute rotation later...
                             pygplates.GpmlFiniteRotation(interpolated_original_rotation),
@@ -119,19 +136,23 @@ for rotation_feature_collection_index, rotation_feature_collection in enumerate(
                         5,
                         fixed_plate_id=0)
                     
-                    if moving_plate_id != 5:
+                    if moving_plate_id == 5:
+                        # The original rotation file already had a 005-000 sequence.
+                        # Presumably because it used the output of an old version of the
+                        # optimization workflow that did not remove 005-000 from its output.
+                        # Here we just swap the old 005-000 with the new 005-000.
+                        rotation = absolute_plate_motion_rotation
+                    elif fixed_plate_id == 5:
+                        rotation = rotation_sample.get_value().get_finite_rotation()
+                        if remove_005_000_from_original_rotations:
+                            rotation = absolute_plate_motion_rotation * rotation
+                    else:
                         # Our sequence now references fixed plate 000 instead of 005 so we need to adjust its rotations.
                         #
                         #   R_opt(0->t,000->005) * R(0->t,000->moving) -> R(0->t,000->moving)
                         #
                         rotation = rotation_sample.get_value().get_finite_rotation()
                         rotation = absolute_plate_motion_rotation * rotation
-                    else:
-                        # The original rotation file already had a 005-000 sequence.
-                        # Presumably because it uses the output of an old version of the
-                        # optimization workflow that did not remove 005-000 from its output.
-                        # Here we just swap the old 005-000 with the new 005-000.
-                        rotation = absolute_plate_motion_rotation
                     
                     rotation_sample.get_value().set_finite_rotation(rotation)
                 
@@ -143,6 +164,18 @@ for rotation_feature_collection_index, rotation_feature_collection in enumerate(
                 
                 # Mark the rotation feature's collection as modified (so we can later write it out to disk).
                 modified_rotation_feature_collection = True
+            
+            if remove_005_000_from_original_rotations:
+                # Keep all rotation features except 005-000.
+                if not (fixed_plate_id == 0 and moving_plate_id == 5):
+                    rotation_features_minus_005_000.append(rotation_feature)
+                else:
+                    # Mark the rotation feature's collection as modified (so we can later write it out to disk).
+                    # It's modified because we're removing 005-000.
+                    modified_rotation_feature_collection = True
+    
+    if remove_005_000_from_original_rotations and modified_rotation_feature_collection:
+        rotation_feature_collection = pygplates.FeatureCollection(rotation_features_minus_005_000)
     
     # Write a modified version of the current original rotation feature collection to disk.
     if modified_rotation_feature_collection:
