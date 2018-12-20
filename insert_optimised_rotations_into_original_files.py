@@ -119,12 +119,20 @@ for rotation_feature_collection_index, rotation_feature_collection in enumerate(
                         5,
                         fixed_plate_id=0)
                     
-                    # Our sequence now references fixed plate 000 instead of 005 so we need to adjust its rotations.
-                    #
-                    #   R_opt(0->t,000->005) * R(0->t,000->moving) -> R(0->t,000->moving)
-                    #
-                    rotation = rotation_sample.get_value().get_finite_rotation()
-                    rotation = absolute_plate_motion_rotation * rotation
+                    if moving_plate_id != 5:
+                        # Our sequence now references fixed plate 000 instead of 005 so we need to adjust its rotations.
+                        #
+                        #   R_opt(0->t,000->005) * R(0->t,000->moving) -> R(0->t,000->moving)
+                        #
+                        rotation = rotation_sample.get_value().get_finite_rotation()
+                        rotation = absolute_plate_motion_rotation * rotation
+                    else:
+                        # The original rotation file already had a 005-000 sequence.
+                        # Presumably because it uses the output of an old version of the
+                        # optimization workflow that did not remove 005-000 from its output.
+                        # Here we just swap the old 005-000 with the new 005-000.
+                        rotation = absolute_plate_motion_rotation
+                    
                     rotation_sample.get_value().set_finite_rotation(rotation)
                 
                 # Store the new sequence of samples in the current rotation feature.
