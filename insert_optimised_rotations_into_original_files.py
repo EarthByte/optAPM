@@ -102,8 +102,12 @@ for rotation_feature in optimised_rotation_features:
                 if insert_optimised_rotations_from_optimisation_run:
                     raise ValueError('Expected a single 005-000 sequence, but got multiple, in output rotation file of optimisation workflow')
             absolute_plate_motion_rotation_features.append(rotation_feature)
-            absolute_plate_motion_rotation_sample_times.extend(
-                pygplates.GeoTimeInstant(sample.get_time()) for sample in rotation_sequence.get_enabled_time_samples())
+            for sample in rotation_sequence.get_enabled_time_samples():
+                sample_time = pygplates.GeoTimeInstant(sample.get_time())
+                # Remove duplicates (eg, duplicate at 250Ma from separate 0-250 and 250-410Ma sequences)
+                # by only adding a sample time if it hasn't already been added.
+                if sample_time not in absolute_plate_motion_rotation_sample_times:
+                    absolute_plate_motion_rotation_sample_times.append(sample_time)
 
 if not absolute_plate_motion_rotation_features:
     if insert_optimised_rotations_from_optimisation_run:
