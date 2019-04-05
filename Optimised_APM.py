@@ -268,46 +268,6 @@ if __name__ == '__main__':
         rotation_features = list(pgp.FeatureCollection(original_rotation_file))
         original_rotation_model = pgp.RotationModel(rotation_features)
         
-        # for rotation_feature in rotation_features:
-        #     
-        #     total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
-        #     if total_reconstruction_pole:
-        #         
-        #         fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
-        #         if moving_plate_id == ref_rotation_plate_id:
-        #             
-        #             zero_rotation_time_samples_701_rel_fixed = []
-        #             
-        #             # Start with identity rotation at time 0Ma.
-        #             zero_rotation_time_samples_701_rel_fixed.append(
-        #                 pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'optAPM'))
-        #             
-        #             for ref_rotation_start_age in age_range:
-        #                 
-        #                 # We want our 701 to 001 rotation to be zero.
-        #                 # However the 701 sequence might have a fixed plate ID that is not 001.
-        #                 # So convert zero 701 rel 001 rotation to the 701 rel 'fixed_plate_id' rotation to store in rotation feature.
-        #                 #
-        #                 #                         R(0->t,001->701) = R(0->t,001->fixed) * R(0->t,fixed->701)
-        #                 #                                 Identity = R(0->t,001->fixed) * R(0->t,fixed->701)
-        #                 #   inverse(R(0->t,001->fixed)) * Identity = R(0->t,fixed->701)
-        #                 #                       R(0->t,fixed->701) = inverse(R(0->t,001->fixed))
-        #                 #
-        #                 zero_rotation_701_rel_fixed = original_rotation_model.get_rotation(ref_rotation_start_age, fixed_plate_id, fixed_plate_id=1).get_inverse()
-        # 
-        #                 zero_rotation_time_samples_701_rel_fixed.append(
-        #                     pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_701_rel_fixed), ref_rotation_start_age, 'optAPM'))
-        #             
-        #             # Replace the 701 rotation sequence.
-        #             rotation_feature.set_total_reconstruction_pole(
-        #                 fixed_plate_id,
-        #                 ref_rotation_plate_id,
-        #                 pgp.GpmlIrregularSampling(zero_rotation_time_samples_701_rel_fixed))
-        #             
-        #             # Write the rotation file with zero 701-to-anchor rotations.
-        #             pgp.FeatureCollection(rotation_features).write(rotation_file)
-        #             break
-        
         # Remove any existing 005-000 rotation features.
         rotation_features_except_005_000 = []
         for rotation_feature in rotation_features:
@@ -713,66 +673,43 @@ if __name__ == '__main__':
             # --------------------------------------------------------------------
             # Update rotation file with result
 
-            rotation_model_tmp = pgp.FeatureCollection(rotation_file)
+            rotation_features_updated = pgp.FeatureCollection(rotation_file)
 
-            # Find existing rotations for Africa
-            opt_rotation_feature = None
-            for rotation_feature in rotation_model_tmp:
-
+            # Find existing optimised rotation sequence for 005-000.
+            opt_rotation_sequence = None
+            for rotation_feature in rotation_features_updated:
                 total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
-
                 if total_reconstruction_pole:
-
                     fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
-
-                    # if moving_plate_id == ref_rotation_plate_id:
-                    #     opt_rotation_feature = rotation_feature
-                    #     break
-
                     if moving_plate_id == 5 and fixed_plate_id == 0:
-                        opt_rotation_feature = rotation_feature
+                        opt_rotation_sequence = rotation_sequence
                         break
 
 
-            # Update existing rotation in the model with result
-            if opt_rotation_feature:
-
-                # adjustment_time = pgp.GeoTimeInstant(ref_rotation_start_age)
-
-                for finite_rotation_sample in rotation_sequence.get_enabled_time_samples():
-
+            # Update existing optimised rotation in the model with result
+            if opt_rotation_sequence:
+                for finite_rotation_sample in opt_rotation_sequence.get_enabled_time_samples():
                     finite_rotation_time = finite_rotation_sample.get_time()
-
                     if finite_rotation_time == ref_rotation_start_age:
-
-                        # new_rotation = pgp.FiniteRotation((np.double(round(min_results[-1][2], 2)), 
-                        #                                    np.double(round(min_results[-1][3], 2))), 
-                        #                                    np.radians(np.double(round(min_results[-1][1], 2))))
-
-                        new_rotation = pgp.FiniteRotation((np.double(round(plat, 2)), 
-                                                           np.double(round(plon, 2))), 
-                                                           np.radians(np.double(round(min_results[-1][1], 2))))
-
-                        # # Our new rotation is from 701 to 001 so remove the 'fixed_plate_id' to 001 part to get the
-                        # # 701 to 'fixed_plate_id' part that get stored in this rotation feature.
-                        # fixed_plate_rotation = rotation_model.get_rotation(ref_rotation_start_age, fixed_plate_id, fixed_plate_id=1)
-                        # new_rotation = fixed_plate_rotation.get_inverse() * new_rotation
+                        new_rotation_701_rel_000 = pgp.FiniteRotation((np.double(round(plat, 2)), 
+                                                                       np.double(round(plon, 2))), 
+                                                                       np.radians(np.double(round(min_results[-1][1], 2))))
 
                         # Our new rotation is from 701 to 000 so remove the 701 to 005 part to get the
-                        # 005 to 000 part that get stored in this rotation feature.
+                        # 005 to 000 part that gets stored in the 005-000 rotation feature.
                         #
                         #                               R(0->t,000->701) = R(0->t,000->005) * R(0->t,005->701)
                         #   R(0->t,000->701) * inverse(R(0->t,005->701)) = R(0->t,000->005)
                         #
                         plate_rotation_701_rel_005 = rotation_model.get_rotation(
                                 ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=5)
-                        new_rotation = new_rotation * plate_rotation_701_rel_005.get_inverse()
+                        new_rotation_005_rel_000 = new_rotation_701_rel_000 * plate_rotation_701_rel_005.get_inverse()
                         
-                        finite_rotation_sample.get_value().set_finite_rotation(new_rotation)
+                        finite_rotation_sample.get_value().set_finite_rotation(new_rotation_005_rel_000)
 
 
-            # Add result rotation pole to rotation file
-            rotation_model_tmp.write(rotation_file)
+            # Write result to rotation file
+            rotation_features_updated.write(rotation_file)
 
 
     # When using mpi4py we only collect and process results in one process (the one with rank/ID 0).
