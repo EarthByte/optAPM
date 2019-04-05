@@ -44,7 +44,7 @@ Then run:
 
 Then load the deforming topologies into a version of GPlates that supports exporting net rotation with *deforming* topologies.
 There should be a "2016_v3.gproj" project file in "data/Global_Model_WD_Internal_Release_2016_v3/" or its "ProjectFiles/" sub-directory.
-Choose the *comma delimited* CSV export format and set the velocity time step to 1My and export 0-250Ma in 1My increments.
+Choose the *comma delimited* CSV export format and set the velocity time step to 1My and export 0-410Ma in 1My increments.
 
 Then copy the exported "total-net-rotations.csv" file to the "data/Global_Model_WD_Internal_Release_2016_v3/optimisation/" directory.
 You can ignore the other exported files.
@@ -64,14 +64,14 @@ The optimisation workflow can be run in serial or parallel. In parallel it can b
 
 Each of these should produce the final optimised rotation file "all_rotations_optAPM<model>.rot",
 in the "data/Global_Model_WD_Internal_Release_2016_v3/optimisation/" directory, where *optAPM<model>* is defined
-by the `model_name` variable in the "Optimise_APM.py" script.
+by the `model_name` variable in the "Optimised_APM.py" script.
 
 ### To run in serial
 
-Edit "Optimise_APM.py" and change the `use_parallel` parameter to `None` and then run:
+Edit "Optimised_APM.py" and change the `use_parallel` parameter to `None` and then run:
 
 ```
-  python Optimise_APM.py
+  python Optimised_APM.py
 ```
 
 ### To run in parallel using `ipyparallel`
@@ -80,13 +80,13 @@ This is useful when running a Jupyter notebook since it supports `ipyparallel` b
 
 * Starting clusters in the Jupyter clusters tab, or
 * Running `ipcluster start -n <cores>` to start engines on *cores* number of cores manually (eg, if not using a notebook).
-  * **NOTE**: You should be in the directory containing "Optimise_APM.py" when you start the cluster
+  * **NOTE**: You should be in the directory containing "Optimised_APM.py" when you start the cluster
     to avoid the error `ImportError: No module named objective_function`.
 
-Edit "Optimise_APM.py" and change the `use_parallel` parameter to `IPYPARALLEL` and then run:
+Edit "Optimised_APM.py" and change the `use_parallel` parameter to `IPYPARALLEL` and then run:
 
 ```
-  python Optimise_APM.py
+  python Optimised_APM.py
 ```
 
 ### To run in parallel using `mpi4py`
@@ -94,12 +94,12 @@ Edit "Optimise_APM.py" and change the `use_parallel` parameter to `IPYPARALLEL` 
 This is useful when running on a High Performance Computing (HPC) cluster since MPI is used to
 spread the parallel workload across any number of nodes/cores.
 
-Edit "Optimise_APM.py" and change the `use_parallel` parameter to `MPI4PY`.
+Edit "Optimised_APM.py" and change the `use_parallel` parameter to `MPI4PY`.
 
 If you are running on a personal computer that has an MPI runtime installed then run:
 
 ```
-  mpiexec -n <cores> python Optimise_APM.py
+  mpiexec -n <cores> python Optimised_APM.py
 ```
 
 ...where *cores* is the number of cores to use.
