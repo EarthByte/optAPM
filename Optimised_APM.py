@@ -65,6 +65,35 @@ models = 100
 model_stop_condition = 'threshold'
 max_iter = 5  # Only applies if model_stop_condition != 'threshold'
 
+
+#
+# Which components are enabled and their weightings.
+#
+# NOTE: The weights are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
+#
+def get_fracture_zone_params(age):
+    return False, 1.0  # Disable fracture zones.
+
+def get_net_rotation_params(age):
+    # Reduce net rotation weight to half for times older than 80Ma
+    # due to large number of synthetic (uncertain) plates.
+    if age <= 80:
+        return True, 1.0
+    else:
+        # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
+        return True, 2.0  # Gives a *multiplicative* weight of 0.5
+
+def get_trench_migration_params(age):
+    return True, 1.0
+
+def get_hotspot_trail_params(age):
+    # Only use hotspot trails for 0-80Ma.
+    if age <= 80:
+        return True, 1.0
+    else:
+        return False, 1.0
+
+
 # Trench migration parameters
 tm_method = 'pygplates' # 'pygplates' for new method OR 'convergence' for old method
 # tm_data_type = 'muller2016' # 'muller2016' or 'shephard2013' or 'Global_Model_WD_Internal_Release_2016_v3'
@@ -361,26 +390,11 @@ if __name__ == '__main__':
         #ref_rotation_end_age = 0.
         
         
-        fracture_zones   = False
-        net_rotation     = True
-        trench_migration = True
-        # # Only use hotspot trails for 0-80Ma.
-        if ref_rotation_start_age <= 80:
-            hotspot_trails   = True
-        else:
-            hotspot_trails   = False
-        
-        # # sigma (i.e. cost / sigma = weight)
-        fracture_zone_weight    = 1.0
-        trench_migration_weight = 1.0
-        hotspot_trails_weight   = 1.0
-        # Reduce net rotation weight to half for times older than 80Ma
-        # due to large number of synthetic (uncertain) plates.
-        if ref_rotation_start_age <= 80:
-            net_rotation_weight = 1.0
-        else:
-            # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-            net_rotation_weight = 2.0  # Gives a *multiplicative* weight of 0.5
+        # Determine which components are enabled and their weightings.
+        fracture_zones, fracture_zone_weight = get_fracture_zone_params(ref_rotation_start_age)
+        net_rotation, net_rotation_weight = get_net_rotation_params(ref_rotation_start_age)
+        trench_migration, trench_migration_weight = get_trench_migration_params(ref_rotation_start_age)
+        hotspot_trails, hotspot_trails_weight = get_hotspot_trail_params(ref_rotation_start_age)
         
         
         # When using mpi4py we only prepare the data in one process (the one with rank/ID 0).
