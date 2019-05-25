@@ -148,12 +148,18 @@ no_auto_ref_rot_longitude = -53.5
 no_auto_ref_rot_latitude = 56.6
 no_auto_ref_rot_angle = -2.28
 
-ref_rotation_plate_id = 701
-
 interpolation_resolution = 5
 rotation_age_of_interest = True
 
-pmag_rotfile = 'Palaeomagnetic_Africa_S.rot'
+#
+# Which reference plate ID and PMAG rotation file to use at which age.
+#
+def get_pmag_params(age):
+    ref_rotation_plate_id = 701
+    pmag_rotfile = 'Palaeomagnetic_Africa_S.rot'
+    
+    return ref_rotation_plate_id, pmag_rotfile
+
 
 if tm_method == 'convergence':
 
@@ -322,6 +328,9 @@ if __name__ == '__main__':
         
         for ref_rotation_start_age in age_range:
             
+            # Get the reference plate ID (which could vary over time).
+            ref_rotation_plate_id, _ = get_pmag_params(ref_rotation_start_age)
+            
             # We want our 701 to 000 rotation to be zero.
             #
             #                         R(0->t,000->701) = R(0->t,000->005) * R(0->t,005->701)
@@ -390,12 +399,14 @@ if __name__ == '__main__':
         #ref_rotation_end_age = 0.
         
         
-        # Determine which components are enabled and their weightings.
+        # Determine which components are enabled and their weightings (which could vary over time).
         fracture_zones, fracture_zone_weight = get_fracture_zone_params(ref_rotation_start_age)
         net_rotation, net_rotation_weight = get_net_rotation_params(ref_rotation_start_age)
         trench_migration, trench_migration_weight = get_trench_migration_params(ref_rotation_start_age)
         hotspot_trails, hotspot_trails_weight = get_hotspot_trail_params(ref_rotation_start_age)
         
+        # Determine reference plate ID and PMAG rotation file (which could vary over time).
+        ref_rotation_plate_id, pmag_rotfile = get_pmag_params(ref_rotation_start_age)
         
         # When using mpi4py we only prepare the data in one process (the one with rank/ID 0).
         if use_parallel != MPI4PY or mpi_rank == 0:
