@@ -96,7 +96,6 @@ rotation_model = pygplates.RotationModel(rotation_features)
 
 # Remove any moving plate 701 rotation features (we'll add an NNR 701 rotation feature later).
 rotation_features_tmp = []
-total_reconstruction_poles_701 = []
 for rotation_feature in rotation_features:
 
     # Get the rotation feature information.
@@ -109,17 +108,15 @@ for rotation_feature in rotation_features:
     if moving_plate_id != 701:
         # Add all rotation features except moving plate 701.
         rotation_features_tmp.append(rotation_feature)
-    else:
-        total_reconstruction_poles_701.append(total_reconstruction_pole)
 
 # Rotation features now exclude moving plate 701, but we'll add below.
 rotation_features = rotation_features_tmp
 
 
-pole_time_samples_701_rel_fixed = []
+pole_time_samples_701_rel_001 = []
 
 # Start with identity rotation at time 0Ma.
-pole_time_samples_701_rel_fixed.append(
+pole_time_samples_701_rel_001.append(
     pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'NNR'))
 
 # Start with identity net rotation at time 0Ma.
@@ -136,39 +133,21 @@ for time, net_stage_lat, net_stage_lon, net_stage_angle_per_my in reversed(net_s
     
     # Remove net total rotation at current time from 701 rel 001 rotation.
     no_net_rotation_701_rel_001 = net_total_rotation.get_inverse() * rotation_model.get_rotation(time, 701, fixed_plate_id=1)
-
-    # Find the fixed plate ID for moving plate 701 at the current time.
-    # We do this by searching through the 701 rotation sequences.
-    fixed_plate_id_for_701 = None
-    for fixed_plate_id, _, rotation_sequence in total_reconstruction_poles_701:
-        if rotation_sequence.get_time_samples_bounding_time(time):
-            fixed_plate_id_for_701 = fixed_plate_id
-            break
     
-    # If not 701 sequences bound the current time then just ignore the current time and print a warning.
-    if fixed_plate_id_for_701 is None:
-        print("Unable to find a moving plate 701 sequence that contains time {0} - so no NNR generated for that time.".format(time), file=sys.stderr)
-        continue
-    
-    # Convert 701 rel 001 rotation to the 701 rel 'fixed_plate_id' rotation to store in rotation file.
-    no_net_rotation_701_rel_fixed = rotation_model.get_rotation(time, fixed_plate_id_for_701, fixed_plate_id=1).get_inverse() * no_net_rotation_701_rel_001
-
-    pole_time_samples_701_rel_fixed.append(
-        pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(no_net_rotation_701_rel_fixed), time, 'NNR'))
+    pole_time_samples_701_rel_001.append(
+        pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(no_net_rotation_701_rel_001), time, 'NNR'))
 
 # The time samples need to be wrapped into an irregular sampling property value.
-total_reconstruction_pole_701_rel_fixed = pygplates.GpmlIrregularSampling(pole_time_samples_701_rel_fixed)
+total_reconstruction_pole_701_rel_001 = pygplates.GpmlIrregularSampling(pole_time_samples_701_rel_001)
 
 # Create the total reconstruction sequence (rotation) feature.
-# rotation_feature_701_rel_fixed = pygplates.Feature(pygplates.FeatureType.gpml_total_reconstruction_sequence)
-# rotation_feature_701_rel_fixed.set_total_reconstruction_pole(fixed_plate_id, 701, total_reconstruction_pole_701_rel_fixed)
-rotation_feature_701_rel_fixed = pygplates.Feature.create_total_reconstruction_sequence(
-    fixed_plate_id,
+rotation_feature_701_rel_001 = pygplates.Feature.create_total_reconstruction_sequence(
+    1,
     701,
-    total_reconstruction_pole_701_rel_fixed)
+    total_reconstruction_pole_701_rel_001)
 
 # Add the new NNR 701 sequence.
-rotation_features.append(rotation_feature_701_rel_fixed)
+rotation_features.append(rotation_feature_701_rel_001)
 
 # Write NNR rotation file.
 pygplates.FeatureCollection(rotation_features).write(nnr_rotation_filename)
