@@ -49,6 +49,7 @@ input_rotation_filenames = glob.glob(os.path.join(rotation_data_dir, '*.rot'))
 
 # Main trench migration data directory.
 tm_data_dir = os.path.join(base_dir, 'data', 'TMData', 'Global_Model_WD_Internal_Release_2016_v3')
+tm_data_dir = os.path.join(base_dir, 'data', 'TMData', 'Global_1000-0_Model_2017')
 
 # Interpolated hotspots (used when 'interpolated_hotspot_trails' is True in main script).
 interpolated_hotspots_filename = os.path.join(base_dir, 'data', 'interpolated_hotspot_chains_5Myr.xlsx')
@@ -167,7 +168,7 @@ if not required_rotations_include_005_000:
         5,
         pygplates.GpmlIrregularSampling([
             pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), time, 'Absolute Reference Frame Optimisation')
-                for time in (0.0, 600.0)]))
+                for time in (0.0, times_start)]))
     required_rotation_features.append(rotation_feature_005_rel_000)
 
 
