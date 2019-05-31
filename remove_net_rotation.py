@@ -3,6 +3,7 @@ import sys
 import os.path
 import math
 import pygplates
+import Optimised_APM  # To query reference plate ID over time.
 
 
 # # Check the required pygplates version.
@@ -16,15 +17,17 @@ import pygplates
 #             os.path.basename(__file__), pygplates.Version.get_imported_version(), PYGPLATES_VERSION_REQUIRED))
 
 
-#########################################################
-# Script to remove net rotation from a rotation file.   #
-#                                                       #
-# Note that this removes net rotation from Africa 701.  #
-# This has the undesired effect of bypassing plate      #
-# circuits that don't go through Africa, but this is OK #
-# for the optimisation workflow because, for the net    #
-# rotation part, it only looks at Africa.               #
-#########################################################
+##########################################################
+# Script to remove net rotation from a rotation file.    #
+#                                                        #
+# Note that this removes net rotation from the reference #
+# plate (which can change over time). Typically this is  #
+# Africa 701. Normally this has the undesired effect of  #
+# bypassing plate circuits that don't go through the     #
+# reference plate, but this is OK for the optimisation   #
+# workflow because, for the net rotation part, it only   #
+# looks at the reference plate (at a particular time).   #
+##########################################################
 
 
 # The main directory is the directory containing this source file.
@@ -34,10 +37,14 @@ base_dir = os.path.abspath(os.path.dirname(__file__))
 data_dir = os.path.join(base_dir, 'data')
 
 rotation_filename = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2016_v3', 'optimisation', 'all_rotations.rot')
-nnr_rotation_filename = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2016_v3', 'optimisation', 'all_rotations_NNR.rot')
+nnr_rotation_filename = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2016_v3', 'optimisation', 'no_net_rotations.rot')
 
 net_rotations_filename = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2016_v3', 'optimisation', 'total-net-rotations.csv')
 
+
+
+# The rotation model before net rotation is removed.
+rotation_model = pygplates.RotationModel(rotation_filename)
 
 def read_net_rotations(net_rotations_filename):
     
@@ -87,37 +94,14 @@ net_stage_rotation_interval = net_stage_pole_data[0][0] - net_stage_pole_data[1]
 # print('Net rotations:', net_stage_pole_data)
 
 
-# Load the rotation features from rotation files.
-rotation_features = list(pygplates.FeatureCollection(rotation_filename))
+# Each item is a 2-tuple (ref_rotation_plate_id, list of time samples).
+nnr_ref_plate_sequences = []
 
-# A rotation model using the rotation features before they are modified.
-rotation_model = pygplates.RotationModel(rotation_features)
-
-
-# Remove any moving plate 701 rotation features (we'll add an NNR 701 rotation feature later).
-rotation_features_tmp = []
-for rotation_feature in rotation_features:
-
-    # Get the rotation feature information.
-    total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
-    if not total_reconstruction_pole:
-        # Not a rotation feature.
-        continue
-
-    _, moving_plate_id, _ = total_reconstruction_pole
-    if moving_plate_id != 701:
-        # Add all rotation features except moving plate 701.
-        rotation_features_tmp.append(rotation_feature)
-
-# Rotation features now exclude moving plate 701, but we'll add below.
-rotation_features = rotation_features_tmp
-
-
-pole_time_samples_701_rel_001 = []
-
-# Start with identity rotation at time 0Ma.
-pole_time_samples_701_rel_001.append(
-    pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'NNR'))
+# Start with identity rotation at time 0Ma for the first reference plate.
+first_ref_rotation_plate_id, _ = Optimised_APM.get_reference_params(0)
+nnr_ref_plate_sequences.append((
+    first_ref_rotation_plate_id,
+    [pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'NNR')]))
 
 # Start with identity net rotation at time 0Ma.
 net_total_rotation = pygplates.FiniteRotation()
@@ -131,23 +115,42 @@ for time, net_stage_lat, net_stage_lon, net_stage_angle_per_my in reversed(net_s
             math.radians(net_stage_angle_per_my * net_stage_rotation_interval))
     net_total_rotation = net_stage_rotation.get_inverse() * net_total_rotation
     
-    # Remove net total rotation at current time from 701 rel 001 rotation.
-    no_net_rotation_701_rel_001 = net_total_rotation.get_inverse() * rotation_model.get_rotation(time, 701, fixed_plate_id=1)
+    # The reference plate for the current time obtained from main optimisation workflow.
+    ref_rotation_plate_id, _ = Optimised_APM.get_reference_params(time)
     
-    pole_time_samples_701_rel_001.append(
-        pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(no_net_rotation_701_rel_001), time, 'NNR'))
+    # Remove net total rotation at current time from 'ref_rotation_plate_id' rel 000 rotation.
+    #
+    #   R_net_rotation * R_no_net_rotation(0->t,000->ref_plate) = R(0->t,000->ref_plate)
+    #                    R_no_net_rotation(0->t,000->ref_plate) = inverse(R_net_rotation) * R(0->t,000->ref_plate)
+    #
+    no_net_rotation = net_total_rotation.get_inverse() * rotation_model.get_rotation(time, ref_rotation_plate_id)
+    
+    # If the reference plate changes then start a new rotation sequence.
+    last_ref_rotation_plate_id = nnr_ref_plate_sequences[-1][0]
+    if ref_rotation_plate_id != last_ref_rotation_plate_id:
+        nnr_ref_plate_sequences.append((ref_rotation_plate_id, []))
+    
+    # Add current no-net-rotation to the current reference plate sequence.
+    nnr_ref_plate_sequences[-1][1].append(
+        pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(no_net_rotation), time, 'NNR'))
 
-# The time samples need to be wrapped into an irregular sampling property value.
-total_reconstruction_pole_701_rel_001 = pygplates.GpmlIrregularSampling(pole_time_samples_701_rel_001)
-
-# Create the total reconstruction sequence (rotation) feature.
-rotation_feature_701_rel_001 = pygplates.Feature.create_total_reconstruction_sequence(
-    1,
-    701,
-    total_reconstruction_pole_701_rel_001)
-
-# Add the new NNR 701 sequence.
-rotation_features.append(rotation_feature_701_rel_001)
+# There is one feature for each contiguous reference plate sequence.
+# This is all that's needed for the main optimisation workflow to compare rotations against no-net-rotation.
+#
+# For example, if there is only reference plate and it's 701 then there will be only one
+# 701 no-net-rotation feature even though 701 might have been spread across 2 rotation files
+# (as two separate rotation features).
+# Another example, if the reference plate switches once from 701 to 101 then there'll be 2 NNR features.
+nnr_rotation_features = []
+for ref_rotation_plate_id, nnr_pole_time_samples in nnr_ref_plate_sequences:
+    # Create the no-net-rotation total reconstruction sequence (rotation) feature.
+    nnr_rotation_feature = pygplates.Feature.create_total_reconstruction_sequence(
+        0,
+        ref_rotation_plate_id,
+        # The time samples need to be wrapped into an irregular sampling property value...
+        pygplates.GpmlIrregularSampling(nnr_pole_time_samples))
+    
+    nnr_rotation_features.append(nnr_rotation_feature)
 
 # Write NNR rotation file.
-pygplates.FeatureCollection(rotation_features).write(nnr_rotation_filename)
+pygplates.FeatureCollection(nnr_rotation_features).write(nnr_rotation_filename)

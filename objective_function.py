@@ -122,28 +122,28 @@ class ObjectiveFunction(object):
         tmp_opt_rlat = []
         opt_stats = []
 
-        # Check incoming Africa finite rotation pole values
+        # Check incoming reference plate finite rotation pole values
         lat_, lon_ = geoTools.checkLatLon(x[1], x[0])
         ang_ = x[2]
 
 
         #### -----------------------------------------------------------------------------------------
-        #### 2. Update Africa rotation
+        #### 2. Update reference plate rotation
 
 
-        new_rotation_701_rel_000 = pgp.FiniteRotation((np.double(lat_), np.double(lon_)), np.radians(np.double(ang_)))
+        new_rotation_ref_plate_rel_000 = pgp.FiniteRotation((np.double(lat_), np.double(lon_)), np.radians(np.double(ang_)))
         
-        # Our new rotation is from 701 to 000 so remove the 701 to 005 part to get the
-        # 005 to 000 part that gets stored in the 005-000 rotation feature.
+        # Our new rotation is from 'ref_rotation_plate_id' to 000 so remove the 'ref_rotation_plate_id' to 005 part
+        # to get the 005 to 000 part that gets stored in the 005-000 rotation feature.
         #
-        #                               R(0->t,000->701) = R(0->t,000->005) * R(0->t,005->701)
-        #   R(0->t,000->701) * inverse(R(0->t,005->701)) = R(0->t,000->005)
+        #                                     R(0->t,000->ref_plate) = R(0->t,000->005) * R(0->t,005->ref_plate)
+        #   R(0->t,000->ref_plate) * inverse(R(0->t,005->ref_plate)) = R(0->t,000->005)
         #
-        plate_rotation_701_rel_005 = self.rotation_model_original.get_rotation(
+        plate_rotation_ref_plate_rel_005 = self.rotation_model_original.get_rotation(
                 self.ref_rotation_start_age,
                 self.ref_rotation_plate_id,
                 fixed_plate_id=5)
-        new_rotation_005_rel_000 = new_rotation_701_rel_000 * plate_rotation_701_rel_005.get_inverse()
+        new_rotation_005_rel_000 = new_rotation_ref_plate_rel_000 * plate_rotation_ref_plate_rel_005.get_inverse()
         
         # Update the 005-000 rotation.
         # Note that this modifies the state of 'self.rotation_features_updated' - in other words,

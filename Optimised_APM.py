@@ -154,9 +154,9 @@ rotation_age_of_interest = True
 #
 # Which reference plate ID and PMAG rotation file to use at which age.
 #
-def get_pmag_params(age):
     ref_rotation_plate_id = 701
     pmag_rotfile = 'Palaeomagnetic_Africa_S.rot'
+def get_reference_params(age):
     
     return ref_rotation_plate_id, pmag_rotfile
 
@@ -174,7 +174,7 @@ elif tm_method == 'pygplates':
     if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
 
         nnr_relative_datadir = 'TMData/Global_Model_WD_Internal_Release_2016_v3/'
-        nnr_rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/all_rotations_NNR.rot'
+        nnr_rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/no_net_rotations.rot'
 
     elif tm_data_type == 'muller2016':
 
@@ -317,7 +317,7 @@ if __name__ == '__main__':
         rotation_features = rotation_features_except_005_000
         
         #
-        # Create a new 005-000 rotation feature such that 701 rel 000 is zero.
+        # Create a new 005-000 rotation feature such that 'ref_rotation_plate_id' rel 000 is zero.
         #
         
         zero_rotation_time_samples_005_rel_000 = []
@@ -329,14 +329,14 @@ if __name__ == '__main__':
         for ref_rotation_start_age in age_range:
             
             # Get the reference plate ID (which could vary over time).
-            ref_rotation_plate_id, _ = get_pmag_params(ref_rotation_start_age)
+            ref_rotation_plate_id, _ = get_reference_params(ref_rotation_start_age)
             
-            # We want our 701 to 000 rotation to be zero.
+            # We want our 'ref_rotation_plate_id' to 000 rotation to be zero.
             #
-            #                         R(0->t,000->701) = R(0->t,000->005) * R(0->t,005->701)
-            #                                 Identity = R(0->t,000->005) * R(0->t,005->701)
-            #   inverse(R(0->t,000->005)) * Identity = R(0->t,005->701)
-            #                       R(0->t,000->005) = inverse(R(0->t,005->701))
+            #                 R(0->t,000->ref_plate) = R(0->t,000->005) * R(0->t,005->ref_plate)
+            #                               Identity = R(0->t,000->005) * R(0->t,005->ref_plate)
+            #   inverse(R(0->t,000->005)) * Identity = R(0->t,005->ref_plate)
+            #                       R(0->t,000->005) = inverse(R(0->t,005->ref_plate))
             #
             zero_rotation_005_rel_000 = original_rotation_model.get_rotation(ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=5).get_inverse()
 
@@ -351,7 +351,7 @@ if __name__ == '__main__':
         
         rotation_features.append(rotation_feature_005_000)
         
-        # Write the rotation file with zero 701-to-anchor rotations.
+        # Write the rotation file with zero reference_plate-to-anchor rotations.
         pgp.FeatureCollection(rotation_features).write(rotation_file)
         
         
@@ -406,7 +406,7 @@ if __name__ == '__main__':
         hotspot_trails, hotspot_trails_weight = get_hotspot_trail_params(ref_rotation_start_age)
         
         # Determine reference plate ID and PMAG rotation file (which could vary over time).
-        ref_rotation_plate_id, pmag_rotfile = get_pmag_params(ref_rotation_start_age)
+        ref_rotation_plate_id, pmag_rotfile = get_reference_params(ref_rotation_start_age)
         
         # When using mpi4py we only prepare the data in one process (the one with rank/ID 0).
         if use_parallel != MPI4PY or mpi_rank == 0:
@@ -716,19 +716,20 @@ if __name__ == '__main__':
                 for finite_rotation_sample in opt_rotation_sequence.get_enabled_time_samples():
                     finite_rotation_time = finite_rotation_sample.get_time()
                     if finite_rotation_time == ref_rotation_start_age:
-                        new_rotation_701_rel_000 = pgp.FiniteRotation((np.double(round(plat, 2)), 
+                        new_rotation_ref_plate_rel_000 = pgp.FiniteRotation((np.double(round(plat, 2)), 
                                                                        np.double(round(plon, 2))), 
                                                                        np.radians(np.double(round(min_results[-1][1], 2))))
 
-                        # Our new rotation is from 701 to 000 so remove the 701 to 005 part to get the
-                        # 005 to 000 part that gets stored in the 005-000 rotation feature.
+                        # Our new rotation is from 'ref_rotation_plate_id' to 000 so remove the
+                        # 'ref_rotation_plate_id' to 005 part to get the 005 to 000 part that gets
+                        # stored in the 005-000 rotation feature.
                         #
-                        #                               R(0->t,000->701) = R(0->t,000->005) * R(0->t,005->701)
-                        #   R(0->t,000->701) * inverse(R(0->t,005->701)) = R(0->t,000->005)
+                        #                                     R(0->t,000->ref_plate) = R(0->t,000->005) * R(0->t,005->ref_plate)
+                        #   R(0->t,000->ref_plate) * inverse(R(0->t,005->ref_plate)) = R(0->t,000->005)
                         #
-                        plate_rotation_701_rel_005 = rotation_model.get_rotation(
+                        plate_rotation_ref_plate_rel_005 = rotation_model.get_rotation(
                                 ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=5)
-                        new_rotation_005_rel_000 = new_rotation_701_rel_000 * plate_rotation_701_rel_005.get_inverse()
+                        new_rotation_005_rel_000 = new_rotation_ref_plate_rel_000 * plate_rotation_ref_plate_rel_005.get_inverse()
                         
                         finite_rotation_sample.get_value().set_finite_rotation(new_rotation_005_rel_000)
 
