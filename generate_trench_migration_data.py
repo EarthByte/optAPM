@@ -23,7 +23,7 @@ if not hasattr(pgp, 'Version') or pgp.Version.get_imported_version() < PYGPLATES
 # continuously-closing plates and deforming networks is relatively time consuming. #
 ####################################################################################
 
-timeStart = 410
+timeStart = 1000
 
 # If using optimised rotation model to reconstruct/resolve topologies.
 # model = '1'
@@ -68,15 +68,23 @@ tm_data_dir = os.path.join(data_dir, 'TMData')
 #topologies = '/Users/Mike/PhD/Plate_Models/Shephard_etal_2013_ESR/GPlates/Shephard_etal_ESR2013_Global_EarthByte_2013.gpml'
 
 #
-# Global_Model_WD_Internal_Release_2016_v3
+# Global_1000-0_Model_2017
 #
-output_data_dir = os.path.join(tm_data_dir, 'Global_Model_WD_Internal_Release_2016_v3')
-input_data_dir = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2016_v3')
+output_data_dir = os.path.join(tm_data_dir, 'Global_1000-0_Model_2017')
+input_data_dir = os.path.join(data_dir, 'Global_1000-0_Model_2017')
 topology_files = glob.glob(os.path.join(input_data_dir, '*.gpml'))
-# Gather all '.rot' files in the input directory.
 starting_rotfiles = glob.glob(os.path.join(input_data_dir, '*.rot'))
-# ...or use the optimised rotation file from the most recent model run.
-# starting_rotfiles = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2016_v3', 'optimisation', 'all_rotations_optAPM' + model + '.rot')
+
+#
+# Global_Model_WD_Internal_Release_2019_v1
+#
+# output_data_dir = os.path.join(tm_data_dir, 'Global_Model_WD_Internal_Release_2019_v1')
+# input_data_dir = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2019_v1')
+# topology_files = glob.glob(os.path.join(input_data_dir, '*.gpml'))
+# # Gather all '.rot' files in the input directory.
+# starting_rotfiles = glob.glob(os.path.join(input_data_dir, '*.rot'))
+# # ...or use the optimised rotation file from the most recent model run.
+# # starting_rotfiles = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2019_v1', 'optimisation', 'all_rotations_optAPM' + model + '.rot')
 
 
 # Load/parse the rotation and topologies files once (instead of repeating in each time loop iteration).

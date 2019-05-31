@@ -17,7 +17,7 @@ import pygplates
 
 # Optimising for 0-410Ma.
 # Currently only used for pre-resolved subduction zones.
-times_start = 410
+times_start = 1000
 
 # Whether to fix Africa (701) to plate 000 (ie, zero rotations for 701 relative to 000).
 # This is only used as a test input for the optimization workflow, to compare with (non-fixed)
@@ -28,7 +28,7 @@ fix_701_to_000 = False
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
 # Directory containing the input rotation files.
-rotation_data_dir = os.path.join(base_dir, 'data', 'Global_Model_WD_Internal_Release_2016_v3')
+rotation_data_dir = os.path.join(base_dir, 'data', 'Global_1000-0_Model_2017')
 
 # The combined output rotation file.
 output_rotation_filename = os.path.join(rotation_data_dir, 'optimisation', 'all_rotations.rot')
@@ -48,7 +48,7 @@ input_rotation_filenames = glob.glob(os.path.join(rotation_data_dir, '*.rot'))
 
 
 # Main trench migration data directory.
-tm_data_dir = os.path.join(base_dir, 'data', 'TMData', 'Global_Model_WD_Internal_Release_2016_v3')
+tm_data_dir = os.path.join(base_dir, 'data', 'TMData', 'Global_1000-0_Model_2017')
 
 # Interpolated hotspots (used when 'interpolated_hotspot_trails' is True in main script).
 interpolated_hotspots_filename = os.path.join(base_dir, 'data', 'interpolated_hotspot_chains_5Myr.xlsx')

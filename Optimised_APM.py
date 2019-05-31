@@ -50,9 +50,9 @@ use_parallel = MPI4PY
 # 
 
 # The 'r' number is the Subversion revision number of deforming model 2016_v3.
-model_name = "optAPM_r1228"
+model_name = "optAPM_r1378"
 
-start_age = 410
+start_age = 1000
 end_age = 0
 interval = 10
 
@@ -75,16 +75,14 @@ def get_fracture_zone_params(age):
     return False, 1.0  # Disable fracture zones.
 
 def get_net_rotation_params(age):
-    # Reduce net rotation weight to half for times older than 80Ma
-    # due to large number of synthetic (uncertain) plates.
+    return True, 1.0
+
+def get_trench_migration_params(age):
     if age <= 80:
         return True, 1.0
     else:
         # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
         return True, 2.0  # Gives a *multiplicative* weight of 0.5
-
-def get_trench_migration_params(age):
-    return True, 1.0
 
 def get_hotspot_trail_params(age):
     # Only use hotspot trails for 0-80Ma.
@@ -96,8 +94,9 @@ def get_hotspot_trail_params(age):
 
 # Trench migration parameters
 tm_method = 'pygplates' # 'pygplates' for new method OR 'convergence' for old method
-# tm_data_type = 'muller2016' # 'muller2016' or 'shephard2013' or 'Global_Model_WD_Internal_Release_2016_v3'
-tm_data_type = 'Global_Model_WD_Internal_Release_2016_v3' # 'muller2016' or 'shephard2013' or 'Global_Model_WD_Internal_Release_2016_v3'
+
+# 'Global_Model_WD_Internal_Release_2019_v1' or 'Global_1000-0_Model_2017' or 'muller2016' or 'shephard2013'
+tm_data_type = 'Global_1000-0_Model_2017'
 
 # Hotspot parameters:
 interpolated_hotspot_trails = True
@@ -112,10 +111,15 @@ include_chains = ['Louisville', 'Tristan', 'Reunion', 'St_Helena', 'Foundation',
 
 
 # Rotation file with existing APM rotations removed from 0-250Ma to be used:
-if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
+if tm_data_type == 'Global_Model_WD_Internal_Release_2019_v1':
 
-    original_rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/all_rotations.rot'
-    rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/all_rotations_' + model_name + '.rot'
+    original_rotfile = 'Global_Model_WD_Internal_Release_2019_v1/optimisation/all_rotations.rot'
+    rotfile = 'Global_Model_WD_Internal_Release_2019_v1/optimisation/all_rotations_' + model_name + '.rot'
+
+elif tm_data_type == 'Global_1000-0_Model_2017':
+
+    original_rotfile = 'Global_1000-0_Model_2017/optimisation/all_rotations.rot'
+    rotfile = 'Global_1000-0_Model_2017/optimisation/all_rotations_' + model_name + '.rot'
 
 elif tm_data_type == 'muller2016':
 
@@ -154,9 +158,17 @@ rotation_age_of_interest = True
 #
 # Which reference plate ID and PMAG rotation file to use at which age.
 #
-    ref_rotation_plate_id = 701
-    pmag_rotfile = 'Palaeomagnetic_Africa_S.rot'
 def get_reference_params(age):
+    if tm_data_type == 'Global_1000-0_Model_2017':
+        if age <= 550:
+            ref_rotation_plate_id = 701
+            pmag_rotfile = 'Global_1000-0_Model_2017/pmag/550_0_Palaeomagnetic_Africa_S.rot'
+        else:
+            ref_rotation_plate_id = 101
+            pmag_rotfile = 'Global_1000-0_Model_2017/pmag/1000_550_Laurentia_pmag_reference.rot'
+    else:
+        ref_rotation_plate_id = 701
+        pmag_rotfile = 'Palaeomagnetic_Africa_S.rot'
     
     return ref_rotation_plate_id, pmag_rotfile
 
@@ -171,10 +183,15 @@ if tm_method == 'convergence':
 
 elif tm_method == 'pygplates':
 
-    if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
+    if tm_data_type == 'Global_Model_WD_Internal_Release_2019_v1':
 
-        nnr_relative_datadir = 'TMData/Global_Model_WD_Internal_Release_2016_v3/'
-        nnr_rotfile = 'Global_Model_WD_Internal_Release_2016_v3/optimisation/no_net_rotations.rot'
+        nnr_relative_datadir = 'TMData/Global_Model_WD_Internal_Release_2019_v1/'
+        nnr_rotfile = 'Global_Model_WD_Internal_Release_2019_v1/optimisation/no_net_rotations.rot'
+
+    elif tm_data_type == 'Global_1000-0_Model_2017':
+
+        nnr_relative_datadir = 'TMData/Global_1000-0_Model_2017/'
+        nnr_rotfile = 'Global_1000-0_Model_2017/optimisation/no_net_rotations.rot'
 
     elif tm_data_type == 'muller2016':
 
@@ -187,11 +204,25 @@ elif tm_method == 'pygplates':
         nnr_rotfile = 'Shephard_etal_ESR2013_Global_EarthByte_NNR_ORIGINAL.rot'
 
 
-if tm_data_type == 'Global_Model_WD_Internal_Release_2016_v3':
+if tm_data_type == 'Global_Model_WD_Internal_Release_2019_v1':
 
-    ridge_file = 'Global_Model_WD_Internal_Release_2016_v3/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2016_v3.gpml'
-    isochron_file = 'Global_Model_WD_Internal_Release_2016_v3/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2016_v3.gpml'
-    isocob_file = 'Global_Model_WD_Internal_Release_2016_v3/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2016_v3.gpml'
+    ridge_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
+    isochron_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
+    isocob_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
+
+elif tm_data_type == 'Global_1000-0_Model_2017':
+
+    ##################################################################################################################################
+    #
+    # There are no static geometries (besides coastlines) for 'Global_1000-0_Model_2017'.
+    #
+    # NOTE: SO USING SAME FILES AS 'Global_Model_WD_Internal_Release_2019_v1'.
+    #       THIS IS OK IF WE'RE NOT INCLUDING FRACTURE ZONES (BECAUSE THEN THESE FILES ARE NOT USED FOR FINAL OPTIMISED ROTATIONS).
+    #
+    ##################################################################################################################################
+    ridge_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
+    isochron_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
+    isocob_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
 
 else:
 

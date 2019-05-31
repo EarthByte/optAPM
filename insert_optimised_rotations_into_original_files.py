@@ -42,7 +42,7 @@ insert_optimised_rotations_from_optimisation_run = True
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
 # Directory containing the original rotation files.
-original_rotation_data_dir = os.path.join(base_dir, 'data', 'Global_Model_WD_Internal_Release_2016_v3')
+original_rotation_data_dir = os.path.join(base_dir, 'data', 'Global_1000-0_Model_2017')
 
 # Directory containing the optimised rotation files.
 optimised_rotation_data_dir = os.path.join(original_rotation_data_dir, 'optimisation')
