@@ -1,6 +1,7 @@
 import sys
 import os.path
 import numpy as np
+import math
 import time
 import pygplates as pgp
 import geoTools
@@ -444,11 +445,31 @@ if __name__ == '__main__':
             
             print "Start age:", ref_rotation_start_age, "Ma"
             print ""
+            
+            current_search_radius = search_radius
+            current_models = models
+            if i > 0 and search == 'Initial':
+                # If the reference plate ID used in this iteration differs from the last iteration then temporarily
+                # expand the search diameter to 90 degrees since the two reference plate poles might differ a lot.
+                # Is 90 as high as we can go?
+                last_ref_rotation_plate_id, _ = get_reference_params(age_range[i-1])
+                if ref_rotation_plate_id != last_ref_rotation_plate_id:
+                    current_search_radius = 90
+                    # Expand number of models by the increase in area of small circle search radius 2*PI*(1 - cos(small_circle_radius)).
+                    # NOTE: The values given in search radius appear to be diameters (so halving them).
+                    current_models = int(
+                        (1.0 - math.cos(0.5 * math.radians(current_search_radius))) /
+                        (1.0 - math.cos(0.5 * math.radians(search_radius)))
+                        * models + 0.5)
+                    print "Temporarily expanding search diameter to {0} from {1} at {2}Ma due to change in reference plate.".format(
+                        current_search_radius, search_radius, ref_rotation_start_age)
+                    print "Also proportionately expanding number of models to {0} from {1}.".format(current_models, models)
+                    print ""
 
             # --------------------------------------------------------------------
 
             # Gather parameters
-            params = [search_radius, rotation_uncertainty, search_type, models, model_stop_condition, max_iter,
+            params = [current_search_radius, rotation_uncertainty, search_type, current_models, model_stop_condition, max_iter,
                       ref_rotation_plate_id, ref_rotation_start_age, ref_rotation_end_age, interpolation_resolution, 
                       rotation_age_of_interest, fracture_zones, net_rotation, trench_migration, hotspot_trails,
                       no_auto_ref_rot_longitude, no_auto_ref_rot_latitude, no_auto_ref_rot_angle, auto_calc_ref_pole, search, 
@@ -691,15 +712,15 @@ if __name__ == '__main__':
 
             # Save results to pickle file located as '/model_output/
             output_file = pr.saveResultsToPickle(data_array, data_array_labels_short, ref_rotation_start_age, 
-                                                 ref_rotation_end_age, search_radius, xopt, models, model_name)
+                                                 ref_rotation_end_age, current_search_radius, xopt, current_models, model_name)
 
 
             # Plot results
             rmin, rmean = pr.sortAndPlot(output_file, ref_rotation_start_age, ref_rotation_end_age, 
                                          rotation_age_of_interest_age, xopt, rotation_file, ref_rot_longitude,
                                          ref_rot_latitude, ref_rot_angle, seed_lons, seed_lats, 
-                                         ref_rotation_plate_id, model_name, models, data_array_labels_short, 
-                                         data_array, search_radius,
+                                         ref_rotation_plate_id, model_name, current_models, data_array_labels_short, 
+                                         data_array, current_search_radius,
                                          plot)
 
 

@@ -291,7 +291,7 @@ class ModelSetup():
         # rotation_model_tmp = pgp.FeatureCollection(rotation_file)
 
 
-        # Calculate initial reference rotation for Africa from selected rotation model
+        # Calculate initial reference rotation for the reference plate (eg, Africa) from selected rotation model
         if auto_calc_ref_pole == True:
 
             print "- Auto-calc palaeomagnetic"
@@ -340,7 +340,7 @@ class ModelSetup():
         # ref_rot_angle = np.rad2deg(ref_rot_angle)
 
         print " "
-        print "Reference finite rotation pole for Africa at", ref_rotation_start_age, "Ma:"
+        print "Reference finite rotation pole for reference plate", ref_rotation_plate_id, "at", ref_rotation_start_age, "Ma:"
         print "- Lon:", ref_rot_longitude
         print "- Lat:", ref_rot_latitude
         print "- Angle:", ref_rot_angle
@@ -353,7 +353,7 @@ class ModelSetup():
         ref_rot_latitude_of_interest = ref_rot_of_interest_pole.get_latitude()
         ref_rot_angle_of_interest = np.rad2deg(ref_rot_of_interest_angle)
 
-        # print "Reference finite rotation pole for Africa at", rotation_age_of_interest_age, "Ma:"
+        # print "Reference finite rotation pole for reference plate", ref_rotation_plate_id, "at", rotation_age_of_interest_age, "Ma:"
         # print "- Lon:", ref_rot_longitude_of_interest
         # print "- Lat:", ref_rot_latitude_of_interest
         # print "- Angle:", ref_rot_angle_of_interest
@@ -733,7 +733,7 @@ class ModelSetup():
 
                 tmp_seed = []
 
-                # Set first seed to known Africa rotation
+                # Set first seed to known reference plate rotation
                 if len(start_seeds) < 1:
 
                     lon_rand = ref_rot_longitude
