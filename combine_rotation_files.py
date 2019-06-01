@@ -2,6 +2,7 @@ import glob
 import os.path
 import pandas
 import pygplates
+import Optimised_APM  # To query reference plate ID over time.
 
 #########################################################################
 # Script to concatenate all rotation ('.rot') files in a directory, and #
@@ -15,7 +16,7 @@ import pygplates
 # those that go through Africa 701).                                    #
 #########################################################################
 
-# Optimising for 0-410Ma.
+# Optimising for 0-1000Ma.
 # Currently only used for pre-resolved subduction zones.
 times_start = 1000
 
@@ -60,13 +61,14 @@ interpolated_hotspots_filename = os.path.join(base_dir, 'data', 'interpolated_ho
 
 required_plate_ids = set()
 
-# Add Africa (used by Net Rotation objective function).
-required_plate_ids.add(701)
-
 # Add plate IDs are pre-resolved subduction zones.
 for time in xrange(0, times_start+1):
     
     # print time
+    
+    # Add reference plate IDs (used by Net Rotation objective function).
+    ref_rotation_plate_id, _ = Optimised_APM.get_reference_params(time)
+    required_plate_ids.add(ref_rotation_plate_id)
     
     # Read TM gpml file.
     subduction_features = pygplates.FeatureCollection.read(os.path.join(tm_data_dir, 'TMData_' + str(time) + 'Ma.gpml'))
@@ -170,6 +172,8 @@ if not required_rotations_include_005_000:
                 for time in (0.0, times_start)]))
     required_rotation_features.append(rotation_feature_005_rel_000)
 
+pygplates.FeatureCollection(required_rotation_features).write(output_rotation_filename)
+
 
 # Fix Africa (701) to plate 000 if requested (for normal optimization runs we don't do this).
 if fix_701_to_000:
@@ -256,5 +260,3 @@ if fix_701_to_000:
     nnr_rotation_features.append(rotation_feature_005_000)
     
     pygplates.FeatureCollection(nnr_rotation_features).write(output_rotation_filename_fixed_701_for_NNR)
-
-pygplates.FeatureCollection(required_rotation_features).write(output_rotation_filename)
