@@ -59,6 +59,12 @@ interval = 10
 
 search = "Initial"
 search_radius = 60
+# If True then temporarily expand search radius to 90 whenever the reference plate changes.
+# Normally the reference plate stays constant at Africa (701), but does switch to 101 for the 1Ga model.
+# It's off by default since it doesn't appear to change the results, and may sometimes cause job to fail
+# on Artemis (presumably since 'models' is increased by a factor of 2.5) - although problem manifested
+# as failure to read "all_rotations_<...>.rot" file, so it was probably something else.
+expand_search_radius_on_ref_plate_switches = False
 rotation_uncertainty = 30
 auto_calc_ref_pole = True
 models = 100
@@ -448,7 +454,7 @@ if __name__ == '__main__':
             
             current_search_radius = search_radius
             current_models = models
-            if i > 0 and search == 'Initial':
+            if expand_search_radius_on_ref_plate_switches and i > 0 and search == 'Initial':
                 # If the reference plate ID used in this iteration differs from the last iteration then temporarily
                 # expand the search diameter to 90 degrees since the two reference plate poles might differ a lot.
                 # Is 90 as high as we can go?
