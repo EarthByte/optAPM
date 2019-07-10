@@ -37,9 +37,13 @@ use_parallel = MPI4PY
 # 
 
 # The 'r' number is the Subversion revision number of deforming model 2016_v3.
-model_name = "optAPM_r1381_HS1_TM_NR0.5_80Ma"
+model_name = "optAPM_r1378_test"
 
-start_age = 80
+# The data model to run the optimisation on.
+# This should be the name of the sub-directory in 'data/' and also the sub-directory in 'data/TMData/'.
+data_model = 'Global_1000-0_Model_2017'
+
+start_age = 1000
 end_age = 0
 interval = 10
 
@@ -68,11 +72,11 @@ def get_fracture_zone_params(age):
     return False, 1.0  # Disable fracture zones.
 
 def get_net_rotation_params(age):
-    return True, 2.0  # Gives a *multiplicative* weight of 0.5
+    return True, 1.0
 
 def get_trench_migration_params(age):
     if age <= 80:
-        return True, 2.0  # Gives a *multiplicative* weight of 0.5
+        return True, 1.0
     else:
         # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
         return True, 2.0  # Gives a *multiplicative* weight of 0.5
@@ -88,8 +92,7 @@ def get_hotspot_trail_params(age):
 # Trench migration parameters
 tm_method = 'pygplates' # 'pygplates' for new method OR 'convergence' for old method
 
-# 'Global_Model_WD_Internal_Release_2019_v1' or 'Global_1000-0_Model_2017' or 'muller2016' or 'shephard2013'
-tm_data_type = 'Global_Model_WD_Internal_Release_2019_v1'
+tm_data_type = data_model
 
 # Hotspot parameters:
 interpolated_hotspot_trails = True

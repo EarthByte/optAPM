@@ -2,7 +2,7 @@ import glob
 import os.path
 import pandas
 import pygplates
-import Optimised_config  # To query reference plate ID over time.
+import Optimised_config
 
 #########################################################################
 # Script to concatenate all rotation ('.rot') files in a directory, and #
@@ -16,9 +16,8 @@ import Optimised_config  # To query reference plate ID over time.
 # those that go through Africa 701).                                    #
 #########################################################################
 
-# Optimising for 0-1000Ma.
 # Currently only used for pre-resolved subduction zones.
-times_start = 1000
+times_start = Optimised_config.start_age
 
 # Whether to fix Africa (701) to plate 000 (ie, zero rotations for 701 relative to 000).
 # This is only used as a test input for the optimization workflow, to compare with (non-fixed)
@@ -29,7 +28,7 @@ fix_701_to_000 = False
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
 # Directory containing the input rotation files.
-rotation_data_dir = os.path.join(base_dir, 'data', 'Global_1000-0_Model_2017')
+rotation_data_dir = os.path.join(base_dir, 'data', Optimised_config.data_model)
 
 # The combined output rotation file.
 output_rotation_filename = os.path.join(rotation_data_dir, 'optimisation', 'all_rotations.rot')
@@ -49,10 +48,10 @@ input_rotation_filenames = glob.glob(os.path.join(rotation_data_dir, '*.rot'))
 
 
 # Main trench migration data directory.
-tm_data_dir = os.path.join(base_dir, 'data', 'TMData', 'Global_1000-0_Model_2017')
+tm_data_dir = os.path.join(base_dir, 'data', 'TMData', Optimised_config.data_model)
 
 # Interpolated hotspots (used when 'interpolated_hotspot_trails' is True in main script).
-interpolated_hotspots_filename = os.path.join(base_dir, 'data', 'interpolated_hotspot_chains_5Myr.xlsx')
+interpolated_hotspots_filename = os.path.join(base_dir, 'data', Optimised_config.interpolated_hotspots)
 
 
 #

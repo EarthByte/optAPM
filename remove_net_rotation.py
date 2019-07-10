@@ -3,7 +3,7 @@ import sys
 import os.path
 import math
 import pygplates
-import Optimised_config  # To query reference plate ID over time.
+import Optimised_config
 
 
 # # Check the required pygplates version.
@@ -36,10 +36,10 @@ base_dir = os.path.abspath(os.path.dirname(__file__))
 # Data sub-directory.
 data_dir = os.path.join(base_dir, 'data')
 
-rotation_filename = os.path.join(data_dir, 'Global_1000-0_Model_2017', 'optimisation', 'all_rotations.rot')
-nnr_rotation_filename = os.path.join(data_dir, 'Global_1000-0_Model_2017', 'optimisation', 'no_net_rotations.rot')
+rotation_filename = os.path.join(data_dir, Optimised_config.data_model, 'optimisation', 'all_rotations.rot')
+nnr_rotation_filename = os.path.join(data_dir, Optimised_config.data_model, 'optimisation', 'no_net_rotations.rot')
 
-net_rotations_filename = os.path.join(data_dir, 'Global_1000-0_Model_2017', 'optimisation', 'total-net-rotations.csv')
+net_rotations_filename = os.path.join(data_dir, Optimised_config.data_model, 'optimisation', 'total-net-rotations.csv')
 
 
 

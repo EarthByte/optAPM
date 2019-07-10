@@ -3,6 +3,7 @@ import os.path
 import sys
 import pygplates as pgp
 import subduction_convergence_for_absolute_plate_motion as scap
+import Optimised_config
 
 
 # Check the required pygplates version.
@@ -23,7 +24,7 @@ if not hasattr(pgp, 'Version') or pgp.Version.get_imported_version() < PYGPLATES
 # continuously-closing plates and deforming networks is relatively time consuming. #
 ####################################################################################
 
-timeStart = 1000
+timeStart = Optimised_config.start_age
 
 # If using optimised rotation model to reconstruct/resolve topologies.
 # model = '1'
@@ -36,55 +37,10 @@ data_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
 tm_data_dir = os.path.join(data_dir, 'TMData')
 
 
-# Muller 2016
-# starting_rotfile = '/Users/Mike/PhD/Plate_Models/Muller_etal_2016/Global_EarthByte_230-0Ma_GK07_AREPS.rot'
-# output_data_dir = '/Users/Mike/PhD/Plate_Models/Muller_etal_2016/Resolved_subduction_zones/'
-# topologies = '/Users/Mike/PhD/Plate_Models/Muller_etal_2016/Global_EarthByte_230-0Ma_GK07_AREPS_PlateBoundaries.gpml'
-
-# Shephard 2016
-# starting_rotfile = '/Users/Mike/PhD/Plate_Models/Shephard_etal_2013_ESR/GPlates/Shephard_etal_ESR2013_Global_EarthByte_2013.rot'
-# output_data_dir = '/Users/Mike/PhD/Plate_Models/Shephard_etal_2013_ESR/GPlates/Resolved_subduction_zones/'
-# topologies = '/Users/Mike/PhD/Plate_Models/Shephard_etal_2013_ESR/GPlates/Shephard_etal_ESR2013_Global_EarthByte_2013.gpml'
-
-# Muller 2016
-# starting_rotfiles = [os.path.join(data_dir, 'Global_EarthByte_230-0Ma_GK07_AREPS_optAPM' + model + '.rot')]
-
-# Shephard 2013    
-# starting_rotfile = '/Users/Mike/Projects/optAPM/model_output_0-80Ma/optAPM' + model + \
-#                    '/Shephard_etal_ESR2013_Global_EarthByte_2013_optAPM' + model + '.rot'
-
-# Muller 2016 alternative reference frames
-# starting_rotfile = '/Users/Mike/PhD/Plate_Models/Muller_etal_2016/Alternative_reference_frames/' + \
-#                    'Global_EarthByte_230-0Ma_GK07_AREPS_' + model + '.rot'
-
-# output_data_dir = '/Users/Mike/Projects/optAPM/model_output_0-80Ma/optAPM' + model + \
-#                   '/Subduction_zone_params/Resolved_topologies/'
-# output_data_dir = '/Users/Mike/PhD/Plate_Models/Muller_etal_2016/Alternative_reference_frames/Resolved_topologies/' + model + '/'
-# output_data_dir = os.path.join(data_dir, 'TMData', 'Muller_2016')
-
-# topology_files = [
-#     os.path.join(data_dir, 'Global_EarthByte_230-0Ma_GK07_AREPS_PlateBoundaries.gpml'),
-#     os.path.join(data_dir, 'Global_EarthByte_230-0Ma_GK07_AREPS_Topology_BuildingBlocks.gpml')]
-#topologies = '/Users/Mike/PhD/Plate_Models/Shephard_etal_2013_ESR/GPlates/Shephard_etal_ESR2013_Global_EarthByte_2013.gpml'
-
-#
-# Global_1000-0_Model_2017
-#
-output_data_dir = os.path.join(tm_data_dir, 'Global_1000-0_Model_2017')
-input_data_dir = os.path.join(data_dir, 'Global_1000-0_Model_2017')
+output_data_dir = os.path.join(tm_data_dir, Optimised_config.data_model)
+input_data_dir = os.path.join(data_dir, Optimised_config.data_model)
 topology_files = glob.glob(os.path.join(input_data_dir, '*.gpml'))
 starting_rotfiles = glob.glob(os.path.join(input_data_dir, '*.rot'))
-
-#
-# Global_Model_WD_Internal_Release_2019_v1
-#
-# output_data_dir = os.path.join(tm_data_dir, 'Global_Model_WD_Internal_Release_2019_v1')
-# input_data_dir = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2019_v1')
-# topology_files = glob.glob(os.path.join(input_data_dir, '*.gpml'))
-# # Gather all '.rot' files in the input directory.
-# starting_rotfiles = glob.glob(os.path.join(input_data_dir, '*.rot'))
-# # ...or use the optimised rotation file from the most recent model run.
-# # starting_rotfiles = os.path.join(data_dir, 'Global_Model_WD_Internal_Release_2019_v1', 'optimisation', 'all_rotations_optAPM' + model + '.rot')
 
 
 # Load/parse the rotation and topologies files once (instead of repeating in each time loop iteration).

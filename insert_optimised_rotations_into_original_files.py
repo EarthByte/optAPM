@@ -2,6 +2,7 @@ import glob
 import os.path
 import pandas
 import pygplates
+import Optimised_config
 
 
 #########################################################################
@@ -11,11 +12,9 @@ import pygplates
 #########################################################################
 
 optimised_model_name = None
-#optimised_model_name = 'optAPM_r1228'
 
 # If model name not manually specified above then read it from the config module 'Optimised_config'.
 if not optimised_model_name:
-    import Optimised_config  # To get 'model_name'
     optimised_model_name = Optimised_config.model_name
 
 # In some cases the original rotation files already have a 005-000 sequence.
@@ -42,7 +41,7 @@ insert_optimised_rotations_from_optimisation_run = True
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
 # Directory containing the original rotation files.
-original_rotation_data_dir = os.path.join(base_dir, 'data', 'Global_1000-0_Model_2017')
+original_rotation_data_dir = os.path.join(base_dir, 'data', Optimised_config.data_model)
 
 # Directory containing the optimised rotation files.
 optimised_rotation_data_dir = os.path.join(original_rotation_data_dir, 'optimisation')
