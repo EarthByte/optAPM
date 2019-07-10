@@ -37,13 +37,13 @@ use_parallel = MPI4PY
 # 
 
 # The 'r' number is the Subversion revision number of deforming model 2016_v3.
-model_name = "optAPM_r1378_test"
+model_name = "optAPM_run1"
 
 # The data model to run the optimisation on.
 # This should be the name of the sub-directory in 'data/' and also the sub-directory in 'data/TMData/'.
-data_model = 'Global_1000-0_Model_2017'
+data_model = 'Muller++_2015_AREPS_CORRECTED'
 
-start_age = 1000
+start_age = 230
 end_age = 0
 interval = 10
 
@@ -72,14 +72,14 @@ def get_fracture_zone_params(age):
     return False, 1.0  # Disable fracture zones.
 
 def get_net_rotation_params(age):
-    return True, 1.0
-
-def get_trench_migration_params(age):
     if age <= 80:
         return True, 1.0
     else:
         # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
         return True, 2.0  # Gives a *multiplicative* weight of 0.5
+
+def get_trench_migration_params(age):
+    return True, 1.0
 
 def get_hotspot_trail_params(age):
     # Only use hotspot trails for 0-80Ma.
@@ -116,6 +116,11 @@ elif tm_data_type == 'Global_1000-0_Model_2017':
 
     original_rotfile = 'Global_1000-0_Model_2017/optimisation/all_rotations.rot'
     rotfile = 'Global_1000-0_Model_2017/optimisation/all_rotations_' + model_name + '.rot'
+
+elif tm_data_type == 'Muller++_2015_AREPS_CORRECTED':
+
+    original_rotfile = 'Muller++_2015_AREPS_CORRECTED/optimisation/all_rotations.rot'
+    rotfile = 'Muller++_2015_AREPS_CORRECTED/optimisation/all_rotations_' + model_name + '.rot'
 
 elif tm_data_type == 'muller2016':
 
@@ -189,6 +194,11 @@ elif tm_method == 'pygplates':
         nnr_relative_datadir = 'TMData/Global_1000-0_Model_2017/'
         nnr_rotfile = 'Global_1000-0_Model_2017/optimisation/no_net_rotations.rot'
 
+    elif tm_data_type == 'Muller++_2015_AREPS_CORRECTED':
+
+        nnr_relative_datadir = 'TMData/Muller++_2015_AREPS_CORRECTED/'
+        nnr_rotfile = 'Muller++_2015_AREPS_CORRECTED/optimisation/no_net_rotations.rot'
+
     elif tm_data_type == 'muller2016':
 
         nnr_relative_datadir = 'TMData/Muller_2016/'
@@ -206,11 +216,12 @@ if tm_data_type == 'Global_Model_WD_Internal_Release_2019_v1':
     isochron_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
     isocob_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
 
-elif tm_data_type == 'Global_1000-0_Model_2017':
+elif (tm_data_type == 'Global_1000-0_Model_2017' or
+      tm_data_type == 'Muller++_2015_AREPS_CORRECTED'):
 
     ##################################################################################################################################
     #
-    # There are no static geometries (besides coastlines) for 'Global_1000-0_Model_2017'.
+    # There are no static geometries (besides coastlines) for this data model.
     #
     # NOTE: SO USING SAME FILES AS 'Global_Model_WD_Internal_Release_2019_v1'.
     #       THIS IS OK IF WE'RE NOT INCLUDING FRACTURE ZONES (BECAUSE THEN THESE FILES ARE NOT USED FOR FINAL OPTIMISED ROTATIONS).
