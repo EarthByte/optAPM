@@ -13,10 +13,10 @@ import pygplates
 optimised_model_name = None
 #optimised_model_name = 'optAPM_r1228'
 
-# If model name not manually specified above then read it from the main 'Optimised_APM' module.
+# If model name not manually specified above then read it from the config module 'Optimised_config'.
 if not optimised_model_name:
-    import Optimised_APM  # To get 'model_name'
-    optimised_model_name = Optimised_APM.model_name
+    import Optimised_config  # To get 'model_name'
+    optimised_model_name = Optimised_config.model_name
 
 # In some cases the original rotation files already have a 005-000 sequence.
 # Presumably because they are the output of an old version of the

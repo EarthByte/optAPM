@@ -3,7 +3,7 @@ import sys
 import os.path
 import math
 import pygplates
-import Optimised_APM  # To query reference plate ID over time.
+import Optimised_config  # To query reference plate ID over time.
 
 
 # # Check the required pygplates version.
@@ -98,7 +98,7 @@ net_stage_rotation_interval = net_stage_pole_data[0][0] - net_stage_pole_data[1]
 nnr_ref_plate_sequences = []
 
 # Start with identity rotation at time 0Ma for the first reference plate.
-first_ref_rotation_plate_id, _ = Optimised_APM.get_reference_params(0)
+first_ref_rotation_plate_id, _ = Optimised_config.get_reference_params(0)
 nnr_ref_plate_sequences.append((
     first_ref_rotation_plate_id,
     [pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'NNR')]))
@@ -116,7 +116,7 @@ for time, net_stage_lat, net_stage_lon, net_stage_angle_per_my in reversed(net_s
     net_total_rotation = net_stage_rotation.get_inverse() * net_total_rotation
     
     # The reference plate for the current time obtained from main optimisation workflow.
-    ref_rotation_plate_id, _ = Optimised_APM.get_reference_params(time)
+    ref_rotation_plate_id, _ = Optimised_config.get_reference_params(time)
     
     # Remove net total rotation at current time from 'ref_rotation_plate_id' rel 000 rotation.
     #

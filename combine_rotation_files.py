@@ -2,7 +2,7 @@ import glob
 import os.path
 import pandas
 import pygplates
-import Optimised_APM  # To query reference plate ID over time.
+import Optimised_config  # To query reference plate ID over time.
 
 #########################################################################
 # Script to concatenate all rotation ('.rot') files in a directory, and #
@@ -67,7 +67,7 @@ for time in xrange(0, times_start+1):
     # print time
     
     # Add reference plate IDs (used by Net Rotation objective function).
-    ref_rotation_plate_id, _ = Optimised_APM.get_reference_params(time)
+    ref_rotation_plate_id, _ = Optimised_config.get_reference_params(time)
     required_plate_ids.add(ref_rotation_plate_id)
     
     # Read TM gpml file.
