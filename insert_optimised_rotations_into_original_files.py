@@ -36,7 +36,7 @@ if not optimised_model_name:
 #
 # So we have the option to remove 005-000 and set all fixed plate ids that are 005 back to 000.
 # It's an option because the owner of the original rotation files might want to keep 005-000 for some reason.
-remove_005_000_from_original_rotations = True
+remove_005_000_from_original_rotations = False
 
 # Insert the 005-000 optimisations produced by an optimisation run.
 #
