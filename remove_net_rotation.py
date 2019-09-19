@@ -3,6 +3,7 @@ import sys
 import os.path
 import math
 import pygplates
+import warnings
 import Optimised_config
 
 
@@ -15,6 +16,16 @@ import Optimised_config
 # if not hasattr(pygplates, 'Version') or pygplates.Version.get_imported_version() < PYGPLATES_VERSION_REQUIRED:
 #     raise RuntimeError('{0}: Error - imported pygplates version {1} but version {2} or greater is required'.format(
 #             os.path.basename(__file__), pygplates.Version.get_imported_version(), PYGPLATES_VERSION_REQUIRED))
+
+
+def warning_format(message, category, filename, lineno, file=None, line=None):
+    # return '{0}:{1}: {1}:{1}\n'.format(filename, lineno, category.__name__, message)
+    return '{0}: {1}\n'.format(category.__name__, message)
+# Print the warnings without the filename and line number.
+# Users are not going to want to see that.
+warnings.formatwarning = warning_format
+# Always print warnings (not just the first time encountered at a particular location).
+warnings.simplefilter("always")
 
 
 ##########################################################

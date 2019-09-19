@@ -3,6 +3,7 @@ import os.path
 import numpy as np
 import math
 import time
+import warnings
 import pygplates as pgp
 import geoTools
 
@@ -14,6 +15,16 @@ from datetime import datetime, timedelta
 # All the config parameters are now in a separate module 'Optimised_config' that also
 # gets imported into the pre-processing modules.
 from Optimised_config import *
+
+
+def warning_format(message, category, filename, lineno, file=None, line=None):
+    # return '{0}:{1}: {1}:{1}\n'.format(filename, lineno, category.__name__, message)
+    return '{0}: {1}\n'.format(category.__name__, message)
+# Print the warnings without the filename and line number.
+# Users are not going to want to see that.
+warnings.formatwarning = warning_format
+# Always print warnings (not just the first time encountered at a particular location).
+warnings.simplefilter("always")
 
 
 if __name__ == '__main__':
