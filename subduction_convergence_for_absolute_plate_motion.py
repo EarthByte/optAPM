@@ -32,72 +32,18 @@
 from __future__ import print_function
 import argparse
 import math
+import os.path
 import sys
 import pygplates
+import warnings
 
 
-# Determine the overriding and subducting plates of the subduction shared sub-segment.
-def find_overriding_and_subducting_plates(subduction_shared_sub_segment, time):
-    
-    # Get the subduction polarity of the nearest subducting line.
-    subduction_polarity = subduction_shared_sub_segment.get_feature().get_enumeration(pygplates.PropertyName.gpml_subduction_polarity)
-    if (not subduction_polarity) or (subduction_polarity == 'Unknown'):
-        print('Unable to find the overriding plate of the subducting shared sub-segment "{0}"'.format(
-            subduction_shared_sub_segment.get_feature().get_name()), file=sys.stderr)
-        print('    subduction zone feature is missing subduction polarity property or it is set to "Unknown".', file=sys.stderr)
-        return
-
-    # There should be two sharing topologies - one is the overriding plate and the other the subducting plate.
-    sharing_resolved_topologies = subduction_shared_sub_segment.get_sharing_resolved_topologies()
-    if len(sharing_resolved_topologies) != 2:
-        print('Unable to find the overriding and subducting plates of the subducting shared sub-segment "{0}" at {1}Ma'.format(
-            subduction_shared_sub_segment.get_feature().get_name(), time), file=sys.stderr)
-        print('    there are not exactly 2 topologies sharing the sub-segment.', file=sys.stderr)
-        return
-
-    overriding_plate = None
-    subducting_plate = None
-    
-    geometry_reversal_flags = subduction_shared_sub_segment.get_sharing_resolved_topology_geometry_reversal_flags()
-    for index in range(2):
-
-        sharing_resolved_topology = sharing_resolved_topologies[index]
-        geometry_reversal_flag = geometry_reversal_flags[index]
-
-        if sharing_resolved_topology.get_resolved_boundary().get_orientation() == pygplates.PolygonOnSphere.Orientation.clockwise:
-            # The current topology sharing the subducting line has clockwise orientation (when viewed from above the Earth).
-            # If the overriding plate is to the 'left' of the subducting line (when following its vertices in order) and
-            # the subducting line is reversed when contributing to the topology then that topology is the overriding plate.
-            # A similar test applies to the 'right' but with the subducting line not reversed in the topology.
-            if ((subduction_polarity == 'Left' and geometry_reversal_flag) or
-                (subduction_polarity == 'Right' and not geometry_reversal_flag)):
-                overriding_plate = sharing_resolved_topology
-            else:
-                subducting_plate = sharing_resolved_topology
-        else:
-            # The current topology sharing the subducting line has counter-clockwise orientation (when viewed from above the Earth).
-            # If the overriding plate is to the 'left' of the subducting line (when following its vertices in order) and
-            # the subducting line is not reversed when contributing to the topology then that topology is the overriding plate.
-            # A similar test applies to the 'right' but with the subducting line reversed in the topology.
-            if ((subduction_polarity == 'Left' and not geometry_reversal_flag) or
-                (subduction_polarity == 'Right' and geometry_reversal_flag)):
-                overriding_plate = sharing_resolved_topology
-            else:
-                subducting_plate = sharing_resolved_topology
-    
-    if overriding_plate is None:
-        print('Unable to find the overriding plate of the subducting shared sub-segment "{0}" at {1}Ma'.format(
-            subduction_shared_sub_segment.get_feature().get_name(), time), file=sys.stderr)
-        print('    both sharing topologies are on subducting side of subducting line.', file=sys.stderr)
-        return
-    
-    if subducting_plate is None:
-        print('Unable to find the subducting plate of the subducting shared sub-segment "{0}" at {1}Ma'.format(
-            subduction_shared_sub_segment.get_feature().get_name(), time), file=sys.stderr)
-        print('    both sharing topologies are on overriding side of subducting line.', file=sys.stderr)
-        return
-    
-    return (overriding_plate, subducting_plate, subduction_polarity)
+# PyGPlates version 22 can handle topological lines (can get their sub-sub-segment plate IDs).
+PYGPLATES_VERSION_REQUIRED = pygplates.Version(22)
+# Check the imported pygplates version.
+if not hasattr(pygplates, 'Version') or pygplates.Version.get_imported_version() < PYGPLATES_VERSION_REQUIRED:
+    raise ImportError('{0}: Error - imported pygplates version {1} but version {2} or greater is required'.format(
+            os.path.basename(__file__), pygplates.Version.get_imported_version(), PYGPLATES_VERSION_REQUIRED))
 
 
 # Resolves subduction zone topologies at 'time' and returns resolved geometries as a list of features.
@@ -138,35 +84,50 @@ def resolve_subduction_zones(
         # These are the parts of the subducting line that actually contribute to topological boundaries.
         for shared_sub_segment in shared_boundary_section.get_shared_sub_segments():
             
-            # The plate ID of the subduction zone line (as opposed to the subducting plate).
+            # The plate ID of the trench line (as opposed to the subducting plate).
             #
-            # Update: The plate IDs of the subduction zone line and overriding plate can differ
+            # Update: The plate IDs of the trench line and overriding plate can differ
             # even in a non-deforming model due to smaller plates, not modelled by topologies, moving
-            # differently than the larger topological plate being modelled - and the subduction zone line
+            # differently than the larger topological plate being modelled - and the trench line
             # having plate IDs of the smaller plates near them. For that reason we use the plate ID
-            # of the subduction zone line whenever we can. Since some subduction zone lines can be
-            # topological lines, they might actually be deforming (or intended to be deforming) and
-            # hence their plate ID is not meaningful or at least we can't be sure whether it will
-            # be zero or the overriding plate (or something else). So if the subduction zone line
-            # is a topological line then we'll use the overriding plate ID instead.
+            # of the trench line whenever we can.
             #
-            if isinstance(shared_boundary_section.get_topological_section(), pygplates.ResolvedTopologicalLine):
-                # Find the overriding and subducting plates on either side of the shared sub-segment.
-                overriding_and_subducting_plates = find_overriding_and_subducting_plates(shared_sub_segment, time)
-                if not overriding_and_subducting_plates:
-                    continue
-                overriding_plate, subducting_plate, subduction_polarity = overriding_and_subducting_plates
-                subduction_zone_plate_id = overriding_plate.get_feature().get_reconstruction_plate_id()
-            else:
-                subduction_zone_plate_id = shared_sub_segment.get_feature().get_reconstruction_plate_id()
-            
-            # Create the resolved subduction zone feature.
-            resolved_subduction_feature = shared_sub_segment.get_feature().clone()
-            # Overrid the plate ID and geometry.
-            resolved_subduction_feature.set_reconstruction_plate_id(subduction_zone_plate_id)
-            resolved_subduction_feature.set_geometry(shared_sub_segment.get_resolved_geometry())
-            
-            resolved_subduction_features.append(resolved_subduction_feature)
+            # If the current shared sub-segment is part of a topological line then we obtain its sub-sub-segments
+            # (since we require pyGPlates version 22 or above). This is because trench lines that are
+            # topological lines might actually be deforming (or intended to be deforming) and hence their
+            # plate ID is not meaningful or at least we can't be sure whether it will be zero or the
+            # overriding plate (or something else). In this case we look at the plate IDs of the sub-sub-segments.
+            #
+            sub_segments_of_topological_line_sub_segment = shared_sub_segment.get_sub_segments()
+            if sub_segments_of_topological_line_sub_segment:
+                
+                # Subduction polarity - default to 'Unknown' if subduction zone doesn't have one.
+                subduction_polarity = shared_sub_segment.get_feature().get_enumeration(
+                    pygplates.PropertyName.gpml_subduction_polarity,
+                    'Unknown')
+                
+                # Iterate over the sub-sub-segments associated with the topological line.
+                for sub_sub_segment in sub_segments_of_topological_line_sub_segment:
+                    
+                    # Create the resolved subduction zone feature.
+                    resolved_subduction_feature = sub_sub_segment.get_resolved_feature()
+                    
+                    # Transfer the subduction polarity from the subduction zone feature to its current sub-segment feature.
+                    # They are different features and hence only the subduction zone itself will have a subduction polarity.
+                    resolved_subduction_feature.set_enumeration(
+                        pygplates.PropertyName.gpml_subduction_polarity,
+                        subduction_polarity,
+                        # Just in case the sub-sub-segment feature type does not support a subduction polarity...
+                        verify_information_model=pygplates.VerifyInformationModel.no)
+                    
+                    resolved_subduction_features.append(resolved_subduction_feature)
+                    
+            else: # It's not a topological line...
+                
+                # Create the resolved subduction zone feature.
+                resolved_subduction_feature = shared_sub_segment.get_resolved_feature()
+                
+                resolved_subduction_features.append(resolved_subduction_feature)
                 
     return resolved_subduction_features
 
@@ -191,8 +152,7 @@ def resolve_subduction_zones(
 #
 # NOTE: The topologies should have already been resolved for time 'time' and their resolved geometries stored
 # in features (which are passed in the 'resolved_topology_features' argument). The subduction zone plate ID
-# and polarities should also be stored in the features. The subduction zone plate ID should be the overriding plate
-# if it came from a topological line, otherwise just the normal subduction zone plate ID.
+# and polarities should also be stored in the features.
 #
 # Note that the absolute velocity magnitudes are negative if the subduction zones absolute motion is heading
 # in the direction of the overriding plates (if absolute obliquity angle is less than 90 and greater than -90).
@@ -241,7 +201,8 @@ def subduction_absolute_motion(
         # We need to reverse the subducting_normal vector direction if overriding plate is to
         # the right of the subducting line since great circle arc normal is always to the left.
         subduction_polarity = shared_sub_segment_feature.get_enumeration(pygplates.PropertyName.gpml_subduction_polarity)
-        if subduction_polarity == 'Unknown':
+        if (not subduction_polarity) or (subduction_polarity == 'Unknown'):
+            warnings.warn('Unknown subduction polarity in feature "{0}".\n'.format(shared_sub_segment_feature.get_name()), RuntimeWarning)
             continue
         elif subduction_polarity == 'Left':
             subducting_normal_reversal = 1
@@ -250,6 +211,7 @@ def subduction_absolute_motion(
         
         shared_sub_segment_geometry = shared_sub_segment_feature.get_geometry()
         if not shared_sub_segment_geometry:
+            warnings.warn('Missing subduction geometry in feature "{0}".\n'.format(shared_sub_segment_feature.get_name()), RuntimeWarning)
             continue
         
         # Apply absolute rotation adjustment to pre-resolved topology.
@@ -273,6 +235,7 @@ def subduction_absolute_motion(
         
         # Shouldn't happen, but just in case the shared sub-segment polyline coincides with a point.
         if not arc_midpoints:
+            warnings.warn('Sub-segment polyline coincides with a point in feature "{0}".\n'.format(shared_sub_segment_feature.get_name()), RuntimeWarning)
             continue
         
         # The subducting arc normals relative to North (azimuth).
