@@ -36,14 +36,14 @@ use_parallel = MPI4PY
 #     hotspot_dispersion : Boolean
 # 
 
-# The 'r' number is the Subversion revision number of deforming model 2016_v3.
+# The model name is suffixed to various output filenames.
 model_name = "optAPM_run1"
 
 # The data model to run the optimisation on.
 # This should be the name of the sub-directory in 'data/' and also the sub-directory in 'data/TMData/'.
-data_model = 'Muller++_2015_AREPS_CORRECTED'
+data_model = 'Global_Model_WD_Internal_Release_2019_v2'
 
-start_age = 230
+start_age = 410
 end_age = 0
 interval = 10
 
@@ -106,23 +106,7 @@ include_chains = ['Louisville', 'Tristan', 'Reunion', 'St_Helena', 'Foundation',
 #include_chains = ['Louisville', 'Tristan', 'Reunion', 'Hawaii', 'St_Helena', 'Tasmantid']
 
 
-# Rotation file with existing APM rotations removed from 0-250Ma to be used:
-if tm_data_type == 'Global_Model_WD_Internal_Release_2019_v1':
-
-    original_rotfile = 'Global_Model_WD_Internal_Release_2019_v1/optimisation/all_rotations.rot'
-    rotfile = 'Global_Model_WD_Internal_Release_2019_v1/optimisation/all_rotations_' + model_name + '.rot'
-
-elif tm_data_type == 'Global_1000-0_Model_2017':
-
-    original_rotfile = 'Global_1000-0_Model_2017/optimisation/all_rotations.rot'
-    rotfile = 'Global_1000-0_Model_2017/optimisation/all_rotations_' + model_name + '.rot'
-
-elif tm_data_type == 'Muller++_2015_AREPS_CORRECTED':
-
-    original_rotfile = 'Muller++_2015_AREPS_CORRECTED/optimisation/all_rotations.rot'
-    rotfile = 'Muller++_2015_AREPS_CORRECTED/optimisation/all_rotations_' + model_name + '.rot'
-
-elif tm_data_type == 'muller2016':
+if tm_data_type == 'muller2016':
 
     original_rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS.rot'
     rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS_' + model_name + '.rot'
@@ -132,6 +116,10 @@ elif tm_data_type == 'shephard2013':
     original_rotfile = 'Shephard_etal_ESR2013_Global_EarthByte_2013.rot'
     rotfile = 'Shephard_etal_ESR2013_Global_EarthByte_2013_' + model_name + '.rot'
 
+else:
+
+    original_rotfile = tm_data_type + '/optimisation/all_rotations.rot'
+    rotfile = tm_data_type + '/optimisation/all_rotations_' + model_name + '.rot'
 
 # Large area grid search to find minima
 if search == 'Initial':
@@ -184,22 +172,7 @@ if tm_method == 'convergence':
 
 elif tm_method == 'pygplates':
 
-    if tm_data_type == 'Global_Model_WD_Internal_Release_2019_v1':
-
-        nnr_relative_datadir = 'TMData/Global_Model_WD_Internal_Release_2019_v1/'
-        nnr_rotfile = 'Global_Model_WD_Internal_Release_2019_v1/optimisation/no_net_rotations.rot'
-
-    elif tm_data_type == 'Global_1000-0_Model_2017':
-
-        nnr_relative_datadir = 'TMData/Global_1000-0_Model_2017/'
-        nnr_rotfile = 'Global_1000-0_Model_2017/optimisation/no_net_rotations.rot'
-
-    elif tm_data_type == 'Muller++_2015_AREPS_CORRECTED':
-
-        nnr_relative_datadir = 'TMData/Muller++_2015_AREPS_CORRECTED/'
-        nnr_rotfile = 'Muller++_2015_AREPS_CORRECTED/optimisation/no_net_rotations.rot'
-
-    elif tm_data_type == 'muller2016':
+    if tm_data_type == 'muller2016':
 
         nnr_relative_datadir = 'TMData/Muller_2016/'
         nnr_rotfile = 'Global_EarthByte_230-0Ma_GK07_AREPS_NNR.rot'
@@ -209,12 +182,29 @@ elif tm_method == 'pygplates':
         nnr_relative_datadir = 'TMData/Shephard_2013/'
         nnr_rotfile = 'Shephard_etal_ESR2013_Global_EarthByte_NNR_ORIGINAL.rot'
 
+    else:
+
+        nnr_relative_datadir = 'TMData/' + tm_data_type + '/'
+        nnr_rotfile = tm_data_type + '/optimisation/no_net_rotations.rot'
+
 
 if tm_data_type == 'Global_Model_WD_Internal_Release_2019_v1':
 
     ridge_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
     isochron_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
     isocob_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
+
+elif tm_data_type == 'Global_Model_WD_Internal_Release_2019_v1_CORRECTED':
+
+    ridge_file = 'Global_Model_WD_Internal_Release_2019_v1_CORRECTED/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
+    isochron_file = 'Global_Model_WD_Internal_Release_2019_v1_CORRECTED/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
+    isocob_file = 'Global_Model_WD_Internal_Release_2019_v1_CORRECTED/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
+
+elif tm_data_type == 'Global_Model_WD_Internal_Release_2019_v2':
+
+    ridge_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
+    isochron_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
+    isocob_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
 
 elif (tm_data_type == 'Global_1000-0_Model_2017' or
       tm_data_type == 'Muller++_2015_AREPS_CORRECTED'):
@@ -223,13 +213,13 @@ elif (tm_data_type == 'Global_1000-0_Model_2017' or
     #
     # There are no static geometries (besides coastlines) for this data model.
     #
-    # NOTE: SO USING SAME FILES AS 'Global_Model_WD_Internal_Release_2019_v1'.
+    # NOTE: SO USING SAME FILES AS 'Global_Model_WD_Internal_Release_2019_v2'.
     #       THIS IS OK IF WE'RE NOT INCLUDING FRACTURE ZONES (BECAUSE THEN THESE FILES ARE NOT USED FOR FINAL OPTIMISED ROTATIONS).
     #
     ##################################################################################################################################
-    ridge_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
-    isochron_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
-    isocob_file = 'Global_Model_WD_Internal_Release_2019_v1/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
+    ridge_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
+    isochron_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
+    isocob_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
 
 else:
 
