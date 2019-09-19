@@ -110,7 +110,7 @@ def resolve_subduction_zones(
             if sub_segments_of_topological_line_sub_segment:
                 
                 # Subduction polarity - default to 'Unknown' if subduction zone doesn't have one.
-                subduction_polarity = shared_sub_segment.get_feature().get_enumeration(
+                shared_sub_segment_subduction_polarity = shared_sub_segment.get_feature().get_enumeration(
                     pygplates.PropertyName.gpml_subduction_polarity,
                     'Unknown')
                 
@@ -120,11 +120,22 @@ def resolve_subduction_zones(
                     # Create the resolved subduction zone feature.
                     resolved_subduction_feature = sub_sub_segment.get_resolved_feature()
                     
+                    if shared_sub_segment_subduction_polarity == 'Unknown':
+                        sub_sub_segment_subduction_polarity = 'Unknown'
+                    else:
+                        if sub_sub_segment.was_geometry_reversed_in_topology():
+                            if shared_sub_segment_subduction_polarity == 'Left':
+                                sub_sub_segment_subduction_polarity = 'Right'
+                            else:  # shared_sub_segment_subduction_polarity == 'Right'
+                                sub_sub_segment_subduction_polarity = 'Left'
+                        else:
+                            sub_sub_segment_subduction_polarity = shared_sub_segment_subduction_polarity
+                    
                     # Transfer the subduction polarity from the subduction zone feature to its current sub-segment feature.
                     # They are different features and hence only the subduction zone itself will have a subduction polarity.
                     resolved_subduction_feature.set_enumeration(
                         pygplates.PropertyName.gpml_subduction_polarity,
-                        subduction_polarity,
+                        sub_sub_segment_subduction_polarity,
                         # Just in case the sub-sub-segment feature type does not support a subduction polarity...
                         verify_information_model=pygplates.VerifyInformationModel.no)
                     
