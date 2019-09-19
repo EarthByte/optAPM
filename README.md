@@ -44,7 +44,7 @@ Then run:
 
 Then load the deforming topologies into a version of GPlates that supports exporting net rotation with *deforming* topologies.
 There should be a "2016_v3.gproj" project file in "data/Global_Model_WD_Internal_Release_2016_v3/" or its "ProjectFiles/" sub-directory.
-Choose the *comma delimited* CSV export format and set the velocity time step to 1My and export 0-410Ma in 1My increments.
+Choose the *comma delimited* CSV export format and set the velocity time step to 1My (and velocity method to "T to (T-dt)") and export 0-410Ma in 1My increments.
 
 Then copy the exported "total-net-rotations.csv" file to the "data/Global_Model_WD_Internal_Release_2016_v3/optimisation/" directory.
 You can ignore the other exported files.
@@ -55,8 +55,9 @@ Then run:
   python remove_net_rotation.py
 ```
 
-...to generate the "all_rotations_NNR.rot" rotation file, in the "data/Global_Model_WD_Internal_Release_2016_v3/optimisation/" directory,
-by removing global net rotation from the "all_rotations.rot" rotation file.
+...to generate the "no_net_rotations.rot" rotation file (from "all_rotations.rot"),
+in the "data/Global_Model_WD_Internal_Release_2016_v3/optimisation/" directory,
+by removing net rotation from the reference plate (typically Africa).
 
 ## Running the optimisation workflow
 
