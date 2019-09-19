@@ -84,6 +84,14 @@ def resolve_subduction_zones(
         # These are the parts of the subducting line that actually contribute to topological boundaries.
         for shared_sub_segment in shared_boundary_section.get_shared_sub_segments():
             
+            # If all topologies sharing this sub-segment are slabs ("TopologicalSlabBoundary") then exclude the subduction zone.
+            #
+            # Slabs overlay on top of the global topological boundaries/networks and end up doubling the weight
+            # of trench migration velocities along these boundaries.
+            if all((topology.get_feature().get_feature_type() == pygplates.FeatureType.gpml_topological_slab_boundary)
+                    for topology in shared_sub_segment.get_sharing_resolved_topologies()):
+                continue
+            
             # The plate ID of the trench line (as opposed to the subducting plate).
             #
             # Update: The plate IDs of the trench line and overriding plate can differ
