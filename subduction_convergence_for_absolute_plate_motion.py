@@ -118,8 +118,15 @@ def resolve_subduction_zones(
                 for sub_sub_segment in sub_segments_of_topological_line_sub_segment:
                     
                     # Create the resolved subduction zone feature.
-                    resolved_subduction_feature = sub_sub_segment.get_resolved_feature()
+                    #
+                    # Prefer to clone and explicitly set resolved geometry rather than just call 'get_resolved_feature()'
+                    # so that we store geometry in the *default* geometry property name so that later, when we call 'get_geometry()',
+                    # the geometry will get found.
+                    resolved_subduction_feature = sub_sub_segment.get_feature().clone()
+                    resolved_subduction_feature.set_geometry(sub_sub_segment.get_resolved_geometry())
                     
+                    # Need to reverse subduction polarity if the sub-sub-segment was reversed when
+                    # contributing to the topological line.
                     if shared_sub_segment_subduction_polarity == 'Unknown':
                         sub_sub_segment_subduction_polarity = 'Unknown'
                     else:
@@ -144,7 +151,12 @@ def resolve_subduction_zones(
             else: # It's not a topological line...
                 
                 # Create the resolved subduction zone feature.
-                resolved_subduction_feature = shared_sub_segment.get_resolved_feature()
+                #
+                # Prefer to clone and explicitly set resolved geometry rather than just call 'get_resolved_feature()'
+                # so that we store geometry in the *default* geometry property name so that later, when we call 'get_geometry()',
+                # the geometry will get found.
+                resolved_subduction_feature = shared_sub_segment.get_feature().clone()
+                resolved_subduction_feature.set_geometry(shared_sub_segment.get_resolved_geometry())
                 
                 resolved_subduction_features.append(resolved_subduction_feature)
                 
