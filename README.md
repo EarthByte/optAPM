@@ -147,3 +147,8 @@ This can be done using the 'remove_plate_rotations' module in Plate Tectonic Too
 ```
 
 ...where you replace `...` with the optimised rotation model. Typically only three rotation files are different than the original rotation files.
+
+## Plotting results
+
+After running the workflow and post-processing (although you don't need to run `ptt.remove_plate_rotations` for this), you can plot the
+trench migration stats and net rotation curves for the non-optimised and any optimised models using the Jupyter notebooks in the `figures/` directory.
