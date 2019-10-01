@@ -37,7 +37,7 @@ use_parallel = MPI4PY
 # 
 
 # The model name is suffixed to various output filenames.
-model_name = "optAPM_run1"
+model_name = "optAPM_run6"
 
 # The data model to run the optimisation on.
 # This should be the name of the sub-directory in 'data/' and also the sub-directory in 'data/TMData/'.
@@ -74,9 +74,12 @@ def get_fracture_zone_params(age):
 def get_net_rotation_params(age):
     if age <= 80:
         return True, 1.0
+    elif age <= 170:
+        # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
+        return True, 2.0 # Gives a *multiplicative* weight of 0.5
     else:
         # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-        return True, 2.0  # Gives a *multiplicative* weight of 0.5
+        return True, 5.0 # Gives a *multiplicative* weight of 0.2
 
 def get_trench_migration_params(age):
     return True, 1.0
