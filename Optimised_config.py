@@ -1,3 +1,7 @@
+import glob
+import os.path
+
+
 #########################################
 # Optimisation configuration parameters #
 #########################################
@@ -11,7 +15,7 @@ IPYPARALLEL = 1
 
 # Choose parallelisation method (or None to disable parallelisation, eg, for testing).
 use_parallel = MPI4PY  # For example, to use with 'mpiexec -n <cores> python Optimised_APM.py'.
-# use_parallel = None
+#use_parallel = None
 ##########################################################################################
 
 
@@ -29,8 +33,22 @@ models = 100
 # This should be the name of the sub-directory in 'data/' and also the sub-directory in 'data/TMData/'.
 data_model = 'Global_Model_WD_Internal_Release_2019_v2'
 
-original_rotfile = data_model + '/optimisation/all_rotations.rot'
-rotfile = data_model + '/optimisation/all_rotations_' + model_name + '.rot'
+# The original rotation files (relative to the 'data/<data_model>/' directory).
+#
+# Can either:
+#   1) use glob to automatically find all the rotation files (you don't need to do anything), or
+#   2) explicitly list all the rotation files (you need to list the filenames).
+#
+# 1) Gather all '.rot' files (and make filenames relative to the 'data/' directory).
+this_dir = os.path.abspath(os.path.dirname(__file__))
+data_dir = os.path.join(this_dir, 'data')
+unoptimised_rotation_filenames = [os.path.relpath(abs_path, data_dir) for abs_path in
+        glob.glob(os.path.join(data_dir, data_model, '*.rot'))]
+# 2) Explicitly list all the input rotation files (must be relative to the 'data/' directory).
+#unoptimised_rotation_filenames = [
+#  'Global_Model_WD_Internal_Release_2019_v2/rotation_file1.rot',
+#  'Global_Model_WD_Internal_Release_2019_v2/rotation_file2.rot',
+#]
 
 nnr_relative_datadir = 'TMData/' + data_model + '/'
 nnr_rotfile = data_model + '/optimisation/no_net_rotations.rot'
