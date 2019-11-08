@@ -37,14 +37,6 @@ First run:
 
 ...to generate the resolved trench data in "data/TMData/Global_Model_WD_Internal_Release_2019_v2/" directory.
 
-Then run:
-
-```
-  python combine_rotation_files.py
-```
-
-...to generate the "all_rotations.rot" rotation file in the "data/Global_Model_WD_Internal_Release_2019_v2/optimisation/" directory.
-
 Then load the deforming topologies into a version of GPlates that supports exporting net rotation with *deforming* topologies.
 There should be a "2019_v2.gproj" project file in "data/Global_Model_WD_Internal_Release_2019_v2/" or its "ProjectFiles/" sub-directory.
 Choose the *comma delimited* CSV export format and set the velocity time step to 1My (and velocity method to "T to (T-dt)") and export 0-410Ma in 1My increments.
@@ -66,13 +58,13 @@ by removing net rotation from the reference plate (typically Africa).
 
 The optimisation workflow can be run in serial or parallel. In parallel it can be run using `ipyparallel` or `mpi4py`.
 
-Each of these should produce the final optimised rotation file "all_rotations_optAPM<model>.rot",
-in the "data/Global_Model_WD_Internal_Release_2019_v2/optimisation/" directory, where *optAPM<model>* is defined
-by the `model_name` variable in the "Optimised_APM.py" script.
+Each of these should produce the final optimised rotation file "optimised_rotation_model_<model_name>.rot",
+in the "data/Global_Model_WD_Internal_Release_2019_v2/optimisation/" directory, where *<model_name>* is defined
+by the `model_name` variable in "Optimised_config.py" script.
 
 ### To run in serial
 
-Edit "Optimised_APM.py" and change the `use_parallel` parameter to `None` and then run:
+Edit "Optimised_config.py" and change the `use_parallel` parameter to `None` and then run:
 
 ```
   python Optimised_APM.py
@@ -87,7 +79,7 @@ This is useful when running a Jupyter notebook since it supports `ipyparallel` b
   * **NOTE**: You should be in the directory containing "Optimised_APM.py" when you start the cluster
     to avoid the error `ImportError: No module named objective_function`.
 
-Edit "Optimised_APM.py" and change the `use_parallel` parameter to `IPYPARALLEL` and then run:
+Edit "Optimised_config.py" and change the `use_parallel` parameter to `IPYPARALLEL` and then run:
 
 ```
   python Optimised_APM.py
@@ -98,7 +90,7 @@ Edit "Optimised_APM.py" and change the `use_parallel` parameter to `IPYPARALLEL`
 This is useful when running on a High Performance Computing (HPC) cluster since MPI is used to
 spread the parallel workload across any number of nodes/cores.
 
-Edit "Optimised_APM.py" and change the `use_parallel` parameter to `MPI4PY`.
+Edit "Optimised_config.py" and change the `use_parallel` parameter to `MPI4PY`.
 
 If you are running on a personal computer that has an MPI runtime installed then run:
 
@@ -126,9 +118,8 @@ will get raised during execution and mpirun (or mpiexec) will get terminated abr
 
 ## Post-processing for the workflow
 
-After running the workflow, the optimised rotations will be in a file with a name like "optimisation/all_rotations_optAPM_run1.rot"
-(depending on the model name in "Optimised_config.py") which is similar to "optimisation/all_rotations.rot" except it also has
-the optimised 005-000 rotations (at the end of the file).
+After running the workflow, the optimised rotations will be in a file with a name like "optimisation/optimised_rotation_model_run1.rot"
+(depending on the model name in "Optimised_config.py").
 
 To insert these optimised 005-000 rotations back into the original files run:
 
