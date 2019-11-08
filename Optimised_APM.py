@@ -186,6 +186,9 @@ if __name__ == '__main__':
         print "Search type:", search
         print "Search radius:", search_radius
         print ""
+        
+        # Flush the print statements (for parallel code).
+        sys.stdout.flush()
 
 
 
@@ -348,6 +351,9 @@ if __name__ == '__main__':
             #print "Number of start seeds generated:", len(start_seeds)
             print "Optimised models to be run:", len(start_seeds)
             print " "
+            
+            # Flush the print statements (for parallel code).
+            sys.stdout.flush()
         
         
         # Debugging.
@@ -404,7 +410,11 @@ if __name__ == '__main__':
                 opt.set_xtol_rel(1e-8)
 
             xopt = opt.optimize(x)
-            minf = opt.last_optimum_value()    
+            minf = opt.last_optimum_value()
+            
+            # Debug print number of iterations needed to converge.
+            print opt.get_numevals()
+            sys.stdout.flush()
 
             return xopt, minf
 
@@ -574,6 +584,9 @@ if __name__ == '__main__':
 
             # Write result to rotation file
             rotation_features_updated.write(rotation_file)
+            
+            # Flush the print statements (for parallel code).
+            sys.stdout.flush()
 
 
     # When using mpi4py we only collect and process results in one process (the one with rank/ID 0).
