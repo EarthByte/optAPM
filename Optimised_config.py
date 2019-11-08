@@ -20,7 +20,7 @@ use_parallel = MPI4PY  # For example, to use with 'mpiexec -n <cores> python Opt
 
 
 # The model name is suffixed to various output filenames.
-model_name = "optAPM_run_test"
+model_name = "run_test"
 
 start_age = 410
 end_age = 0
@@ -132,7 +132,7 @@ search_radius = 60
 # Normally the reference plate stays constant at Africa (701), but does switch to 101 for the 1Ga model.
 # It's off by default since it doesn't appear to change the results, and may sometimes cause job to fail
 # on Artemis (presumably since 'models' is increased by a factor of 2.5) - although problem manifested
-# as failure to read "all_rotations_<...>.rot" file, so it was probably something else.
+# as failure to read the rotation file being optimised, so it was probably something else.
 expand_search_radius_on_ref_plate_switches = False
 rotation_uncertainty = 30
 auto_calc_ref_pole = True

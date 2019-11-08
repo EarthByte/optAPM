@@ -36,7 +36,7 @@ class OptimisedRotationUpdater(object):
         
         # The single combined optimised rotation filename (relative to the 'data/' directory).
         self.optimised_rotation_filename = os.path.join(
-                data_model, 'optimisation', 'optimised_rotations_' + model_name + '.rot')
+                data_model, 'optimisation', 'optimised_rotation_model_' + model_name + '.rot')
         
         #
         # Combine the unoptimised (input) rotation files into a single optimised version, and
