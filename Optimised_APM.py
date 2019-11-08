@@ -11,6 +11,7 @@ from optapm import ModelSetup as ms, ProcessResults as pr
 from functools import partial
 import itertools
 from datetime import datetime, timedelta
+from optimised_rotation_updater import OptimisedRotationUpdater
 
 # All the config parameters are now in a separate module 'Optimised_config' that also
 # gets imported into the pre-processing modules.
@@ -107,70 +108,27 @@ if __name__ == '__main__':
     # The main data directory is the 'data' sub-directory of the directory containing this source file.
     datadir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data', '')
 
-    rotation_file = datadir + rotfile
-
-
     # When using mpi4py we only print and collect/process results in one process (the one with rank/ID 0).
     if use_parallel != MPI4PY or mpi_rank == 0:
         
+        # Manages updates to the rotation model due to optimisation.
         #
-        # Copy the original rotation file into the optimised version, and zero out the rotations
-        # that we will soon replace with optimised rotations.
-        #
-        original_rotation_file = datadir + original_rotfile
-        rotation_features = list(pgp.FeatureCollection(original_rotation_file))
-        original_rotation_model = pgp.RotationModel(rotation_features)
+        # The creation/construction of this OptimisedRotationUpdater object also:
+        #   Creates a single optimised rotation file by combining all unoptimised (input) rotations.
+        #   The 005-000 rotation feature is inserted (or replaced if already existing in input) and
+        #   defined such that the rotation of reference plate (obtained for each time using
+        #   'get_reference_params') relative to 000 is zero for each time in 'age_range'.
+        optimised_rotation_updater = OptimisedRotationUpdater(
+                datadir,
+                unoptimised_rotation_filenames,
+                age_range,
+                get_reference_params,
+                data_model,
+                model_name)
         
-        # Remove any existing 005-000 rotation features.
-        rotation_features_except_005_000 = []
-        for rotation_feature in rotation_features:
-            total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
-            if total_reconstruction_pole:
-                fixed_plate_id, moving_plate_id, _ = total_reconstruction_pole
-                if not (moving_plate_id == 5 and fixed_plate_id == 0):
-                    # Add all existing rotation features except 005-000.
-                    rotation_features_except_005_000.append(rotation_feature)
-        
-        # Rotation features now exclude the old 005-000 features.
-        rotation_features = rotation_features_except_005_000
-        
-        #
-        # Create a new 005-000 rotation feature such that 'ref_rotation_plate_id' rel 000 is zero.
-        #
-        
-        zero_rotation_time_samples_005_rel_000 = []
-        
-        # Start with identity rotation at time 0Ma.
-        zero_rotation_time_samples_005_rel_000.append(
-            pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(pgp.FiniteRotation()), 0.0, 'optAPM'))
-        
-        for ref_rotation_start_age in age_range:
-            
-            # Get the reference plate ID (which could vary over time).
-            ref_rotation_plate_id, _ = get_reference_params(ref_rotation_start_age)
-            
-            # We want our 'ref_rotation_plate_id' to 000 rotation to be zero.
-            #
-            #                 R(0->t,000->ref_plate) = R(0->t,000->005) * R(0->t,005->ref_plate)
-            #                               Identity = R(0->t,000->005) * R(0->t,005->ref_plate)
-            #   inverse(R(0->t,000->005)) * Identity = R(0->t,005->ref_plate)
-            #                       R(0->t,000->005) = inverse(R(0->t,005->ref_plate))
-            #
-            zero_rotation_005_rel_000 = original_rotation_model.get_rotation(ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=5).get_inverse()
-
-            zero_rotation_time_samples_005_rel_000.append(
-                pgp.GpmlTimeSample(pgp.GpmlFiniteRotation(zero_rotation_005_rel_000), ref_rotation_start_age, 'optAPM'))
-        
-        # Create a new 005/000 rotation sequence.
-        rotation_feature_005_000 = pgp.Feature.create_total_reconstruction_sequence(
-            0,
-            5,
-            pgp.GpmlIrregularSampling(zero_rotation_time_samples_005_rel_000))
-        
-        rotation_features.append(rotation_feature_005_000)
-        
-        # Write the rotation file with zero reference_plate-to-anchor rotations.
-        pgp.FeatureCollection(rotation_features).write(rotation_file)
+        # The filename of the single optimised rotation file just created
+        # (relative to the 'data/' directory).
+        rotfile = optimised_rotation_updater.get_optimised_rotation_filename()
         
         
         print "Rotation file to be used: ", rotfile
@@ -272,8 +230,6 @@ if __name__ == '__main__':
                                  ridge_file=ridge_file, isochron_file=isochron_file, isocob_file=isocob_file, 
                                  hst_file=hst_file, hs_file=hs_file, interpolated_hotspots=interpolated_hotspots)
 
-            rotation_model = data[0]
-
             # Calculate starting conditions
             startingConditions = ms.modelStartConditions(params, data, plot)
         
@@ -326,7 +282,7 @@ if __name__ == '__main__':
         
         # Extract variables from starting conditions.
         (x, opt_n, N, lb, ub,  model_stop_condition, max_iter,
-            _,
+            rotation_file,
             ref_rotation_start_age, ref_rotation_end_age,
             ref_rotation_plate_id,
             Lats, Lons,
@@ -354,11 +310,6 @@ if __name__ == '__main__':
             
             # Flush the print statements (for parallel code).
             sys.stdout.flush()
-        
-        
-        # Debugging.
-        # import objective_function
-        # objective_function.opt_ind_data = []
 
 
         # --------------------------------------------------------------------
@@ -544,46 +495,16 @@ if __name__ == '__main__':
 
             # --------------------------------------------------------------------
             # --------------------------------------------------------------------
-            # Update rotation file with result
+            # Update the optimised rotation file with result
 
-            rotation_features_updated = pgp.FeatureCollection(rotation_file)
-
-            # Find existing optimised rotation sequence for 005-000.
-            opt_rotation_sequence = None
-            for rotation_feature in rotation_features_updated:
-                total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
-                if total_reconstruction_pole:
-                    fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
-                    if moving_plate_id == 5 and fixed_plate_id == 0:
-                        opt_rotation_sequence = rotation_sequence
-                        break
-
-
-            # Update existing optimised rotation in the model with result
-            if opt_rotation_sequence:
-                for finite_rotation_sample in opt_rotation_sequence.get_enabled_time_samples():
-                    finite_rotation_time = finite_rotation_sample.get_time()
-                    if finite_rotation_time == ref_rotation_start_age:
-                        new_rotation_ref_plate_rel_000 = pgp.FiniteRotation((np.double(round(plat, 2)), 
-                                                                       np.double(round(plon, 2))), 
-                                                                       np.radians(np.double(round(min_results[-1][1], 2))))
-
-                        # Our new rotation is from 'ref_rotation_plate_id' to 000 so remove the
-                        # 'ref_rotation_plate_id' to 005 part to get the 005 to 000 part that gets
-                        # stored in the 005-000 rotation feature.
-                        #
-                        #                                     R(0->t,000->ref_plate) = R(0->t,000->005) * R(0->t,005->ref_plate)
-                        #   R(0->t,000->ref_plate) * inverse(R(0->t,005->ref_plate)) = R(0->t,000->005)
-                        #
-                        plate_rotation_ref_plate_rel_005 = rotation_model.get_rotation(
-                                ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=5)
-                        new_rotation_005_rel_000 = new_rotation_ref_plate_rel_000 * plate_rotation_ref_plate_rel_005.get_inverse()
-                        
-                        finite_rotation_sample.get_value().set_finite_rotation(new_rotation_005_rel_000)
-
-
-            # Write result to rotation file
-            rotation_features_updated.write(rotation_file)
+            optimised_rotation_ref_plate_rel_000 = pgp.FiniteRotation(
+                    (np.double(round(plat, 2)), np.double(round(plon, 2))),
+                    np.radians(np.double(round(min_results[-1][1], 2))))
+            
+            optimised_rotation_updater.update_optimised_rotation(
+                    optimised_rotation_ref_plate_rel_000,
+                    ref_rotation_plate_id,
+                    ref_rotation_start_age)
             
             # Flush the print statements (for parallel code).
             sys.stdout.flush()
