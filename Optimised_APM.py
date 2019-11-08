@@ -28,6 +28,21 @@ warnings.formatwarning = warning_format
 warnings.simplefilter("always")
 
 
+# Check the required pygplates version.
+#
+# PyGPlates version 19 can close the gaps in resolved topologies in the *deforming* model (along deforming lines).
+# PyGPlates version 22 can handle topological lines (can get their sub-sub-segment plate IDs).
+# PyGPlates version 25 greatly improved the speed of pygplates.RotationModel.
+#
+# We really do need the speed afforded by pyGPlates version 25, so we'll make that a requirement,
+# otherwise it can take about 8 times longer (eg, 16 hours instead of 2 hours).
+PYGPLATES_VERSION_REQUIRED = pgp.Version(25)
+# Check the imported pygplates version.
+if not hasattr(pgp, 'Version') or pgp.Version.get_imported_version() < PYGPLATES_VERSION_REQUIRED:
+    raise RuntimeError('{0}: Error - imported pygplates version {1} but version {2} or greater is required'.format(
+            os.path.basename(__file__), pgp.Version.get_imported_version(), PYGPLATES_VERSION_REQUIRED))
+
+
 if __name__ == '__main__':
 
     if use_parallel == IPYPARALLEL:

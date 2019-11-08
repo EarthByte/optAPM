@@ -3,6 +3,7 @@ import pygplates as pgp
 import optimisation_methods
 import geoTools
 import subduction_convergence_for_absolute_plate_motion as scap
+import sys
 
 from optapm import ObjectiveFunctions
 from scipy import stats
@@ -113,6 +114,7 @@ class ObjectiveFunction(object):
     def __call__(self, x, grad):
 
         # print self.debug_count
+        # sys.stdout.flush()
         self.debug_count += 1
         
         #### -----------------------------------------------------------------------------------------
@@ -131,10 +133,11 @@ class ObjectiveFunction(object):
         #### 2. Update reference plate rotation
 
 
+        # Our new rotation is the 'ref_rotation_plate_id' relative to the optimisation root plate (000).
         new_rotation_ref_plate_rel_000 = pgp.FiniteRotation((np.double(lat_), np.double(lon_)), np.radians(np.double(ang_)))
         
-        # Our new rotation is from 'ref_rotation_plate_id' to 000 so remove the 'ref_rotation_plate_id' to 005 part
-        # to get the 005 to 000 part that gets stored in the 005-000 rotation feature.
+        # Remove the 'ref_rotation_plate_id' relative to 005 part (of our new rotation) to get the
+        # 005 relative to 000 (optimisation root plate) part that gets stored in the 005-000 rotation feature.
         #
         #                                     R(0->t,000->ref_plate) = R(0->t,000->005) * R(0->t,005->ref_plate)
         #   R(0->t,000->ref_plate) * inverse(R(0->t,005->ref_plate)) = R(0->t,000->005)
@@ -155,6 +158,11 @@ class ObjectiveFunction(object):
                 # OPTIMIZATION: We need to be careful setting this to False - we should ensure
                 # that we'll never modify the rotation features 'self.rotation_features_updated' while
                 # 'rotation_model_updated' is being used (ie, calling one of its methods).
+                #
+                # UPDATE: This optimisation is ignored for pygplates revision >= 25 since the
+                #         'clone_rotation_features' argument has been deprecated (ie, subsequent modifications
+                #         to rotation features no longer affect a RotationModel after it's created).
+                #         Also the internals of RotationModel have been significantly optimised in revision 25.
                 clone_rotation_features=False)
 
 
