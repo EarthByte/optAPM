@@ -135,7 +135,7 @@ if __name__ == '__main__':
         #   'get_reference_params') relative to 000 is zero for each time in 'age_range'.
         optimised_rotation_updater = OptimisedRotationUpdater(
                 datadir,
-                unoptimised_rotation_filenames,
+                original_rotation_filenames,
                 age_range,
                 get_reference_params,
                 data_model,
@@ -527,6 +527,9 @@ if __name__ == '__main__':
 
     # When using mpi4py we only collect and process results in one process (the one with rank/ID 0).
     if use_parallel != MPI4PY or mpi_rank == 0:
+        
+        # Save the final optimised model back to the original rotation files (or copies of them).
+        optimised_rotation_updater.save_to_rotation_files()
         
         main_end_time = round(time.time() - main_start, 10)
         main_sec = timedelta(seconds = float(main_end_time))

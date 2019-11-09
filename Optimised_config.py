@@ -42,10 +42,10 @@ data_model = 'Global_Model_WD_Internal_Release_2019_v2'
 # 1) Gather all '.rot' files (and make filenames relative to the 'data/' directory).
 this_dir = os.path.abspath(os.path.dirname(__file__))
 data_dir = os.path.join(this_dir, 'data')
-unoptimised_rotation_filenames = [os.path.relpath(abs_path, data_dir) for abs_path in
+original_rotation_filenames = [os.path.relpath(abs_path, data_dir) for abs_path in
         glob.glob(os.path.join(data_dir, data_model, '*.rot'))]
 # 2) Explicitly list all the input rotation files (must be relative to the 'data/' directory).
-#unoptimised_rotation_filenames = [
+#original_rotation_filenames = [
 #  'Global_Model_WD_Internal_Release_2019_v2/rotation_file1.rot',
 #  'Global_Model_WD_Internal_Release_2019_v2/rotation_file2.rot',
 #]

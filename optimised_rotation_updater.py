@@ -1,12 +1,14 @@
 import os.path
 import pygplates
 
+from ptt import remove_plate_rotations
+
 
 class OptimisedRotationUpdater(object):
     """
     Class to manage updates to the rotation model due to optimisation.
     
-    The unoptimised input rotation files are combined into a single optimised rotation file,
+    The original input rotation files are combined into an intermediate single optimised rotation file,
     returned by 'get_optimised_rotation_filename()' (relative to the 'data/' directory).
     
     Each optimised rotation 005-000 at each time is updated using 'update_optimised_rotation()'
@@ -14,18 +16,21 @@ class OptimisedRotationUpdater(object):
     processes can read it in for optimisation over the next time interval (pygplates,
     being a C++ extension, does not support pickling its objects for sending to parallel processes,
     hence the pygplates rotation features need to be saved and loaded from files).
+    
+    Finally the original rotation files are modified to reflect the optimisation
+    using 'save_to_rotation_files()'.
     """
     
     def __init__(
             self,
             data_dir,
-            unoptimised_rotation_filenames,  # Relative to the 'data/' directory.
+            original_rotation_filenames,  # Relative to the 'data/' directory.
             age_range,
             reference_params_function,
             data_model,
             model_name):
         """
-        Create a single optimised rotation file by combining all unoptimised (input) rotations.
+        Create a single optimised rotation file by combining all original (input) rotations.
         The 005-000 rotation feature is inserted (or replaced if already existing in input) and
         defined such that the rotation of reference plate (obtained for each time using
         'reference_params_function') relative to 000 is zero for each time in 'age_range'.
@@ -33,50 +38,55 @@ class OptimisedRotationUpdater(object):
         
         self.data_dir = data_dir
         self.reference_params_function = reference_params_function
-        
-        # The single combined optimised rotation filename (relative to the 'data/' directory).
-        self.optimised_rotation_filename = os.path.join(
-                data_model, 'optimisation', 'optimised_rotation_model_' + model_name + '.rot')
+        self.model_name = model_name
         
         #
-        # Combine the unoptimised (input) rotation files into a single optimised version, and
+        # Combine the original (input) rotation files into a single optimised version, and
         # zero out the 005-000 rotations that we will soon replace with optimised rotations.
         #
         
-        # Load all the unoptimised rotation features.
-        rotation_features = []
-        for unoptimised_rotation_filename in unoptimised_rotation_filenames:
+        # Load all the original rotation feature collections.
+        self.rotation_filenames = []
+        self.rotation_feature_collections = []
+        for rotation_filename in original_rotation_filenames:
+            # Read the current rotation file.
             rotation_feature_collection = pygplates.FeatureCollection(
-                    os.path.join(self.data_dir, unoptimised_rotation_filename))
-            rotation_features.extend(rotation_feature_collection)
+                    os.path.join(self.data_dir, rotation_filename))
+            # Convert from a FeatureCollection to a list of Feature.
+            rotation_feature_collection = list(rotation_feature_collection)
+            # Keep track of original feature collections (these will get modified).
+            self.rotation_feature_collections.append(rotation_feature_collection)
+            # Also keep track of the original rotation filenames so
+            # we can write back to them when we're finished optimising.
+            self.rotation_filenames.append(rotation_filename)
         
         # Remove any existing 005-000 rotation features and change fixed plate 000 to 005.
-        rotation_features_except_005_000 = []
-        for rotation_feature in rotation_features:
-            total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
-            if total_reconstruction_pole:
-                fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
+        for rotation_feature_collection in self.rotation_feature_collections:
+            rotation_feature_index = 0
+            while rotation_feature_index < len(rotation_feature_collection):
+                rotation_feature = rotation_feature_collection[rotation_feature_index]
+                total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
+                if total_reconstruction_pole:
+                    fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
+                    
+                    # Change fixed plate ID 000 to 005 (unless it's the 005-000 plate pair).
+                    # We want everything that references 000 to now reference 005.
+                    # Later we'll add a 005-000 sequence to store optimised rotation adjustments.
+                    if fixed_plate_id == 0:
+                        if moving_plate_id == 5:
+                            # Exclude 005-000 rotation features (we'll add a new one later).
+                            del rotation_feature_collection[rotation_feature_index]
+                            rotation_feature_index -= 1
+                        else:
+                            # Change the fixed plate ID from 000 to 005.
+                            rotation_feature.set_total_reconstruction_pole(5, moving_plate_id, rotation_sequence)
                 
-                # Change fixed plate ID 000 to 005 (unless it's the 005-000 plate pair).
-                # We want everything that references 000 to now reference 005.
-                # Later we'll add a 005-000 sequence to store optimised rotation adjustments.
-                if fixed_plate_id == 0:
-                    if moving_plate_id == 5:
-                        # Exclude 005-000 rotation features (we'll add a new one below).
-                        continue
-                    else:
-                        # Change the fixed plate ID from 000 to 005.
-                        rotation_feature.set_total_reconstruction_pole(5, moving_plate_id, rotation_sequence)
-            
-            # All existing rotation features get added except 005-000.
-            rotation_features_except_005_000.append(rotation_feature)
+                rotation_feature_index += 1
         
-        # Rotation features now exclude any old 005-000 rotation features.
-        rotation_features = rotation_features_except_005_000
-        
-        # Unoptimised rotation model.
+        # Rotation model with root plate 005.
+        #
         # Excludes 005-000 rotation features (if any) and root plate is now 005 (instead of 000).
-        unoptimised_rotation_model_anchor_005 = pygplates.RotationModel(rotation_features)
+        original_rotation_model_anchor_005 = pygplates.RotationModel(self.rotation_feature_collections)
         
         #
         # Create a new 005-000 rotation feature such that 'ref_rotation_plate_id' rel 000 is zero.
@@ -99,7 +109,7 @@ class OptimisedRotationUpdater(object):
             #                               Identity = R(0->t,000->005) * R(0->t,005->ref_plate)
             #   inverse(R(0->t,000->005)) * Identity = R(0->t,005->ref_plate)
             #                       R(0->t,000->005) = inverse(R(0->t,005->ref_plate))
-            zero_rotation_005_rel_000 = unoptimised_rotation_model_anchor_005.get_rotation(
+            zero_rotation_005_rel_000 = original_rotation_model_anchor_005.get_rotation(
                     ref_rotation_start_age, ref_rotation_plate_id, anchor_plate_id=5).get_inverse()
 
             zero_rotation_time_samples_005_rel_000.append(
@@ -109,19 +119,23 @@ class OptimisedRotationUpdater(object):
                         'optAPM'))
         
         # Create a new 005/000 rotation sequence.
-        rotation_feature_005_000 = pygplates.Feature.create_total_reconstruction_sequence(
+        # And keep track of 005-000 feature for later so we can update it as we optimise through time.
+        self.optimised_rotation_feature = pygplates.Feature.create_total_reconstruction_sequence(
             0,
             5,
             pygplates.GpmlIrregularSampling(zero_rotation_time_samples_005_rel_000))
-        # Keep track of 005-000 feature for later so we can update it as we optimise through time.
-        self.optimised_rotation_feature = rotation_feature_005_000
-        
-        # Add the 005-000 rotation feature.
-        rotation_features.append(rotation_feature_005_000)
         
         # Keep track of all rotation features for later so we can write them to file as we optimise through time.
         # This includes the optimised 005-000 rotation feature.
-        self.optimised_rotation_feature_collection = pygplates.FeatureCollection(rotation_features)
+        all_rotation_features = []
+        for rotation_feature_collection in self.rotation_feature_collections:
+            all_rotation_features.extend(rotation_feature_collection)
+        all_rotation_features.append(self.optimised_rotation_feature)
+        self.optimised_rotation_feature_collection = pygplates.FeatureCollection(all_rotation_features)
+        
+        # The single combined optimised rotation filename (relative to the 'data/' directory).
+        self.optimised_rotation_filename = os.path.join(
+                data_model, 'optimisation', 'optimised_rotation_model_' + self.model_name + '.rot')
         
         # Write the rotation file with zero reference_plate-to-anchor rotations.
         self.optimised_rotation_feature_collection.write(
@@ -172,3 +186,41 @@ class OptimisedRotationUpdater(object):
         # This will write out the changes to the optimised rotation *sequence* we just made above.
         self.optimised_rotation_feature_collection.write(
                 os.path.join(self.data_dir, self.optimised_rotation_filename))
+    
+    
+    def save_to_rotation_files(self):
+        """
+        The original rotation files are modified to reflect the optimisation.
+        
+        Any rotations that referenced plate 000 are modified to include the optimised absolute plate motion.
+        All other rotations remain unmodified.
+        """
+        
+        # Remove the optimised rotation 005-000 and merge it into any rotations with fixed plate 005.
+        #
+        # First add the optimised rotation 005-000 to any existing feature collection so we don't have
+        # to add one extra feature collection just to store the optimised rotation 005-000.
+        # (it'll then get removed by 'remove_plates()').
+        self.rotation_feature_collections[0].append(self.optimised_rotation_feature)
+        self.rotation_feature_collections = remove_plate_rotations.remove_plates(
+                self.rotation_feature_collections,
+                [5])
+        
+        output_filename_suffix = '_' + self.model_name
+        
+        # Write the modified rotation feature collections back to disk.
+        for rotation_feature_collection_index in range(len(self.rotation_feature_collections)):
+            output_rotation_feature_collection = self.rotation_feature_collections[rotation_feature_collection_index]
+            
+            # Each output filename is the input filename with an optional suffix appended (before the extension).
+            input_rotation_filename = self.rotation_filenames[rotation_feature_collection_index]
+            if output_filename_suffix:
+                dir, file_basename = os.path.split(input_rotation_filename)
+                file_basename, file_ext = os.path.splitext(file_basename)
+                output_rotation_filename = os.path.join(dir, 'optimisation', '{0}{1}{2}'.format(file_basename, output_filename_suffix, file_ext))
+            else:
+                output_rotation_filename = input_rotation_filename
+            
+            output_rotation_filename = os.path.join(self.data_dir, output_rotation_filename)
+            
+            output_rotation_feature_collection.write(output_rotation_filename)
