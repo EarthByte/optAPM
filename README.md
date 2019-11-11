@@ -25,18 +25,10 @@ Other Python module prerequisites are:
 * pmagpy
 * NLopt
 
-## Pre-processing for the workflow
+## Configuration
 
 All settings are now in "Optimised_config.py", such as the model name, start/end times, number of models to use, etc.
 So the first step is to edit that to ensure it is configured how you like.
-
-First run:
-
-```
-  python generate_trench_migration_data.py
-```
-
-...to generate the resolved trench data in "data/TMData/Global_Model_WD_Internal_Release_2019_v2/" directory.
 
 ## Running the optimisation workflow
 
@@ -99,8 +91,7 @@ may require modifications for other HPC systems.
 **NOTE**: Make sure to copy all directories over to the HPC (even empty directories like "model_output") otherwise an exception
 will get raised during execution and mpirun (or mpiexec) will get terminated abruptly (possibly without an error message).
 
-
-## Post-processing for the workflow
+## Results
 
 After running the workflow, the optimised rotations will be in a file with a name like "optimisation/optimised_rotation_model_run1.rot"
 (depending on the model name in "Optimised_config.py"). Note that this one rotation file contains the entire optimised rotation model

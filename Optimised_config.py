@@ -156,8 +156,6 @@ max_iter = 5  # Only applies if model_stop_condition != 'threshold'
 # Trench migration parameters
 tm_method = 'pygplates' # 'pygplates' for new method OR 'convergence' for old method
 tm_data_type = data_model
-# Trench migration data is here, even though it's named nnr (no-net rotation).
-nnr_relative_datadir = 'TMData/' + data_model + '/'
 
 
 # Hotspot parameters:

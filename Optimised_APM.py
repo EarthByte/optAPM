@@ -13,6 +13,7 @@ import itertools
 from datetime import datetime, timedelta
 from no_net_rotation_model import NoNetRotationModel
 from optimised_rotation_updater import OptimisedRotationUpdater
+from trench_resolver import TrenchResolver
 
 # All the config parameters are now in a separate module 'Optimised_config' that also
 # gets imported into the pre-processing modules.
@@ -155,6 +156,17 @@ if __name__ == '__main__':
         # no net rotation.
         nnr_rotfile = no_net_rotation_model.get_no_net_rotation_filename()
         
+        # Generates resolved trench features at each reconstruction time.
+        trench_resolver = TrenchResolver(
+                datadir,
+                original_rotation_filenames,
+                topology_filenames,
+                data_model)
+        
+        # The filename used to store the trench features at the reconstruction time.
+        # The same filename is used for all reconstruction times (it just gets overwritten at each time).
+        tm_file = trench_resolver.get_trench_migration_filename()
+        
         
         print "Rotation file to be used: ", rotfile
         print "TM data:", tm_data_type
@@ -219,8 +231,14 @@ if __name__ == '__main__':
             print ""
             
             # Incrementally build the no-net-rotation model as we go.
+            # The results are updated to the file 'nnr_rotfile'.
             # NOTE: This does nothing if the entire no-net-rotation model was created in 'no_net_rotation_model.__init__()'.
             no_net_rotation_model.update_no_net_rotation(ref_rotation_start_age)
+            
+            # Generate the resolved trenches at time 'ref_rotation_start_age'.
+            # The results are saved to the file 'tm_file'.
+            # Note: The file only contains resolved trenches at time 'ref_rotation_start_age'.
+            trench_resolver.generate_resolved_trenches(ref_rotation_start_age)
             
             current_search_radius = search_radius
             current_models = models
@@ -255,7 +273,7 @@ if __name__ == '__main__':
             # --------------------------------------------------------------------
 
             # Load all data
-            data = ms.dataLoader(datadir, rotfile, pmag_rotfile, nnr_rotfile=nnr_rotfile, nnr_relative_datadir=nnr_relative_datadir, 
+            data = ms.dataLoader(datadir, rotfile, pmag_rotfile, tm_file=tm_file, nnr_rotfile=nnr_rotfile, 
                                  ridge_file=ridge_file, isochron_file=isochron_file, isocob_file=isocob_file, 
                                  hst_file=hst_file, hs_file=hs_file, interpolated_hotspots=interpolated_hotspots)
 
@@ -318,7 +336,7 @@ if __name__ == '__main__':
             spreading_directions, spreading_asymmetries, seafloor_ages,
             PID, CPID,
             data_array,
-            nnr_datadir, no_net_rotation_file, reformArray, trail_data,
+            trench_migration_file, no_net_rotation_file, reformArray, trail_data,
             start_seeds, rotation_age_of_interest_age, data_array_labels_short,
             ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
             seed_lons, seed_lats) = startingConditions[:31]
@@ -347,7 +365,7 @@ if __name__ == '__main__':
 
         def run_optimisation(x, opt_n, N, lb, ub, model_stop_condition, max_iter, interval, rotation_file, 
                              no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions, 
-                             spreading_asymmetries, seafloor_ages, PID, CPID, data_array, nnr_datadir, 
+                             spreading_asymmetries, seafloor_ages, PID, CPID, data_array, trench_migration_file, 
                              ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
                              fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
                              use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method):
@@ -369,7 +387,7 @@ if __name__ == '__main__':
             # NLopt will call this as 'obj_f(x, grad)' because 'obj_f' has a '__call__' method.
             obj_f = ObjectiveFunction(
                     interval, rotation_file, no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions,
-                    spreading_asymmetries, seafloor_ages, PID, CPID, data_array, nnr_datadir,
+                    spreading_asymmetries, seafloor_ages, PID, CPID, data_array, trench_migration_file,
                     ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
                     fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
                     use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method)
@@ -409,7 +427,7 @@ if __name__ == '__main__':
                           no_net_rotation_file=no_net_rotation_file, ref_rotation_start_age=ref_rotation_start_age, 
                           Lats=Lats, Lons=Lons, spreading_directions=spreading_directions, 
                           spreading_asymmetries=spreading_asymmetries, 
-                          seafloor_ages=seafloor_ages, PID=PID, CPID=CPID, data_array=data_array, nnr_datadir=nnr_datadir,
+                          seafloor_ages=seafloor_ages, PID=PID, CPID=CPID, data_array=data_array, trench_migration_file=trench_migration_file,
                           ref_rotation_end_age=ref_rotation_end_age, ref_rotation_plate_id=ref_rotation_plate_id,
                           reformArray=reformArray, trail_data=trail_data, fracture_zone_weight=fracture_zone_weight,
                           net_rotation_weight=net_rotation_weight, trench_migration_weight=trench_migration_weight,

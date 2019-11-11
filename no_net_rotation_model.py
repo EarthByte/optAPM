@@ -22,7 +22,7 @@ class NoNetRotationModel(object):
             self,
             data_dir,
             original_rotation_filenames,  # Relative to the 'data/' directory.
-            topology_filenames,
+            topology_filenames,  # Relative to the 'data/' directory.
             start_age,
             data_model):
         """

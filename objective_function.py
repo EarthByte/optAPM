@@ -35,7 +35,7 @@ class ObjectiveFunction(object):
             PID,
             CPID,
             data_array,
-            nnr_datadir,
+            trench_migration_file,
             ref_rotation_end_age,
             ref_rotation_plate_id,
             reformArray,
@@ -60,7 +60,7 @@ class ObjectiveFunction(object):
         self.PID = PID
         self.CPID = CPID
         self.data_array = data_array
-        self.nnr_datadir = nnr_datadir
+        self.trench_migration_file = trench_migration_file
         self.ref_rotation_end_age = ref_rotation_end_age
         self.ref_rotation_plate_id = ref_rotation_plate_id
         self.reformArray = reformArray
@@ -88,7 +88,7 @@ class ObjectiveFunction(object):
             self.nn_rotation_model = pgp.RotationModel(no_net_rotation_file)
         # Trench migration using pyGPlates.
         if data_array[2] and tm_method == 'pygplates':
-            self.tm_data = pgp.FeatureCollection(nnr_datadir + 'TMData_%sMa.gpml' % (int(ref_rotation_start_age)))
+            self.tm_data = pgp.FeatureCollection(trench_migration_file)
 
 
         #

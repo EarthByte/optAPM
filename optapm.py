@@ -63,7 +63,7 @@ class ModelSetup():
             Optional arguments:
 
                 nnr_rotfile : GPlates no net-rotation *.rot file. Required for net rotation calculations.
-                nnr_datadir : Precomputed data required for net rotation calculations. Relative path to datadir.
+                tm_file : Trench migration data for the current reconstruction time. Required for trench migration calculations.
 
                 ridge_file : GPlates *.gpml ridge file. Required for fracture zone calculations.
                 isochron_file : GPlates *.gpml isochron file. Required for fracture zone calculations.
@@ -76,7 +76,7 @@ class ModelSetup():
 
 
     @staticmethod
-    def dataLoader(datadir, rot_file, pmag_rot_file=None, nnr_relative_datadir=None, nnr_rotfile=None, ridge_file=None, isochron_file=None, isocob_file=None,
+    def dataLoader(datadir, rot_file, pmag_rot_file=None, tm_file=None, nnr_rotfile=None, ridge_file=None, isochron_file=None, isocob_file=None,
                    hst_file=None, hs_file=None, interpolated_hotspots=None):
 
         # Create rotation model
@@ -90,10 +90,9 @@ class ModelSetup():
             pmag_rotation_model = pgp.RotationModel(pmag_rotation_file)
 
         # Check for and load optional arguments
-        nnr_datadir = datadir
-        if nnr_relative_datadir:
+        if tm_file:
 
-            nnr_datadir += nnr_relative_datadir
+            trench_migration_file = datadir + tm_file
 
         if nnr_rotfile:
 
@@ -135,7 +134,7 @@ class ModelSetup():
 
 
         # Return all loaded data
-        data = [rotation_model, rotation_file, nnr_datadir, no_net_rotation_file, features_ri, RidgeFile_subset, features_iso, IsochronFile_subset,
+        data = [rotation_model, rotation_file, trench_migration_file, no_net_rotation_file, features_ri, RidgeFile_subset, features_iso, IsochronFile_subset,
                 features_isocob, IsoCOBFile_subset, hs_trails, hotspots, pmag_rotation_model, pmag_rotation_file, interpolated_hotspot_data]
 
         print "- Data loaded"
@@ -184,7 +183,7 @@ class ModelSetup():
         # Translate data array
         rotation_model = data[0]
         rotation_file = data[1]
-        nnr_datadir = data[2]
+        trench_migration_file = data[2]
         no_net_rotation_file = data[3]
         features_ri = data[4]
         RidgeFile_subset = data[5]
@@ -915,14 +914,18 @@ class ModelSetup():
         # Load pre-computed migration data if needed (net rotation or trench migration)
 
         if tm_method == 'convergence':
-
+            
+            # DEPRECATED: We currently use "tm_method == 'convergence'" so this code is essentially deprecated.
+            #             However, if it's brought then we need access to 'datadir' and 'data_model' (via function arguments).
+            raise DeprecationWarning("Using the old 'convergence' of trench statistics is deprecated - use 'pygplates' instead.")
+            nnr_datadir = datadir + 'TMData/' + data_model + '/'
+            
             FNAME = nnr_datadir + 'data_%s_%s.txt' % (int(ref_rotation_start_age), int(ref_rotation_end_age))
             with open(FNAME, 'r') as f:
                 reformArray = json.load(f)
 
         elif tm_method == 'pygplates':
 
-            #reformArray = pgp.FeatureCollection(nnr_datadir + 'TMData_%sMa.gpml' % (int(ref_rotation_start_age)))
             reformArray = []
 
 
@@ -1021,7 +1024,7 @@ class ModelSetup():
 
 
         startingConditions = [x, opt_n, N, lb, ub, model_stop_condition, max_iter, rotation_file, ref_rotation_start_age, ref_rotation_end_age, ref_rotation_plate_id,
-                              Lats, Lons, spreading_directions, spreading_asymmetries, seafloor_ages, PID, CPID, data_array, nnr_datadir, no_net_rotation_file,
+                              Lats, Lons, spreading_directions, spreading_asymmetries, seafloor_ages, PID, CPID, data_array, trench_migration_file, no_net_rotation_file,
                               reformArray, trail_data, start_seeds, rotation_age_of_interest_age, data_array_labels_short, ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
                               seed_lons, seed_lats, ang_gaussian_array]
 
