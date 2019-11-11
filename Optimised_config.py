@@ -14,9 +14,12 @@ MPI4PY = 0
 IPYPARALLEL = 1
 
 # Choose parallelisation method (or None to disable parallelisation, eg, for testing).
-use_parallel = MPI4PY  # For example, to use with 'mpiexec -n <cores> python Optimised_APM.py'.
-#use_parallel = None
+#use_parallel = MPI4PY  # For example, to use with 'mpiexec -n <cores> python Optimised_APM.py'.
+use_parallel = None
 ##########################################################################################
+# The root input data directory ('data/').
+# This is the 'data/' sub-directory of the directory containing this source file.
+datadir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data', '')
 
 
 # The model name is suffixed to various output filenames.
@@ -36,23 +39,32 @@ data_model = 'Global_Model_WD_Internal_Release_2019_v2'
 # The original rotation files (relative to the 'data/<data_model>/' directory).
 #
 # Can either:
-#   1) use glob to automatically find all the rotation files (you don't need to do anything), or
+#   1) use glob to automatically find all the '.rot' files (you don't need to do anything), or
 #   2) explicitly list all the rotation files (you need to list the filenames).
 #
-# 1) Gather all '.rot' files (and make filenames relative to the 'data/' directory).
-this_dir = os.path.abspath(os.path.dirname(__file__))
-data_dir = os.path.join(this_dir, 'data')
-original_rotation_filenames = [os.path.relpath(abs_path, data_dir) for abs_path in
-        glob.glob(os.path.join(data_dir, data_model, '*.rot'))]
+# 1) Automatically gather all '.rot' files (and make filenames relative to the 'data/' directory).
+original_rotation_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
+        glob.glob(os.path.join(datadir, data_model, '*.rot'))]
 # 2) Explicitly list all the input rotation files (must be relative to the 'data/' directory).
 #original_rotation_filenames = [
 #  'Global_Model_WD_Internal_Release_2019_v2/rotation_file1.rot',
 #  'Global_Model_WD_Internal_Release_2019_v2/rotation_file2.rot',
 #]
 
-nnr_relative_datadir = 'TMData/' + data_model + '/'
-nnr_rotfile = data_model + '/optimisation/no_net_rotations.rot'
-
+# The topology files (relative to the 'data/<data_model>/' directory).
+#
+# Can either:
+#   1) use glob to automatically find all the '.gpml' files (you don't need to do anything), or
+#   2) explicitly list all the topology files (you need to list the filenames).
+#
+# 1) Automatically gather all '.gpml' and '.gpmlz' files (and make filenames relative to the 'data/' directory).
+topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
+        glob.glob(os.path.join(datadir, data_model, '*.gpml')) + glob.glob(os.path.join(datadir, data_model, '*.gpmlz'))]
+# 2) Explicitly list all the topology files (must be relative to the 'data/' directory).
+#topology_filenames = [
+#  'Global_Model_WD_Internal_Release_2019_v2/topology_file1.gpml',
+#  'Global_Model_WD_Internal_Release_2019_v2/topology_file2.gpml',
+#]
 
 ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
 isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
@@ -144,6 +156,9 @@ max_iter = 5  # Only applies if model_stop_condition != 'threshold'
 # Trench migration parameters
 tm_method = 'pygplates' # 'pygplates' for new method OR 'convergence' for old method
 tm_data_type = data_model
+# Trench migration data is here, even though it's named nnr (no-net rotation).
+nnr_relative_datadir = 'TMData/' + data_model + '/'
+
 
 # Hotspot parameters:
 interpolated_hotspot_trails = True

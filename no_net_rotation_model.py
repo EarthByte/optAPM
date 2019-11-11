@@ -91,7 +91,7 @@ class NoNetRotationModel(object):
         
         if self.CREATE_NO_NET_ROTATION_MODEL_AT_INIT:
             
-            print 'Calculating no-net-rotation model...'
+            print 'Calculating no-net-rotation model for {0}-{1}Ma...'.format(0, start_age+1)
             sys.stdout.flush()
             
             no_net_rotation_time_samples_005_rel_000 = []
@@ -108,8 +108,8 @@ class NoNetRotationModel(object):
             # required by 'optimisation_methods.ApproximateNR_from_features()' at time 'start_age'.
             for time in np.arange(1, start_age + 2):
                 
-                print time
-                sys.stdout.flush()
+                #print time
+                #sys.stdout.flush()
                 
                 # Calculate net stage rotation from 'time' to 'time-1'.
                 net_stage_rotation = net_rotation.calculate_net_rotation_internal_gplates(
@@ -207,11 +207,14 @@ class NoNetRotationModel(object):
         if self.CREATE_NO_NET_ROTATION_MODEL_AT_INIT:
             return
         
+        print 'Calculating no-net-rotation model for {0}-{1}Ma...'.format(self.last_update_time, ref_rotation_start_age+1)
+        sys.stdout.flush()
+        
         # Calculate no-net-rotation at 1My increments from where we left off until 'ref_rotation_start_age + 1' Ma.
         for time in np.arange(self.last_update_time + 1, ref_rotation_start_age + 2):
             
-            print time
-            sys.stdout.flush()
+            #print time
+            #sys.stdout.flush()
             
             # Calculate net stage rotation from 'time' to 'time-1'.
             net_stage_rotation = net_rotation.calculate_net_rotation_internal_gplates(
@@ -254,3 +257,6 @@ class NoNetRotationModel(object):
         # Write the no-net-rotation file.
         pygplates.FeatureCollection(all_no_net_rotation_features).write(
                 os.path.join(self.data_dir, self.no_net_rotation_filename))
+        
+        print '...finished calculating no-net-rotation model.'
+        sys.stdout.flush()

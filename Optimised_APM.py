@@ -11,6 +11,7 @@ from optapm import ModelSetup as ms, ProcessResults as pr
 from functools import partial
 import itertools
 from datetime import datetime, timedelta
+from no_net_rotation_model import NoNetRotationModel
 from optimised_rotation_updater import OptimisedRotationUpdater
 
 # All the config parameters are now in a separate module 'Optimised_config' that also
@@ -120,9 +121,6 @@ if __name__ == '__main__':
 
     age_range = np.arange(end_age + interval, start_age + interval, interval)
 
-    # The main data directory is the 'data' sub-directory of the directory containing this source file.
-    datadir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data', '')
-
     # When using mpi4py we only print and collect/process results in one process (the one with rank/ID 0).
     if use_parallel != MPI4PY or mpi_rank == 0:
         
@@ -144,6 +142,18 @@ if __name__ == '__main__':
         # The filename of the single optimised rotation file just created
         # (relative to the 'data/' directory).
         rotfile = optimised_rotation_updater.get_optimised_rotation_filename()
+        
+        # Creates the no-net-rotation model.
+        no_net_rotation_model = NoNetRotationModel(
+                datadir,
+                original_rotation_filenames,
+                topology_filenames,
+                start_age,
+                data_model)
+        
+        # The filename of single rotation file (containing entire rotation model) with
+        # no net rotation.
+        nnr_rotfile = no_net_rotation_model.get_no_net_rotation_filename()
         
         
         print "Rotation file to be used: ", rotfile
@@ -207,6 +217,10 @@ if __name__ == '__main__':
             
             print "Start age:", ref_rotation_start_age, "Ma"
             print ""
+            
+            # Incrementally build the no-net-rotation model as we go.
+            # NOTE: This does nothing if the entire no-net-rotation model was created in 'no_net_rotation_model.__init__()'.
+            no_net_rotation_model.update_no_net_rotation(ref_rotation_start_age)
             
             current_search_radius = search_radius
             current_models = models

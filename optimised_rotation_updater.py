@@ -125,13 +125,13 @@ class OptimisedRotationUpdater(object):
             5,
             pygplates.GpmlIrregularSampling(zero_rotation_time_samples_005_rel_000))
         
-        # Keep track of all rotation features for later so we can write them to file as we optimise through time.
-        # This includes the optimised 005-000 rotation feature.
-        all_rotation_features = []
+        # Keep track of all optimised rotation features for later so we can write them to file
+        # as we optimise through time. This includes the optimised 005-000 rotation feature.
+        all_optimised_rotation_features = []
         for rotation_feature_collection in self.rotation_feature_collections:
-            all_rotation_features.extend(rotation_feature_collection)
-        all_rotation_features.append(self.optimised_rotation_feature)
-        self.optimised_rotation_feature_collection = pygplates.FeatureCollection(all_rotation_features)
+            all_optimised_rotation_features.extend(rotation_feature_collection)
+        all_optimised_rotation_features.append(self.optimised_rotation_feature)
+        self.optimised_rotation_feature_collection = pygplates.FeatureCollection(all_optimised_rotation_features)
         
         # The single combined optimised rotation filename (relative to the 'data/' directory).
         self.optimised_rotation_filename = os.path.join(
@@ -144,7 +144,7 @@ class OptimisedRotationUpdater(object):
     
     def get_optimised_rotation_filename(self):
         """
-        Return the filename of the single combined optimised rotation file (relative to the 'data/' directory).
+        Return the filename (relative to the 'data/' directory) of the single combined optimised rotation file.
         """
         return self.optimised_rotation_filename
     
