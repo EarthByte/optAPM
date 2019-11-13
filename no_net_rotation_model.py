@@ -22,7 +22,7 @@ class NoNetRotationModel(object):
             self,
             data_dir,
             original_rotation_filenames,  # Relative to the 'data/' directory.
-            topology_filenames,  # Relative to the 'data/' directory.
+            topology_features,
             start_age,
             data_model):
         """
@@ -33,14 +33,6 @@ class NoNetRotationModel(object):
         #
         # Combine the original (input) rotation files into a single no-net-rotation file.
         #
-        
-        # Load the topology features.
-        topology_features = []
-        for topology_filename in topology_filenames:
-            # Read the current topology file.
-            topology_feature_collection = pygplates.FeatureCollection(
-                    os.path.join(data_dir, topology_filename))
-            topology_features.extend(topology_feature_collection)
         
         # Load all the original rotation feature collections.
         rotation_features_except_005_rel_000 = []

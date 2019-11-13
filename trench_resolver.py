@@ -14,25 +14,18 @@ class TrenchResolver(object):
             self,
             data_dir,
             original_rotation_filenames,  # Relative to the 'data/' directory.
-            topology_filenames,  # Relative to the 'data/' directory.
+            topology_features,
             data_model):
         """
         Load the topology features and load original rotation model.
         """
         
         self.data_dir = data_dir
+        self.topology_features = topology_features
         
         #
         # Combine the original (input) rotation files into a single no-net-rotation file.
         #
-        
-        # Load the topology features.
-        self.topology_features = []
-        for topology_filename in topology_filenames:
-            # Read the current topology file.
-            topology_feature_collection = pygplates.FeatureCollection(
-                    os.path.join(self.data_dir, topology_filename))
-            self.topology_features.extend(topology_feature_collection)
         
         # Load all the original rotation feature collections.
         rotation_features = []

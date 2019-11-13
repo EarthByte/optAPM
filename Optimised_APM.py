@@ -125,6 +125,12 @@ if __name__ == '__main__':
     # When using mpi4py we only print and collect/process results in one process (the one with rank/ID 0).
     if use_parallel != MPI4PY or mpi_rank == 0:
         
+        # Load the topology features. They can take a long time to load (especially for a deforming model) so we
+        # do it once instead of three times (once each for no-net-rotation, trench resolving and plate velocities).
+        topology_features = []
+        for topology_filename in topology_filenames:
+            topology_features.extend(pgp.FeatureCollection(os.path.join(datadir, topology_filename)))
+        
         # Manages updates to the rotation model due to optimisation.
         #
         # The creation/construction of this OptimisedRotationUpdater object also:
@@ -148,7 +154,7 @@ if __name__ == '__main__':
         no_net_rotation_model = NoNetRotationModel(
                 datadir,
                 original_rotation_filenames,
-                topology_filenames,
+                topology_features,
                 start_age,
                 data_model)
         
@@ -160,7 +166,7 @@ if __name__ == '__main__':
         trench_resolver = TrenchResolver(
                 datadir,
                 original_rotation_filenames,
-                topology_filenames,
+                topology_features,
                 data_model)
         
         # The filename used to store the trench features at the reconstruction time.
