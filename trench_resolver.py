@@ -24,10 +24,6 @@ class TrenchResolver(object):
         self.data_dir = data_dir
         self.topology_features = topology_features
         
-        #
-        # Combine the original (input) rotation files into a single no-net-rotation file.
-        #
-        
         # Load all the original rotation feature collections.
         rotation_features = []
         for rotation_filename in original_rotation_filenames:
@@ -67,15 +63,7 @@ class TrenchResolver(object):
             self,
             ref_rotation_start_age):
         """
-        Update the no-net-rotation 005-000 sequence from last update to 'ref_rotation_start_age+1'.
-        Note that it's 'ref_rotation_start_age+1' instead of 'ref_rotation_start_age' because that's the oldest time
-        required by 'optimisation_methods.ApproximateNR_from_features()' for the current time interval.
-        
-        The no-net-rotation model is then written to the file 'get_no_net_rotation_filename()'.
-        
-        NOTE: This is just temporary. Ideally we should just calculate the entire no-net-rotation model
-              at startup (ie, for the entire time range). But we're dividing it up into time sections
-              for now so that we don't have to wait a long time at startup before seeing things happen.
+        Generate the resolved trench features at the specified time and save them to the trench migration file.
         """
         
         # Resolve trench features
@@ -84,8 +72,6 @@ class TrenchResolver(object):
                 self.topology_features,
                 ref_rotation_start_age)
 
-        # Write to gpml file
-        
         # Write resolved trenches to the trench migration file.
         pygplates.FeatureCollection(resolved_trench_features).write(
                 os.path.join(self.data_dir, self.trench_migration_filename))

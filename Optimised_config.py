@@ -119,6 +119,12 @@ def get_hotspot_trail_params(age):
     else:
         return False, 1.0
 
+def get_plate_velocity_params(age):
+    return True, 1.0
+
+# The grid spacing (in degrees) between points in the grid used for plate velocity calculations.
+plate_velocity_grid_spacing = 2.0
+
 
 #
 # Which reference plate ID and PMAG rotation file to use at which age.

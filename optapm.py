@@ -64,6 +64,8 @@ class ModelSetup():
 
                 nnr_rotfile : GPlates no net-rotation *.rot file. Required for net rotation calculations.
                 tm_file : Trench migration data for the current reconstruction time. Required for trench migration calculations.
+                pv_file : Plate velocity data (points and associated plate IDs) for the current reconstruction time.
+                          Required for plate velocity calculations.
 
                 ridge_file : GPlates *.gpml ridge file. Required for fracture zone calculations.
                 isochron_file : GPlates *.gpml isochron file. Required for fracture zone calculations.
@@ -76,8 +78,9 @@ class ModelSetup():
 
 
     @staticmethod
-    def dataLoader(datadir, rot_file, pmag_rot_file=None, tm_file=None, nnr_rotfile=None, ridge_file=None, isochron_file=None, isocob_file=None,
-                   hst_file=None, hs_file=None, interpolated_hotspots=None):
+    def dataLoader(datadir, rot_file, pmag_rot_file=None, tm_file=None, pv_file=None, nnr_rotfile=None,
+                   ridge_file=None, isochron_file=None, isocob_file=None, hst_file=None, hs_file=None,
+                   interpolated_hotspots=None):
 
         # Create rotation model
         rotation_file = datadir + rot_file
@@ -93,6 +96,10 @@ class ModelSetup():
         if tm_file:
 
             trench_migration_file = datadir + tm_file
+
+        if pv_file:
+
+            plate_velocity_file = datadir + pv_file
 
         if nnr_rotfile:
 
@@ -134,8 +141,9 @@ class ModelSetup():
 
 
         # Return all loaded data
-        data = [rotation_model, rotation_file, trench_migration_file, no_net_rotation_file, features_ri, RidgeFile_subset, features_iso, IsochronFile_subset,
-                features_isocob, IsoCOBFile_subset, hs_trails, hotspots, pmag_rotation_model, pmag_rotation_file, interpolated_hotspot_data]
+        data = [rotation_model, rotation_file, trench_migration_file, plate_velocity_file, no_net_rotation_file,
+                features_ri, RidgeFile_subset, features_iso, IsochronFile_subset, features_isocob, IsoCOBFile_subset,
+                hs_trails, hotspots, pmag_rotation_model, pmag_rotation_file, interpolated_hotspot_data]
 
         print "- Data loaded"
         print " "
@@ -168,11 +176,11 @@ class ModelSetup():
 
             Data to be included in optimisation: True by default.
 
-            fracture_zones : Boolean
-            net_rotation : Boolean
-            trench_migration : Boolean
-            hotspot_reconstruction : Boolean
-            hotspot_dispersion : Boolean
+            enable_fracture_zones : Boolean
+            enable_net_rotation : Boolean
+            enable_trench_migration : Boolean
+            enable_hotspot_trails : Boolean
+            enable_plate_velocity : Boolean
 
             """)
 
@@ -181,22 +189,22 @@ class ModelSetup():
     def modelStartConditions(params, data, plot=True):
 
         # Translate data array
-        rotation_model = data[0]
-        rotation_file = data[1]
-        trench_migration_file = data[2]
-        no_net_rotation_file = data[3]
-        features_ri = data[4]
-        RidgeFile_subset = data[5]
-        features_iso = data[6]
-        IsochronFile_subset = data[7]
-        features_isocob = data[8]
-        IsoCOBFile_subset = data[9]
-        hs_trails = data[10]
-        hotspots = data[11]
-        pmag_rotation_model = data[12]
-        pmag_rotation_file = data[13]
-        interpolated_hotspot_data = data[14]
-
+        (rotation_model,
+         rotation_file,
+         trench_migration_file,
+         plate_velocity_file,
+         no_net_rotation_file,
+         features_ri,
+         RidgeFile_subset,
+         features_iso,
+         IsochronFile_subset,
+         features_isocob,
+         IsoCOBFile_subset,
+         hs_trails,
+         hotspots,
+         pmag_rotation_model,
+         pmag_rotation_file,
+         interpolated_hotspot_data) = data[:16]
 
         # Translate params array
         (geographical_uncertainty,
@@ -210,10 +218,11 @@ class ModelSetup():
             ref_rotation_end_age,
             interpolation_resolution,
             rotation_age_of_interest,
-            fracture_zones,
-            net_rotation,
-            trench_migration,
-            hotspot_trails,
+            enable_fracture_zones,
+            enable_net_rotation,
+            enable_trench_migration,
+            enable_hotspot_trails,
+            enable_plate_velocity,
             ref_rot_longitude,
             ref_rot_latitude,
             ref_rot_angle,
@@ -223,11 +232,12 @@ class ModelSetup():
             nr_weight,
             tm_weight,
             hs_weight,
+            pv_weight,
             include_chains,
             interpolated_hotspot_trails,
-            tm_method) = params[:27]
+            tm_method) = params[:29]
 
-        #print fz_weight, nr_weight, tm_weight, hs_weight
+        #print fz_weight, nr_weight, tm_weight, hs_weight, pv_weight
 
 
         # Set rotation age of interest
@@ -235,12 +245,12 @@ class ModelSetup():
 
         # Optimisation data array
         data_array_labels = ['Fracture zone orientation', 'Net rotation', 'Trench migration',
-                             'Hotspot trails']
+                             'Hotspot trails', 'Plate velocity']
 
-        weights_array = [fz_weight, nr_weight, tm_weight, hs_weight]
+        weights_array = [fz_weight, nr_weight, tm_weight, hs_weight, pv_weight]
 
-        data_array_labels_short = ['FZ', 'NR', 'TM', 'HS']
-        data_array = [fracture_zones, net_rotation, trench_migration, hotspot_trails]
+        data_array_labels_short = ['FZ', 'NR', 'TM', 'HS', 'PV']
+        data_array = [enable_fracture_zones, enable_net_rotation, enable_trench_migration, enable_hotspot_trails, enable_plate_velocity]
 
         # Array containing the name of all chains to be included in optimisation
         if ref_rotation_start_age <= 80:
@@ -1023,9 +1033,12 @@ class ModelSetup():
             ipmag.plot_pole(m, ref_rot_longitude, ref_rot_latitude, geographical_uncertainty, color='red')
 
 
-        startingConditions = [x, opt_n, N, lb, ub, model_stop_condition, max_iter, rotation_file, ref_rotation_start_age, ref_rotation_end_age, ref_rotation_plate_id,
-                              Lats, Lons, spreading_directions, spreading_asymmetries, seafloor_ages, PID, CPID, data_array, trench_migration_file, no_net_rotation_file,
-                              reformArray, trail_data, start_seeds, rotation_age_of_interest_age, data_array_labels_short, ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
+        startingConditions = [x, opt_n, N, lb, ub, model_stop_condition, max_iter,
+                              rotation_file, ref_rotation_start_age, ref_rotation_end_age, ref_rotation_plate_id,
+                              Lats, Lons, spreading_directions, spreading_asymmetries, seafloor_ages, PID, CPID, data_array,
+                              trench_migration_file, plate_velocity_file, no_net_rotation_file,
+                              reformArray, trail_data, start_seeds, rotation_age_of_interest_age, data_array_labels_short,
+                              ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
                               seed_lons, seed_lats, ang_gaussian_array]
 
 

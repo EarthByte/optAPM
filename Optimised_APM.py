@@ -13,6 +13,7 @@ import itertools
 from datetime import datetime, timedelta
 from no_net_rotation_model import NoNetRotationModel
 from optimised_rotation_updater import OptimisedRotationUpdater
+from plate_velocity_partitioner import PlateVelocityPartitioner
 from trench_resolver import TrenchResolver
 
 # All the config parameters are now in a separate module 'Optimised_config' that also
@@ -173,6 +174,18 @@ if __name__ == '__main__':
         # The same filename is used for all reconstruction times (it just gets overwritten at each time).
         tm_file = trench_resolver.get_trench_migration_filename()
         
+        # Generates points and associated plate IDs at each reconstruction time (for plate velocities later on).
+        plate_velocity_partitioner = PlateVelocityPartitioner(
+                datadir,
+                original_rotation_filenames,
+                topology_features,
+                data_model,
+                plate_velocity_grid_spacing)
+        
+        # The filename used to store the (plate velocity) points and associated plate IDs at the reconstruction time.
+        # The same filename is used for all reconstruction times (it just gets overwritten at each time).
+        pv_file = plate_velocity_partitioner.get_plate_velocity_filename()
+        
         
         print "Rotation file to be used: ", rotfile
         print "TM data:", tm_data_type
@@ -222,10 +235,11 @@ if __name__ == '__main__':
         
         
         # Determine which components are enabled and their weightings (which could vary over time).
-        fracture_zones, fracture_zone_weight = get_fracture_zone_params(ref_rotation_start_age)
-        net_rotation, net_rotation_weight = get_net_rotation_params(ref_rotation_start_age)
-        trench_migration, trench_migration_weight = get_trench_migration_params(ref_rotation_start_age)
-        hotspot_trails, hotspot_trails_weight = get_hotspot_trail_params(ref_rotation_start_age)
+        enable_fracture_zones, fracture_zone_weight = get_fracture_zone_params(ref_rotation_start_age)
+        enable_net_rotation, net_rotation_weight = get_net_rotation_params(ref_rotation_start_age)
+        enable_trench_migration, trench_migration_weight = get_trench_migration_params(ref_rotation_start_age)
+        enable_hotspot_trails, hotspot_trails_weight = get_hotspot_trail_params(ref_rotation_start_age)
+        enable_plate_velocity, plate_velocity_weight = get_plate_velocity_params(ref_rotation_start_age)
         
         # Determine reference plate ID and PMAG rotation file (which could vary over time).
         ref_rotation_plate_id, pmag_rotfile = get_reference_params(ref_rotation_start_age)
@@ -245,6 +259,11 @@ if __name__ == '__main__':
             # The results are saved to the file 'tm_file'.
             # Note: The file only contains resolved trenches at time 'ref_rotation_start_age'.
             trench_resolver.generate_resolved_trenches(ref_rotation_start_age)
+            
+            # Generate the (plate velocity) points and associated plate IDs at time 'ref_rotation_start_age'.
+            # The results are saved to the file 'pv_file'.
+            # Note: The file only contains points and plate IDs partitioned at time 'ref_rotation_start_age'.
+            plate_velocity_partitioner.generate_points_and_plate_ids(ref_rotation_start_age)
             
             current_search_radius = search_radius
             current_models = models
@@ -270,16 +289,16 @@ if __name__ == '__main__':
 
             # Gather parameters
             params = [current_search_radius, rotation_uncertainty, search_type, current_models, model_stop_condition, max_iter,
-                      ref_rotation_plate_id, ref_rotation_start_age, ref_rotation_end_age, interpolation_resolution, 
-                      rotation_age_of_interest, fracture_zones, net_rotation, trench_migration, hotspot_trails,
+                      ref_rotation_plate_id, ref_rotation_start_age, ref_rotation_end_age, interpolation_resolution, rotation_age_of_interest,
+                      enable_fracture_zones, enable_net_rotation, enable_trench_migration, enable_hotspot_trails, enable_plate_velocity,
                       no_auto_ref_rot_longitude, no_auto_ref_rot_latitude, no_auto_ref_rot_angle, auto_calc_ref_pole, search, 
-                      fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
+                      fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight, plate_velocity_weight,
                       include_chains, interpolated_hotspot_trails, tm_method]
 
             # --------------------------------------------------------------------
 
             # Load all data
-            data = ms.dataLoader(datadir, rotfile, pmag_rotfile, tm_file=tm_file, nnr_rotfile=nnr_rotfile, 
+            data = ms.dataLoader(datadir, rotfile, pmag_rotfile, tm_file=tm_file, pv_file=pv_file, nnr_rotfile=nnr_rotfile, 
                                  ridge_file=ridge_file, isochron_file=isochron_file, isocob_file=isocob_file, 
                                  hst_file=hst_file, hs_file=hs_file, interpolated_hotspots=interpolated_hotspots)
 
@@ -342,10 +361,10 @@ if __name__ == '__main__':
             spreading_directions, spreading_asymmetries, seafloor_ages,
             PID, CPID,
             data_array,
-            trench_migration_file, no_net_rotation_file, reformArray, trail_data,
+            trench_migration_file, plate_velocity_file, no_net_rotation_file, reformArray, trail_data,
             start_seeds, rotation_age_of_interest_age, data_array_labels_short,
             ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
-            seed_lons, seed_lats) = startingConditions[:31]
+            seed_lons, seed_lats) = startingConditions[:32]
 
         if auto_calc_ref_pole == False:
 
@@ -372,9 +391,9 @@ if __name__ == '__main__':
         def run_optimisation(x, opt_n, N, lb, ub, model_stop_condition, max_iter, interval, rotation_file, 
                              no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions, 
                              spreading_asymmetries, seafloor_ages, PID, CPID, data_array, trench_migration_file, 
-                             ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
+                             plate_velocity_file, ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
                              fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
-                             use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method):
+                             plate_velocity_weight, use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method):
 
             # Make sure remote nodes/cores also import these modules (when running code in parallel).
             #
@@ -393,9 +412,9 @@ if __name__ == '__main__':
             # NLopt will call this as 'obj_f(x, grad)' because 'obj_f' has a '__call__' method.
             obj_f = ObjectiveFunction(
                     interval, rotation_file, no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions,
-                    spreading_asymmetries, seafloor_ages, PID, CPID, data_array, trench_migration_file,
+                    spreading_asymmetries, seafloor_ages, PID, CPID, data_array, trench_migration_file, plate_velocity_file,
                     ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
-                    fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
+                    fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight, plate_velocity_weight,
                     use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method)
             
             opt = nlopt.opt(nlopt.LN_COBYLA, opt_n)
@@ -432,12 +451,13 @@ if __name__ == '__main__':
                           model_stop_condition=model_stop_condition, max_iter=max_iter, interval=interval, rotation_file=rotation_file,
                           no_net_rotation_file=no_net_rotation_file, ref_rotation_start_age=ref_rotation_start_age, 
                           Lats=Lats, Lons=Lons, spreading_directions=spreading_directions, 
-                          spreading_asymmetries=spreading_asymmetries, 
-                          seafloor_ages=seafloor_ages, PID=PID, CPID=CPID, data_array=data_array, trench_migration_file=trench_migration_file,
+                          spreading_asymmetries=spreading_asymmetries, seafloor_ages=seafloor_ages, PID=PID, CPID=CPID, data_array=data_array,
+                          trench_migration_file=trench_migration_file, plate_velocity_file=plate_velocity_file,
                           ref_rotation_end_age=ref_rotation_end_age, ref_rotation_plate_id=ref_rotation_plate_id,
                           reformArray=reformArray, trail_data=trail_data, fracture_zone_weight=fracture_zone_weight,
                           net_rotation_weight=net_rotation_weight, trench_migration_weight=trench_migration_weight,
-                          hotspot_trails_weight=hotspot_trails_weight, use_trail_age_uncertainty=use_trail_age_uncertainty,
+                          hotspot_trails_weight=hotspot_trails_weight, plate_velocity_weight=plate_velocity_weight,
+                          use_trail_age_uncertainty=use_trail_age_uncertainty,
                           trail_age_uncertainty_ellipse=trail_age_uncertainty_ellipse, tm_method=tm_method)
 
         # Start timer for current time step.

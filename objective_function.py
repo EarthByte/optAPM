@@ -36,6 +36,7 @@ class ObjectiveFunction(object):
             CPID,
             data_array,
             trench_migration_file,
+            plate_velocity_file,
             ref_rotation_end_age,
             ref_rotation_plate_id,
             reformArray,
@@ -44,6 +45,7 @@ class ObjectiveFunction(object):
             net_rotation_weight,
             trench_migration_weight,
             hotspot_trails_weight,
+            plate_velocity_weight,
             use_trail_age_uncertainty,
             trail_age_uncertainty_ellipse,
             tm_method):
@@ -61,6 +63,7 @@ class ObjectiveFunction(object):
         self.CPID = CPID
         self.data_array = data_array
         self.trench_migration_file = trench_migration_file
+        self.plate_velocity_file = plate_velocity_file
         self.ref_rotation_end_age = ref_rotation_end_age
         self.ref_rotation_plate_id = ref_rotation_plate_id
         self.reformArray = reformArray
@@ -69,6 +72,7 @@ class ObjectiveFunction(object):
         self.net_rotation_weight = net_rotation_weight
         self.trench_migration_weight = trench_migration_weight
         self.hotspot_trails_weight = hotspot_trails_weight
+        self.plate_velocity_weight = plate_velocity_weight
         self.use_trail_age_uncertainty = use_trail_age_uncertainty
         self.trail_age_uncertainty_ellipse = trail_age_uncertainty_ellipse
         self.tm_method = tm_method
@@ -89,6 +93,13 @@ class ObjectiveFunction(object):
         # Trench migration using pyGPlates.
         if data_array[2] and tm_method == 'pygplates':
             self.tm_data = pgp.FeatureCollection(trench_migration_file)
+        # Plate velocities.
+        # Contains multi-points (and each multi-point has a plate ID).
+        # Each multi-point represents those grid points that fall within a resolved plate
+        # (or continental polygon) with a particular plate ID. Velocities can then be calculated using
+        # each candidate rotation model and the plate IDs (and positions).
+        if data_array[4]:
+            self.pv_data = pgp.FeatureCollection(plate_velocity_file)
 
 
         #
@@ -399,6 +410,16 @@ class ObjectiveFunction(object):
 
 
 
+        #
+        # Plate velocities
+        if self.data_array[4] == True:
+
+            tmp_pv_eval = 0.0
+
+            pv_eval = tmp_pv_eval / self.plate_velocity_weight
+
+
+
 
 
         #### -----------------------------------------------------------------------------------------
@@ -463,6 +484,12 @@ class ObjectiveFunction(object):
             pass
 
 
+        # Plate velocities
+        try:
+            if pv_eval:
+                opt_eval = opt_eval + pv_eval
+        except:
+            pass
 
 
         #### ---------------------------------------------------------------------------------------------
