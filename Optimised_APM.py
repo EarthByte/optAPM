@@ -175,10 +175,19 @@ if __name__ == '__main__':
         tm_file = trench_resolver.get_trench_migration_filename()
         
         # Generates points and associated plate IDs at each reconstruction time (for plate velocities later on).
+        # Use either topologies (continental+ocean) or just continental.
+        if plate_velocity_continental_polygons_file:
+            plate_velocity_plate_features = list(
+                pgp.FeatureCollection(os.path.join(datadir, plate_velocity_continental_polygons_file)))
+            plate_velocity_features_are_topologies = False
+        else:
+            plate_velocity_plate_features = topology_features
+            plate_velocity_features_are_topologies = True
         plate_velocity_partitioner = PlateVelocityPartitioner(
                 datadir,
                 original_rotation_filenames,
-                topology_features,
+                plate_velocity_plate_features,
+                plate_velocity_features_are_topologies,
                 data_model,
                 plate_velocity_grid_spacing)
         

@@ -33,10 +33,10 @@ models = 100
 
 
 # The data model to run the optimisation on.
-# This should be the name of the sub-directory in 'data/' and also the sub-directory in 'data/TMData/'.
-data_model = 'Global_Model_WD_Internal_Release_2019_v2'
+# This should be the name of the sub-directory in 'data/'.
+data_model = 'Global_1000-0_Model_2017'
 
-# The original rotation files (relative to the 'data/<data_model>/' directory).
+# The original rotation files (relative to the 'data/' directory).
 #
 # Can either:
 #   1) use glob to automatically find all the '.rot' files (you don't need to do anything), or
@@ -51,7 +51,7 @@ original_rotation_filenames = [os.path.relpath(abs_path, datadir) for abs_path i
 #  'Global_Model_WD_Internal_Release_2019_v2/rotation_file2.rot',
 #]
 
-# The topology files (relative to the 'data/<data_model>/' directory).
+# The topology files (relative to the 'data/' directory).
 #
 # Can either:
 #   1) use glob to automatically find all the '.gpml' files (you don't need to do anything), or
@@ -66,9 +66,17 @@ topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
 #  'Global_Model_WD_Internal_Release_2019_v2/topology_file2.gpml',
 #]
 
-ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
-isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
-isocob_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
+# The continental polygons file (relative to the 'data/' directory) used for plate velocity calculations (when plate velocity is enabled).
+# NOTE: Set to None to use topologies instead (which includes continental and oceanic crust).
+plate_velocity_continental_polygons_file = data_model + '/StaticGeometries/GSHHS_l_coastlines.gpmlz'
+#plate_velocity_continental_polygons_file = None
+
+# The grid spacing (in degrees) between points in the grid used for plate velocity calculations (when plate velocity is enabled).
+plate_velocity_grid_spacing = 2.0
+
+# ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
+# isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
+# isocob_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
 #
 # For (data_model == 'Global_1000-0_Model_2017') or (data_model == 'Muller++_2015_AREPS_CORRECTED') ...
 #
@@ -80,9 +88,9 @@ isocob_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK
 #       THIS IS OK IF WE'RE NOT INCLUDING FRACTURE ZONES (BECAUSE THEN THESE FILES ARE NOT USED FOR FINAL OPTIMISED ROTATIONS).
 #
 ##################################################################################################################################
-# ridge_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
-# isochron_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
-# isocob_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
+ridge_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
+isochron_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
+isocob_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
 #
 # Original files used in original optimisation script...
 #
@@ -121,9 +129,6 @@ def get_hotspot_trail_params(age):
 
 def get_plate_velocity_params(age):
     return True, 1.0
-
-# The grid spacing (in degrees) between points in the grid used for plate velocity calculations.
-plate_velocity_grid_spacing = 2.0
 
 
 #

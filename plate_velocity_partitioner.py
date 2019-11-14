@@ -18,7 +18,8 @@ class PlateVelocityPartitioner(object):
             self,
             data_dir,
             original_rotation_filenames,  # Relative to the 'data/' directory.
-            topology_features,
+            plate_features,
+            plate_features_are_topologies,
             data_model,
             grid_spacing_degrees):
         """
@@ -26,7 +27,8 @@ class PlateVelocityPartitioner(object):
         """
         
         self.data_dir = data_dir
-        self.topology_features = topology_features
+        self.plate_features = plate_features
+        self.plate_features_are_topologies = plate_features_are_topologies
         
         # Load all the original rotation feature collections.
         rotation_features = []
@@ -93,32 +95,53 @@ class PlateVelocityPartitioner(object):
         Generate the resolved trench features at the specified time and save them to the trench migration file.
         """
         
-        # Resolve the plate polygons for the current time.
-        resolved_topologies = []
-        pygplates.resolve_topologies(self.topology_features, self.rotation_model, resolved_topologies, ref_rotation_start_age,
-            # TODO: We are only looking at *non-deforming* boundaries, but need to also support deforming regions
-            #       Requires extensions to pyGPlates for that.
-            resolve_topology_types=pygplates.ResolveTopologyType.boundary)
+        # Resolved topological plate polygons or reconstruct static continental polygons.
+        if self.plate_features_are_topologies:
+            # Resolve the topological plate polygons for the current time.
+            resolved_topologies = []
+            pygplates.resolve_topologies(self.plate_features, self.rotation_model, resolved_topologies, ref_rotation_start_age,
+                # TODO: We are only looking at *non-deforming* boundaries, but need to also support deforming regions
+                #       Requires extensions to pyGPlates for that.
+                resolve_topology_types=pygplates.ResolveTopologyType.boundary)
+            
+            # Get a list of resolved polygons and a list of their plate IDs.
+            polygons = []
+            polygon_plate_ids = []
+            for resolved_topology in resolved_topologies:
+                polygons.append(resolved_topology.get_resolved_boundary())
+                polygon_plate_ids.append(resolved_topology.get_feature().get_reconstruction_plate_id())
+            
+        else:
+            # Reconstruct the static continental polygons.
+            reconstructed_feature_geometries = []
+            pygplates.reconstruct(self.plate_features, self.rotation_model, reconstructed_feature_geometries, ref_rotation_start_age)
+            
+            # Get a list of resolved polygons and a list of their plate IDs.
+            polygons = []
+            polygon_plate_ids = []
+            for reconstructed_feature_geometry in reconstructed_feature_geometries:
+                polygons.append(reconstructed_feature_geometry.get_reconstructed_geometry())
+                polygon_plate_ids.append(reconstructed_feature_geometry.get_feature().get_reconstruction_plate_id())
         
-        #
-        # Assuming the resolved polygons are *non-overlapping*, which they should be (except for minor overap/gap errors),
-        # find the single polygon (resolved boundary) containing each point.
-        #
+        # Find the resolved plate polygon or reconstructed continental polygon (if any) containing each point.
         point_plate_ids = points_in_polygons.find_polygons(
                 self.points,
-                # The resolved plate polygon geometries...
-                [resolved_topology.get_resolved_boundary() for resolved_topology in resolved_topologies],
-                # The plate ID of each resolved topology (this is what is returned by 'find_polygons')...
-                [resolved_topology.get_feature().get_reconstruction_plate_id() for resolved_topology in resolved_topologies])
+                # The resolved plate polygon (or reconstructed continental polygon) geometries...
+                polygons,
+                # The plate ID of each resolved topology or reconstructed continent (this is what is returned by 'find_polygons')...
+                polygon_plate_ids)
         
         # Dictionary of point lists indexed by plate ID (ie, each plate ID has a list of associated points).
         points_by_plate_id_dict = {}
         
         # Each point is contained by one resolved plate boundary.
         for point_index, point_plate_id in enumerate(point_plate_ids):
-            # If point is not in any resolved boundary then it either fell in a tiny crack/gap
-            # or the topologies don't have global coverage.
-            # In either case we ignore it.
+            # If we're using topological plates, then if point is not in any resolved boundary then
+            # it either fell in a tiny crack/gap or the topologies don't have global coverage.
+            # If we're using continental polygons, then if point is not in any continental boundary then
+            # it is on oceanic crust, and if it's in two polygons then they overlap (which can happen
+            # when continental polygons are reconstructed) and we only see the first polygon encountered.
+            # In all cases we ignore the point.
             if point_plate_id is not None:
                 # Create dictionary entry (an empty list) if first time encountered plate ID.
                 if point_plate_id not in points_by_plate_id_dict:
