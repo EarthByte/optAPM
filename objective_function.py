@@ -412,9 +412,38 @@ class ObjectiveFunction(object):
 
         #
         # Plate velocities
+        #
         if self.data_array[4] == True:
-
-            tmp_pv_eval = 0.0
+            
+            # Calculate velocity magnitudes at all pre-calculated grid points ('self.pv_data').
+            velocity_magnitudes = []
+            
+            # 'self.pv_data' contains multi-points (and each multi-point has a plate ID).
+            # Each multi-point represents those grid points that fall within a resolved plate
+            # (or continental polygon) with a particular plate ID. Velocities can then be calculated
+            # using the current updated rotation model and the plate IDs (and positions).
+            for multi_point_feature in self.pv_data:
+                plate_id = multi_point_feature.get_reconstruction_plate_id()
+                
+                # Get equivalent stage rotation from 'self.ref_rotation_start_age' to
+                # 'self.ref_rotation_start_age - self.interval'
+                equivalent_stage_rotation = rotation_model_updated.get_rotation(
+                        self.ref_rotation_start_age - self.interval,
+                        plate_id,
+                        self.ref_rotation_start_age)
+                
+                # There is only one (multi-point) geometry per feature but behave as if there's more.
+                for multi_point in multi_point_feature.get_geometries():
+                    velocity_vectors = pgp.calculate_velocities(
+                            multi_point,
+                            equivalent_stage_rotation,
+                            self.interval)
+                    velocity_magnitudes.extend(velocity_vector.get_magnitude()
+                            for velocity_vector in velocity_vectors)
+            
+            median_velocity = np.median(velocity_magnitudes)
+            
+            tmp_pv_eval = median_velocity
 
             pv_eval = tmp_pv_eval / self.plate_velocity_weight
 
