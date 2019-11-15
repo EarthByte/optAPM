@@ -214,13 +214,22 @@ class ObjectiveFunction(object):
         # Net rotation
         if self.data_array[1] == True:
 
-            nr_timesteps = np.arange(self.ref_rotation_end_age, self.ref_rotation_start_age + 1, 2)
+            # List of times, not including 'self.ref_rotation_start_age' (ie, last value is
+            # 'self.ref_rotation_start_age - 1') since 'optimisation_methods.ApproximateNR_from_features()'
+            # calculates NR from 't+1' to 't' (and so 't+1' will be 'self.ref_rotation_start_age').
+            #
+            # This is important because sampling beyond 'self.ref_rotation_start_age' will create problems
+            # since 'rotation_model_updated' has only been updated back to 'self.ref_rotation_start_age'.
+            nr_timesteps = np.arange(self.ref_rotation_end_age, self.ref_rotation_start_age, 1)
 
             PTLong1, PTLat1, PTangle1, SPLong, SPLat, SPangle, SPLong_NNR, SPLat_NNR, SPangle_NNR = \
             optimisation_methods.ApproximateNR_from_features(rotation_model_updated, self.nn_rotation_model, 
                                                              nr_timesteps, self.ref_rotation_plate_id)
 
-            nr_eval = (np.sum(np.abs(PTangle1)) + np.mean(np.abs(PTangle1))) / 2
+            # Sum the net rotation absolute angles over 'nr_timesteps' to get full 'interval'.
+            nr_over_interval = np.sum(np.abs(PTangle1))
+            
+            nr_eval = nr_over_interval + np.mean(np.abs(PTangle1))
             
             # Penalise out-of-bound cost values (if requested).
             if self.data_bounds[1]:
@@ -500,7 +509,7 @@ class ObjectiveFunction(object):
 
         # Scaling values
         scale_fracture_zones = 10
-        scale_net_rotation = 1000.0 / 4.0
+        scale_net_rotation = 1000.0 / 8.0
         scale_trench_migration = 1.0
         scale_hot_spots = 1.0 / 8.0
         scale_plate_velocity = 10.0
