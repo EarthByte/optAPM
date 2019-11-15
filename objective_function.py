@@ -462,7 +462,7 @@ class ObjectiveFunction(object):
         scale_net_rotation = 1000.0 / 4.0
         scale_trench_migration = 1.0
         scale_hot_spots = 1.0 / 8.0
-        scale_plate_velocity = 1.0
+        scale_plate_velocity = 10.0
 
 
         opt_eval = 0
