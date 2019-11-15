@@ -202,6 +202,7 @@ class ObjectiveFunction(object):
             # Penalise out-of-bound cost values (if requested).
             if self.data_bounds[0]:
                 fz_lower_bound, fz_upper_bound = self.data_bounds[0]
+                # TODO: Might need to compare 'fz[1]' (ie, the  mean) instead of 'fz_eval'.
                 if fz_eval < fz_lower_bound or fz_eval > fz_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
                     fz_eval += 10000.0
@@ -234,7 +235,10 @@ class ObjectiveFunction(object):
             # Penalise out-of-bound cost values (if requested).
             if self.data_bounds[1]:
                 nr_lower_bound, nr_upper_bound = self.data_bounds[1]
-                if nr_eval < nr_lower_bound or nr_eval > nr_upper_bound:
+                # 'nr_over_interval' is over whole 'interval'.
+                # But the bounded values are in deg/Myr, so convert our NR to deg/Myr.
+                nr_deg_per_myr = nr_over_interval / self.interval
+                if nr_deg_per_myr < nr_lower_bound or nr_deg_per_myr > nr_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
                     nr_eval += 10000.0
 
@@ -448,6 +452,7 @@ class ObjectiveFunction(object):
             # Penalise out-of-bound cost values (if requested).
             if self.data_bounds[3]:
                 hs_lower_bound, hs_upper_bound = self.data_bounds[3]
+                # TODO: Might need to compare (possibly weighted) mean instead of 'hs_dist_eval'.
                 if hs_dist_eval < hs_lower_bound or hs_dist_eval > hs_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
                     hs_dist_eval += 10000.0
@@ -494,7 +499,7 @@ class ObjectiveFunction(object):
             # Penalise out-of-bound cost values (if requested).
             if self.data_bounds[4]:
                 pv_lower_bound, pv_upper_bound = self.data_bounds[4]
-                if pv_eval < pv_lower_bound or pv_eval > pv_upper_bound:
+                if median_velocity < pv_lower_bound or median_velocity > pv_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
                     pv_eval += 10000.0
             
