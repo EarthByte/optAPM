@@ -445,8 +445,13 @@ if __name__ == '__main__':
             minf = opt.last_optimum_value()
             
             # Debug print number of iterations needed to converge.
-            print opt.get_numevals()
-            sys.stdout.flush()
+            #print opt.get_numevals(), 'iterations performed'
+            #sys.stdout.flush()
+
+            # To debug the weighted cost functions (net rotation, trench migration, etc).
+            #print 'Mean objective function costs', np.mean(obj_f.debug_data, axis=0)
+            #print 'Median objective function costs', np.median(obj_f.debug_data, axis=0)
+            #sys.stdout.flush()
 
             return xopt, minf
 
@@ -509,9 +514,6 @@ if __name__ == '__main__':
             
             # Calculate serially.
             xopt = [runopt(x_item) for x_item in x]
-
-        # print 'Mean opt_ind_data', np.mean(objective_function.opt_ind_data, axis=0)
-        # print 'Median opt_ind_data', np.median(objective_function.opt_ind_data, axis=0)
 
         # except Exception as e:
         

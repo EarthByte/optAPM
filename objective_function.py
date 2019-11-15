@@ -120,6 +120,9 @@ class ObjectiveFunction(object):
                     break
         
         self.debug_count = 0
+        
+        # To debug the weighted cost functions (net rotation, trench migration, etc).
+        self.debug_data = []
 
 
     def __call__(self, x, grad):
@@ -455,20 +458,22 @@ class ObjectiveFunction(object):
         #### 3. Calculate evaluation return number
 
         # Scaling values
-        alpha = 10
-        beta = 100
-        gamma = 1000.0 / 4.0
+        scale_fracture_zones = 10
+        scale_net_rotation = 1000.0 / 4.0
+        scale_trench_migration = 1.0
+        scale_hot_spots = 1.0 / 8.0
+        scale_plate_velocity = 1.0
 
 
         opt_eval = 0
         
-        # opt_ind = []
+        opt_ind = []
 
         # Fracture zones
         try:
             if fz_eval:
-                opt_eval = opt_eval + (fz_eval * alpha)
-                # opt_ind.append(fz_eval * alpha)
+                opt_eval = opt_eval + (fz_eval * scale_fracture_zones)
+                opt_ind.append(fz_eval * scale_fracture_zones)
         except:
             pass
 
@@ -476,8 +481,8 @@ class ObjectiveFunction(object):
         # Net rotation
         try:
             if nr_eval:
-                opt_eval = opt_eval + (nr_eval * gamma)
-                # opt_ind.append(nr_eval * gamma)
+                opt_eval = opt_eval + (nr_eval * scale_net_rotation)
+                opt_ind.append(nr_eval * scale_net_rotation)
         except:
             pass
 
@@ -485,9 +490,8 @@ class ObjectiveFunction(object):
         # Trench migration
         try:
             if tm_eval:
-                #opt_eval = opt_eval + (tm_eval / alpha)
-                opt_eval = opt_eval + tm_eval
-                # opt_ind.append(tm_eval)
+                opt_eval = opt_eval + (tm_eval * scale_trench_migration)
+                opt_ind.append(tm_eval * scale_trench_migration)
         except:
             pass
 
@@ -506,8 +510,8 @@ class ObjectiveFunction(object):
                 #opt_eval = opt_eval + (((hs_kappa_eval * 1e6) + hs_dist_eval) / 1.5)
 
                 # Distance misfit
-                opt_eval = opt_eval + (hs_dist_eval / 8)
-                # opt_ind.append((hs_dist_eval / 8))
+                opt_eval = opt_eval + (hs_dist_eval * scale_hot_spots)
+                opt_ind.append(hs_dist_eval * scale_hot_spots)
 
         except:
             pass
@@ -516,21 +520,20 @@ class ObjectiveFunction(object):
         # Plate velocities
         try:
             if pv_eval:
-                opt_eval = opt_eval + pv_eval
+                opt_eval = opt_eval + (pv_eval * scale_plate_velocity)
+                opt_ind.append(pv_eval * scale_plate_velocity)
         except:
             pass
 
 
         #### ---------------------------------------------------------------------------------------------
         #### Return all calculated quantities     
-        try:
-            opt_eval_data.append(opt_eval)
-        except:
-            pass
-        
         # try:
-        #     opt_ind_data.append(opt_ind)
+        #     opt_eval_data.append(opt_eval)
         # except:
         #     pass
+        
+        # To debug the weighted cost functions (net rotation, trench migration, etc).
+        self.debug_data.append(opt_ind)
 
         return opt_eval
