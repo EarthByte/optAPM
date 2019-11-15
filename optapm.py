@@ -218,11 +218,8 @@ class ModelSetup():
             ref_rotation_end_age,
             interpolation_resolution,
             rotation_age_of_interest,
-            enable_fracture_zones,
-            enable_net_rotation,
-            enable_trench_migration,
-            enable_hotspot_trails,
-            enable_plate_velocity,
+            enable_fracture_zones, enable_net_rotation, enable_trench_migration, enable_hotspot_trails, enable_plate_velocity,
+            fracture_zone_bounds, net_rotation_bounds, trench_migration_bounds, hotspot_trails_bounds, plate_velocity_bounds,
             ref_rot_longitude,
             ref_rot_latitude,
             ref_rot_angle,
@@ -235,7 +232,7 @@ class ModelSetup():
             pv_weight,
             include_chains,
             interpolated_hotspot_trails,
-            tm_method) = params[:29]
+            tm_method) = params[:34]
 
         #print fz_weight, nr_weight, tm_weight, hs_weight, pv_weight
 
@@ -251,6 +248,8 @@ class ModelSetup():
 
         data_array_labels_short = ['FZ', 'NR', 'TM', 'HS', 'PV']
         data_array = [enable_fracture_zones, enable_net_rotation, enable_trench_migration, enable_hotspot_trails, enable_plate_velocity]
+        
+        data_bounds = [fracture_zone_bounds, net_rotation_bounds, trench_migration_bounds, hotspot_trails_bounds, plate_velocity_bounds]
 
         # Array containing the name of all chains to be included in optimisation
         if ref_rotation_start_age <= 80:
@@ -275,7 +274,10 @@ class ModelSetup():
 
             if data_array[i] == True:
 
-                print "- " + data_array_labels[i] + " (" + str(weights_array[i]) + ")"
+                print "- " + data_array_labels[i] + ": weight(" + str(weights_array[i]) + ")"
+                
+                if data_bounds[i]:
+                    print "  - bounds" + str(data_bounds[i])
 
         print " "
         print "Termination:"
@@ -1035,8 +1037,8 @@ class ModelSetup():
 
         startingConditions = [x, opt_n, N, lb, ub, model_stop_condition, max_iter,
                               rotation_file, ref_rotation_start_age, ref_rotation_end_age, ref_rotation_plate_id,
-                              Lats, Lons, spreading_directions, spreading_asymmetries, seafloor_ages, PID, CPID, data_array,
-                              trench_migration_file, plate_velocity_file, no_net_rotation_file,
+                              Lats, Lons, spreading_directions, spreading_asymmetries, seafloor_ages, PID, CPID,
+                              data_array, data_bounds, trench_migration_file, plate_velocity_file, no_net_rotation_file,
                               reformArray, trail_data, start_seeds, rotation_age_of_interest_age, data_array_labels_short,
                               ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
                               seed_lons, seed_lats, ang_gaussian_array]

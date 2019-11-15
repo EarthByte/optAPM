@@ -225,7 +225,11 @@ class ObjectiveFunction(object):
             # Penalise out-of-bound cost values (if requested).
             if self.data_bounds[1]:
                 nr_lower_bound, nr_upper_bound = self.data_bounds[1]
-                if nr_eval < nr_lower_bound or nr_eval > nr_upper_bound:
+                # 'nr_eval' is sum of NR over smaller 2My intervals, which is NR over whole 'interval'.
+                # But the bounded values are in deg/Myr, so convert our NR cost to deg/Myr.
+                nr_eval_per_myr = nr_eval / self.interval
+                print nr_eval_per_myr
+                if nr_eval_per_myr < nr_lower_bound or nr_eval_per_myr > nr_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
                     nr_eval += 10000.0
 

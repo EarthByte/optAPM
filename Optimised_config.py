@@ -100,35 +100,67 @@ isocob_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGrid
 
 
 #
-# Which components are enabled and their weightings.
+# Which components are enabled and their weightings and optional restricted bounds.
+#
+# Each return value is a 3-tuple:
+#  1. Enable boolean (True or False),
+#  2. Weight value (float),
+#  3. Optional restricted bounds (2-tuple of min/max cost, or None).
+#
+# For restricted bounds, use None if you are not restricting.
+# Otherwise use a (min, max) tuple.
 #
 # NOTE: The weights are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
 #
 def get_fracture_zone_params(age):
-    return False, 1.0  # Disable fracture zones.
+    return (
+            False,  # Disable fracture zones.
+            1.0,
+            None)
 
 def get_net_rotation_params(age):
     if age <= 80:
-        return True, 1.0
+        return (
+                True,
+                1.0,
+                None)
     elif age <= 170:
         # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-        return True, 2.0 # Gives a *multiplicative* weight of 0.5
+        return (
+                True,
+                2.0,  # Gives a *multiplicative* weight of 0.5
+                None)
     else:
         # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-        return True, 5.0 # Gives a *multiplicative* weight of 0.2
+        return (
+                True,
+                5.0,  # Gives a *multiplicative* weight of 0.2
+                None)
 
 def get_trench_migration_params(age):
-    return True, 1.0
+    return (
+            True,
+            1.0,
+            None)
 
 def get_hotspot_trail_params(age):
     # Only use hotspot trails for 0-80Ma.
     if age <= 80:
-        return True, 1.0
+        return (
+                True,
+                1.0,
+                None)
     else:
-        return False, 1.0
+        return (
+                False,
+                1.0,
+                None)
 
 def get_plate_velocity_params(age):
-    return True, 1.0
+    return (
+            True,
+            1.0,
+            None)
 
 
 #
