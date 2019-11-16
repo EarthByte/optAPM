@@ -119,29 +119,37 @@ def get_fracture_zone_params(age):
             None)
 
 def get_net_rotation_params(age):
+    # Note: Use units of degrees/Myr...
+    #nr_bounds = (0.08, 0.20)
+    nr_bounds = None
+    
     if age <= 80:
         return (
                 True,
                 1.0,
-                None)
+                nr_bounds)
     elif age <= 170:
         # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
         return (
                 True,
                 2.0,  # Gives a *multiplicative* weight of 0.5
-                None)
+                nr_bounds)
     else:
         # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
         return (
                 True,
                 5.0,  # Gives a *multiplicative* weight of 0.2
-                None)
+                nr_bounds)
 
 def get_trench_migration_params(age):
+    # Note: Use units of mm/yr (same as km/Myr)...
+    #tm_bounds = [0, 30]
+    tm_bounds = None
+    
     return (
             True,
             1.0,
-            None)
+            tm_bounds)
 
 def get_hotspot_trail_params(age):
     # Only use hotspot trails for 0-80Ma.
@@ -157,10 +165,14 @@ def get_hotspot_trail_params(age):
                 None)
 
 def get_plate_velocity_params(age):
+    # Note: Use units of mm/yr (same as km/Myr)...
+    #pv_bounds = [0, 60]
+    pv_bounds = None
+    
     return (
             True,
             1.0,
-            None)
+            pv_bounds)
 
 
 #

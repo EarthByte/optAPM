@@ -235,8 +235,8 @@ class ObjectiveFunction(object):
             # Penalise out-of-bound cost values (if requested).
             if self.data_bounds[1]:
                 nr_lower_bound, nr_upper_bound = self.data_bounds[1]
-                # 'nr_over_interval' is over whole 'interval'.
-                # But the bounded values are in deg/Myr, so convert our NR to deg/Myr.
+                # 'nr_over_interval' is over whole 'interval', but the bounded values are in deg/Myr,
+                # so convert our NR to deg/Myr (which is the units of the lower/upper bounds).
                 nr_deg_per_myr = nr_over_interval / self.interval
                 if nr_deg_per_myr < nr_lower_bound or nr_deg_per_myr > nr_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
@@ -349,21 +349,24 @@ class ObjectiveFunction(object):
             trench_vel = np.array(trench_vel)
             trench_obl = np.array(trench_obl)
 
-            # Scale velocities from cm to mm
+            # Scale velocities from cm/yr to mm/yr.
+            # Note that mm/yr is same as km/Myr.
             trench_vel = trench_vel * 10
 
             # Calculate trench orthogonal velocity
             tm_vel_orth = np.abs(trench_vel) * -np.cos(np.radians(trench_obl)) 
 
+            # Mean of absolute trench orthogonal velocity.
+            tm_mean_abs_vel_orth = np.sum(np.abs(tm_vel_orth)) / len(tm_vel_orth)
 
-            trench_numTotal = len(tm_vel_orth)
-            trench_numRetreating = len(np.where(tm_vel_orth > 0)[0])
-            trench_numAdvancing = len(tm_vel_orth) - trench_numRetreating
-            trench_percent_retreat = round((np.float(trench_numRetreating) / np.float(trench_numTotal)) * 100, 2)
-            trench_percent_advance = 100. - trench_percent_retreat
-            trench_sumAbsVel_n = np.sum(np.abs(tm_vel_orth)) / len(tm_vel_orth)
-            trench_numOver30 = len(np.where(tm_vel_orth > 30)[0])
-            trench_numLessNeg30 = len(np.where(tm_vel_orth < -30)[0])
+            # trench_numTotal = len(tm_vel_orth)
+            # trench_numRetreating = len(np.where(tm_vel_orth > 0)[0])
+            # trench_numAdvancing = len(tm_vel_orth) - trench_numRetreating
+            # trench_percent_retreat = round((np.float(trench_numRetreating) / np.float(trench_numTotal)) * 100, 2)
+            # trench_percent_advance = 100. - trench_percent_retreat
+            # trench_sumAbsVel_n = np.sum(np.abs(tm_vel_orth)) / len(tm_vel_orth)
+            # trench_numOver30 = len(np.where(tm_vel_orth > 30)[0])
+            # trench_numLessNeg30 = len(np.where(tm_vel_orth < -30)[0])
 
             # Calculate cost
             #tm_eval_1 = trench_percent_advance * 10
@@ -373,7 +376,7 @@ class ObjectiveFunction(object):
             #tm_eval = (tm_eval_1 + tm_eval_2) / 2
 
             # 2. trench_abs_vel_mean orthogonal
-            tm_eval_2 = np.sum(np.abs(tm_vel_orth)) / len(tm_vel_orth)
+            tm_eval_2 = tm_mean_abs_vel_orth
 
             # 3. number of trenches in advance
             #tm_eval_3 = trench_numAdvancing * 2
@@ -403,7 +406,9 @@ class ObjectiveFunction(object):
             # Penalise out-of-bound cost values (if requested).
             if self.data_bounds[2]:
                 tm_lower_bound, tm_upper_bound = self.data_bounds[2]
-                if tm_eval < tm_lower_bound or tm_eval > tm_upper_bound:
+                # Note that we compare the mean of absolute trench orthogonal velocity (not 'tm_eval').
+                # Also note that mean and bounds velocities are in same units of mm/yr (equivalent to km/Myr).
+                if tm_mean_abs_vel_orth < tm_lower_bound or tm_mean_abs_vel_orth > tm_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
                     tm_eval += 10000.0
             
@@ -488,7 +493,9 @@ class ObjectiveFunction(object):
                     velocity_vectors = pgp.calculate_velocities(
                             multi_point,
                             equivalent_stage_rotation,
-                            self.interval)
+                            self.interval,
+                            # Units of km/Myr (equivalent to mm/yr)...
+                            velocity_units=pgp.VelocityUnits.kms_per_my)
                     velocity_magnitudes.extend(velocity_vector.get_magnitude()
                             for velocity_vector in velocity_vectors)
             
@@ -499,6 +506,9 @@ class ObjectiveFunction(object):
             # Penalise out-of-bound cost values (if requested).
             if self.data_bounds[4]:
                 pv_lower_bound, pv_upper_bound = self.data_bounds[4]
+                # Note that we compare the median velocity (not 'pv_eval').
+                # Currently they're the same, but might not be in future.
+                # Also note that median and bounds velocities are in same units of mm/yr (equivalent to km/Myr).
                 if median_velocity < pv_lower_bound or median_velocity > pv_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
                     pv_eval += 10000.0
