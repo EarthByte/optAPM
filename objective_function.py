@@ -331,11 +331,15 @@ class ObjectiveFunction(object):
         # New method
         elif self.data_array[2] == True and self.tm_method == 'pygplates':
 
-            # Calculate trench segment stats
+            # Calculate trench segment stats.
+            #
+            # Note that migration velocities are calculated from 'self.ref_rotation_start_age' to
+            # 'self.ref_rotation_start_age - self.interval' (which is 'self.ref_rotation_end_age').
             tm_stats = scap.subduction_absolute_motion(rotation_model_updated,
                                                        self.tm_data,
                                                        np.radians(1.),
-                                                       self.ref_rotation_start_age - self.interval)
+                                                       self.ref_rotation_start_age,
+                                                       velocity_delta_time=self.interval)
 
             # Process tm_stats to extract values for use in cost function
             trench_vel = []

@@ -173,6 +173,12 @@ def resolve_subduction_zones(
 # - length of arc segment (in degrees) that current point is on
 # - subducting arc normal azimuth angle (clockwise starting at North, ie, 0 to 360 degrees) at current point
 #
+# NOTE: Velocities are calculated from 'time' to 'time - velocity_delta_time'.
+#       It is assumed that the resolved subduction zones were resolved to time 'time', which
+#       in the optimisation workflow corresponds to the start of a time interval (ie, the older time),
+#       and hence if 'velocity_delta_time' is set to the interval then 'time - velocity_delta_time'
+#       is the end of the time interval (ie, younger time).
+#
 # Also first applies the rotation adjustment 'absolute_rotation_adjustment' to the resolved geometries
 # (this assumes the topologies were resolved using a rotation model that did not have this adjustment).
 # Although note that the argument 'rotation_features_or_model' must include the rotation adjustment
@@ -217,16 +223,16 @@ def subduction_absolute_motion(
         subduction_zone_plate_id = shared_sub_segment_feature.get_reconstruction_plate_id()
         
         # Get the rotation of the subduction zone relative to the anchor plate
-        # from 'time + velocity_delta_time' to 'time'.
+        # from 'time' to 'time - velocity_delta_time'.
         #
         # Note: We don't need to convert to and from the stage rotation reference frame
         # like the above convergence because this stage rotation is relative to the anchor plate
         # and so the above to/from stage rotation frame conversion "R(0->t2,A->F)" is the
         # identity rotation since the fixed plate (F) is the anchor plate (A).
         subduction_zone_equivalent_stage_rotation = rotation_model.get_rotation(
-                time,
+                time - velocity_delta_time,
                 subduction_zone_plate_id,
-                time + velocity_delta_time,
+                time,
                 anchor_plate_id=anchor_plate_id)
         
         # We need to reverse the subducting_normal vector direction if overriding plate is to
