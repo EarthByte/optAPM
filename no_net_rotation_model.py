@@ -1,3 +1,4 @@
+import math
 import net_rotation
 import numpy as np
 import os.path
@@ -21,14 +22,27 @@ class NoNetRotationModel(object):
     def __init__(
             self,
             data_dir,
-            original_rotation_filenames,  # Relative to the 'data/' directory.
+            original_rotation_filenames,  # Relative to the 'data/' directory
             topology_features,
             start_age,
-            data_model):
+            data_model,
+            # Temporary: Allow input of GPlates exported net rotation file.
+            # TODO: Remove when we can calculate net rotation in pygplates for a deforming model.
+            #       This class currently only calculates net rotation for non-deforming models.
+            gplates_net_rotation_filename=None):  # Relative to the 'data/' directory
         """
         Create a single no-net-rotation file by combining all original (input) rotations and
         removing net rotation to produce a no-net-rotation model.
         """
+        
+        # Temporary: Allow input of GPlates exported net rotation file.
+        # TODO: Remove when we can calculate net rotation in pygplates for a deforming model.
+        #       This class currently only calculates net rotation for non-deforming models.
+        if gplates_net_rotation_filename:
+            self.gplates_net_rotations = self._read_gplates_net_rotations(
+                    os.path.join(data_dir, gplates_net_rotation_filename))
+        else:
+            self.gplates_net_rotations = None
         
         #
         # Combine the original (input) rotation files into a single no-net-rotation file.
@@ -103,13 +117,19 @@ class NoNetRotationModel(object):
                 #print time
                 #sys.stdout.flush()
                 
-                # Calculate net stage rotation from 'time' to 'time-1'.
-                net_stage_rotation = net_rotation.calculate_net_rotation_internal_gplates(
-                        rotation_model_zero_005_rel_000,
-                        topology_features,
-                        time,
-                        velocity_method = net_rotation.VelocityMethod.T_TO_T_MINUS_DT,
-                        velocity_delta_time = 1.0)
+                if self.gplates_net_rotations:
+                    net_stage_lat, net_stage_lon, net_stage_angle_per_my = self.gplates_net_rotations[time]
+                    net_stage_rotation = pygplates.FiniteRotation(
+                            pygplates.PointOnSphere(net_stage_lat, net_stage_lon),
+                            math.radians(net_stage_angle_per_my))
+                else:
+                    # Calculate net stage rotation from 'time' to 'time-1'.
+                    net_stage_rotation = net_rotation.calculate_net_rotation_internal_gplates(
+                            rotation_model_zero_005_rel_000,
+                            topology_features,
+                            time,
+                            velocity_method = net_rotation.VelocityMethod.T_TO_T_MINUS_DT,
+                            velocity_delta_time = 1.0)
                 
                 # Accumulate net stage rotations going backward in time (hence the inverse stage rotation)
                 # since finite rotations go backward in time in the rotation file.
@@ -213,13 +233,19 @@ class NoNetRotationModel(object):
             #print time
             #sys.stdout.flush()
             
-            # Calculate net stage rotation from 'time' to 'time-1'.
-            net_stage_rotation = net_rotation.calculate_net_rotation_internal_gplates(
-                    self.rotation_model_zero_005_rel_000,
-                    self.topology_features,
-                    time,
-                    velocity_method = net_rotation.VelocityMethod.T_TO_T_MINUS_DT,
-                    velocity_delta_time = 1.0)
+            if self.gplates_net_rotations:
+                net_stage_lat, net_stage_lon, net_stage_angle_per_my = self.gplates_net_rotations[time]
+                net_stage_rotation = pygplates.FiniteRotation(
+                        pygplates.PointOnSphere(net_stage_lat, net_stage_lon),
+                        math.radians(net_stage_angle_per_my))
+            else:
+                # Calculate net stage rotation from 'time' to 'time-1'.
+                net_stage_rotation = net_rotation.calculate_net_rotation_internal_gplates(
+                        self.rotation_model_zero_005_rel_000,
+                        self.topology_features,
+                        time,
+                        velocity_method = net_rotation.VelocityMethod.T_TO_T_MINUS_DT,
+                        velocity_delta_time = 1.0)
             
             # Accumulate net stage rotations going backward in time (hence the inverse stage rotation)
             # since finite rotations go backward in time in the rotation file.
@@ -257,3 +283,46 @@ class NoNetRotationModel(object):
         
         print '...finished calculating no-net-rotation model.'
         sys.stdout.flush()
+    
+    
+    def _read_gplates_net_rotations(
+            self,
+            gplates_net_rotations_filename):
+        """
+        Temporary function to read the net rotations file exported by GPlates.
+        
+        TODO: Remove this when we can calculate net rotation for deforming models using pygplates.
+        """
+        
+        net_rotations = {}
+        with open(gplates_net_rotations_filename, 'r') as net_rotations_file:
+            for line_number, line in enumerate(net_rotations_file):
+
+                # Make line number 1-based instead of 0-based.
+                line_number = line_number + 1
+
+                line = line.strip()
+                
+                # Skip empty lines.
+                if not line:
+                    continue
+            
+                # Split the line into strings (separated by commas).
+                line_string_list = line.split(',')
+
+                # Expecting 4 numbers
+                if len(line_string_list) != 4:
+                    continue
+
+                # Attempt to convert each string into a floating-point number.
+                try:
+                    time = float(line_string_list[0])
+                    net_stage_lat = float(line_string_list[1])
+                    net_stage_lon = float(line_string_list[2])
+                    net_stage_angle_per_my = float(line_string_list[3])
+                except ValueError:
+                    continue
+
+                net_rotations[time] = net_stage_lat, net_stage_lon, net_stage_angle_per_my
+        
+        return net_rotations

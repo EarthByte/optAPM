@@ -77,6 +77,14 @@ plate_velocity_grid_spacing = 2.0
 # ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
 # isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
 # isocob_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
+# Temporary: Allow input of GPlates exported net rotation file.
+# TODO: Remove when we can calculate net rotation in pygplates for a deforming model.
+#       Currently we can only calculate net rotation in pygplates for non-deforming models.
+#
+# Note: Set this to None for a non-deforming model.
+gplates_net_rotation_filename = data_model + '/optimisation/total-net-rotations.csv'
+#gplates_net_rotation_filename = None
+
 #
 # For (data_model == 'Global_1000-0_Model_2017') or (data_model == 'Muller++_2015_AREPS_CORRECTED') ...
 #
