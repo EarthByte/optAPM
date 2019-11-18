@@ -452,9 +452,9 @@ if __name__ == '__main__':
             #sys.stdout.flush()
 
             # To debug the weighted cost functions (net rotation, trench migration, etc).
-            print 'Mean objective function costs', np.mean(obj_f.debug_data_array, axis=0)
-            print 'Median objective function costs', np.median(obj_f.debug_data_array, axis=0)
-            sys.stdout.flush()
+            #print 'Mean objective function costs', np.mean(obj_f.debug_data_array, axis=0)
+            #print 'Median objective function costs', np.median(obj_f.debug_data_array, axis=0)
+            #sys.stdout.flush()
 
             return xopt, minf
 
