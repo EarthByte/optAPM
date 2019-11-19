@@ -32,7 +32,7 @@ data_model = 'Global_1000-0_Model_2017'
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     model_name = "run7_old_tm"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "run6"
+    model_name = "run7"
 else:
     model_name = "run1"
 
@@ -185,7 +185,7 @@ def get_plate_velocity_params(age):
     # Note: Use units of mm/yr (same as km/Myr)...
     #pv_bounds = [0, 60]
     
-    return False, 1.0, None
+    return True, 1.0, None
 
 
 #
