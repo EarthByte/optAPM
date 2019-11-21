@@ -33,7 +33,7 @@ data_model = 'Global_1000-0_Model_2017'
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     model_name = "run7_old_tm"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "run7"
+    model_name = "run8"
 else:
     model_name = "run1"
 
@@ -156,7 +156,8 @@ def get_net_rotation_params(age):
             # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
             return True, 5.0, None  # 5.0 gives a *multiplicative* weight of 0.2
     elif data_model == 'Global_1000-0_Model_2017':
-        return True, 1.0, None
+        nr_bounds = (0.08, 0.20)
+        return True, 1.0, nr_bounds
     else:
         return True, 1.0, None
 
@@ -167,11 +168,12 @@ def get_trench_migration_params(age):
     if data_model.startswith('Global_Model_WD_Internal_Release'):
         return True, 1.0, None
     elif data_model == 'Global_1000-0_Model_2017':
+        tm_bounds = [0, 30]
         if age <= 80:
-            return True, 1.0, None
+            return True, 1.0, tm_bounds
         else:
             # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-            return True, 2.0, None  # 2.0 gives a *multiplicative* weight of 0.5
+            return True, 2.0, tm_bounds  # 2.0 gives a *multiplicative* weight of 0.5
     else:
         return True, 1.0, None
 
@@ -186,7 +188,11 @@ def get_plate_velocity_params(age):
     # Note: Use units of mm/yr (same as km/Myr)...
     #pv_bounds = [0, 60]
     
-    return True, 1.0, None
+    if data_model == 'Global_1000-0_Model_2017':
+        pv_bounds = [0, 60]
+        return True, 1.0, pv_bounds
+    else:
+        return True, 1.0, None
 
 
 #
