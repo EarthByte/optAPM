@@ -1,5 +1,6 @@
 import glob
 import os.path
+import warnings
 
 
 #########################################
@@ -269,3 +270,17 @@ interpolated_hotspots = 'interpolated_hotspot_chains_5Myr.xlsx'
 # Don't plot in this workflow.
 # This is so it can be run on an HPC cluster with no visualisation node.
 plot = False
+
+
+#
+# How to handle warnings.
+#
+def warning_format(message, category, filename, lineno, file=None, line=None):
+    # return '{0}:{1}: {1}:{1}\n'.format(filename, lineno, category.__name__, message)
+    return '{0}: {1}\n'.format(category.__name__, message)
+# Print the warnings without the filename and line number.
+# Users are not going to want to see that.
+warnings.formatwarning = warning_format
+
+# Always print warnings (not just the first time a particular message is encountered at a particular location).
+#warnings.simplefilter("always")
