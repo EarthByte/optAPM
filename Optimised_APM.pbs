@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N mpi4py-python-2.7.9-openmpi-gcc
 #PBS -P BGH
-#PBS -l select=5:ncpus=4:mem=4Gb:mpiprocs=4,walltime=2:00:00
+#PBS -l select=5:ncpus=5:mem=8Gb:mpiprocs=5,walltime=5:00:00
 
 module load glew
 module load proj
@@ -17,4 +17,4 @@ module load openmpi-gcc
 cd $PBS_O_WORKDIR
 export PYTHONPATH=$PYTHONPATH:/home/jscannon/gplates/builds/latest/python-api-2013-jul-25-build/bin
 
-mpirun -np 20 python Optimised_APM.py
+mpirun -np 25 python Optimised_APM.py
