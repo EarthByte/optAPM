@@ -308,6 +308,14 @@ if __name__ == '__main__':
         
         if use_parallel == MPI4PY:
             
+            # This is probably not needed but make sure the file (eg, optimised rotation, no-net rotations, trench migration
+            # and plate velocity grid) have been written by the rank 0 process above before other rank processes continue.
+            #
+            # It's probably not needed because the scatter/broadcast just below should also synchronise all processes.
+            #
+            # But we did get an error opening the rotation file for reading by one of the processes in the objective function.
+            mpi_comm.barrier()
+            
             if mpi_rank == 0:
                 
                 # print 'all startingConditions[0]', startingConditions[0]
