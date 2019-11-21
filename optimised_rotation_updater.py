@@ -1,5 +1,8 @@
+import numpy as np
 import os.path
 import pygplates
+import sys
+import warnings
 
 from ptt import remove_plate_rotations
 
@@ -25,7 +28,9 @@ class OptimisedRotationUpdater(object):
             self,
             data_dir,
             original_rotation_filenames,  # Relative to the 'data/' directory.
-            age_range,
+            start_age,
+            end_age,
+            interval,
             reference_params_function,
             data_model,
             model_name):
@@ -33,12 +38,17 @@ class OptimisedRotationUpdater(object):
         Create a single optimised rotation file by combining all original (input) rotations.
         The 005-000 rotation feature is inserted (or replaced if already existing in input) and
         defined such that the rotation of reference plate (obtained for each time using
-        'reference_params_function') relative to 000 is zero for each time in 'age_range'.
+        'reference_params_function') relative to 000 is zero for each time from 'start_age' to
+        'end_age + interval' in 'interval' steps.
         """
         
         self.data_dir = data_dir
         self.reference_params_function = reference_params_function
         self.model_name = model_name
+        
+        # The single combined optimised rotation filename (relative to the 'data/' directory).
+        self.optimised_rotation_filename = os.path.join(
+                data_model, 'optimisation', 'optimised_rotation_model_' + self.model_name + '.rot')
         
         #
         # Combine the original (input) rotation files into a single optimised version, and
@@ -89,16 +99,52 @@ class OptimisedRotationUpdater(object):
         original_rotation_model_anchor_005 = pygplates.RotationModel(self.rotation_feature_collections)
         
         #
-        # Create a new 005-000 rotation feature such that 'ref_rotation_plate_id' rel 000 is zero.
+        # Create a new 005-000 rotation feature such that 'ref_rotation_plate_id' rel 000 is zero (from 'start_age' to 'end_age').
         #
         
-        zero_rotation_time_samples_005_rel_000 = []
+        rotation_time_samples_005_rel_000 = []
         
-        # Start with identity rotation at time 0Ma.
-        zero_rotation_time_samples_005_rel_000.append(
-            pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'optAPM'))
+        # If we're not starting at 0Ma then attempt to re-use the existing partially optimised rotation file.
+        # This can save a lot of time if we need to re-start an interrupted optimisation run.
+        if end_age != 0:
+            try:
+                partially_optimised_rotations = pygplates.FeatureCollection(
+                        os.path.join(self.data_dir, self.optimised_rotation_filename))
+            except pygplates.OpenFileForReadingError:
+                warnings.warn('Attempted to re-use partially optimised file {0} starting at {1} '
+                    'but could not open for reading, so starting at 0Ma instead'.format(
+                        self.optimised_rotation_filename, end_age))
+                end_age = 0
         
-        for ref_rotation_start_age in age_range:
+        # Get the initial 005-000 samples.
+        # If we've started a new optimisation run then this will only for the identity rotation at 0Ma.
+        # If we are continuing a previous partial optimisation run then this will be all previous
+        # 005-00 rotations computed so far.
+        if end_age != 0:
+            print 'Re-using existing partially optimised rotation file from 0Ma to {0}Ma'.format(end_age)
+            sys.stdout.flush()
+            
+            # Look for existing 005-000 partially optimised rotation in existing optimised rotation file.
+            # We only collect those samples with times '<= end_age'.
+            for rotation_feature in partially_optimised_rotations:
+                total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
+                if total_reconstruction_pole:
+                    fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
+                    if moving_plate_id == 5 and fixed_plate_id == 0:
+                        for finite_rotation_sample in rotation_sequence.get_enabled_time_samples():
+                            if finite_rotation_sample.get_time() <= pygplates.GeoTimeInstant(end_age):
+                                rotation_time_samples_005_rel_000.append(finite_rotation_sample)
+                        break
+            if not rotation_time_samples_005_rel_000:
+                raise RuntimeError('Expected 005-000 in existing partially optimised file {0} from 0-{1}Ma'.format(
+                        self.optimised_rotation_filename, end_age))
+        else:
+            # Start with identity rotation at time 0Ma.
+            rotation_time_samples_005_rel_000.append(
+                pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'optAPM'))
+        
+        # Add a rotation at each age in 'end_age + interval' to 'start_age' (inclusive) at 'interval' steps.
+        for ref_rotation_start_age in np.arange(end_age + interval, start_age + interval, interval):
             
             # Get the reference plate ID (which could vary over time).
             ref_rotation_plate_id, _ = self.reference_params_function(ref_rotation_start_age)
@@ -112,7 +158,7 @@ class OptimisedRotationUpdater(object):
             zero_rotation_005_rel_000 = original_rotation_model_anchor_005.get_rotation(
                     ref_rotation_start_age, ref_rotation_plate_id, anchor_plate_id=5).get_inverse()
 
-            zero_rotation_time_samples_005_rel_000.append(
+            rotation_time_samples_005_rel_000.append(
                 pygplates.GpmlTimeSample(
                         pygplates.GpmlFiniteRotation(zero_rotation_005_rel_000),
                         ref_rotation_start_age,
@@ -123,7 +169,7 @@ class OptimisedRotationUpdater(object):
         self.optimised_rotation_feature = pygplates.Feature.create_total_reconstruction_sequence(
             0,
             5,
-            pygplates.GpmlIrregularSampling(zero_rotation_time_samples_005_rel_000))
+            pygplates.GpmlIrregularSampling(rotation_time_samples_005_rel_000))
         
         # Keep track of all optimised rotation features for later so we can write them to file
         # as we optimise through time. This includes the optimised 005-000 rotation feature.
@@ -132,10 +178,6 @@ class OptimisedRotationUpdater(object):
             all_optimised_rotation_features.extend(rotation_feature_collection)
         all_optimised_rotation_features.append(self.optimised_rotation_feature)
         self.optimised_rotation_feature_collection = pygplates.FeatureCollection(all_optimised_rotation_features)
-        
-        # The single combined optimised rotation filename (relative to the 'data/' directory).
-        self.optimised_rotation_filename = os.path.join(
-                data_model, 'optimisation', 'optimised_rotation_model_' + self.model_name + '.rot')
         
         # Write the rotation file with zero reference_plate-to-anchor rotations.
         self.optimised_rotation_feature_collection.write(

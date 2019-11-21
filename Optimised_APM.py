@@ -126,12 +126,14 @@ if __name__ == '__main__':
         # The creation/construction of this OptimisedRotationUpdater object also:
         #   Creates a single optimised rotation file by combining all unoptimised (input) rotations.
         #   The 005-000 rotation feature is inserted (or replaced if already existing in input) and
-        #   defined such that the rotation of reference plate (obtained for each time using
-        #   'get_reference_params') relative to 000 is zero for each time in 'age_range'.
+        #   defined such that the rotation of reference plate (obtained for each time using 'get_reference_params')
+        #   relative to 000 is zero for each time from 'start_age' to 'end_age + interval' in 'interval' steps.
         optimised_rotation_updater = OptimisedRotationUpdater(
                 datadir,
                 original_rotation_filenames,
-                age_range,
+                start_age,
+                end_age,
+                interval,
                 get_reference_params,
                 data_model,
                 model_name)
