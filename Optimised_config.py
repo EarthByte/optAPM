@@ -43,6 +43,11 @@ if data_model == 'Global_1000-0_Model_2017':
 else:
     start_age = 410
 end_age = 0
+# Note: You can set 'end_age' to a non-zero value if you are continuing an interrupted run.
+#       In this case the workflow will attempt to re-use the existing partially optimised rotation file.
+#       This can save a lot of time by skipping the optimisations already done by the interrupted optimisation run.
+#       But be sure to set 'end_age' back to zero when finished.
+#       Also this currently only works properly if 'interval' is the same for the interrupted and continued runs (as it should be).
 interval = 10
 
 models = 100

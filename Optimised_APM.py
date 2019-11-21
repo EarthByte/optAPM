@@ -148,7 +148,9 @@ if __name__ == '__main__':
                 original_rotation_filenames,
                 topology_features,
                 start_age,
+                end_age,
                 data_model,
+                model_name,
                 gplates_net_rotation_filename)
         
         # The filename of single rotation file (containing entire rotation model) with

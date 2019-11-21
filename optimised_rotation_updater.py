@@ -108,16 +108,16 @@ class OptimisedRotationUpdater(object):
         # This can save a lot of time if we need to re-start an interrupted optimisation run.
         if end_age != 0:
             try:
-                partially_optimised_rotations = pygplates.FeatureCollection(
+                partially_optimised_rotation_features = pygplates.FeatureCollection(
                         os.path.join(self.data_dir, self.optimised_rotation_filename))
             except pygplates.OpenFileForReadingError:
-                warnings.warn('Attempted to re-use partially optimised file {0} starting at {1} '
+                warnings.warn('Attempted to re-use partially optimised rotation file {0} starting at {1} '
                     'but could not open for reading, so starting at 0Ma instead'.format(
                         self.optimised_rotation_filename, end_age))
                 end_age = 0
         
         # Get the initial 005-000 samples.
-        # If we've started a new optimisation run then this will only for the identity rotation at 0Ma.
+        # If we've started a new optimisation run then this will only be the identity rotation at 0Ma.
         # If we are continuing a previous partial optimisation run then this will be all previous
         # 005-00 rotations computed so far.
         if end_age != 0:
@@ -126,7 +126,7 @@ class OptimisedRotationUpdater(object):
             
             # Look for existing 005-000 partially optimised rotation in existing optimised rotation file.
             # We only collect those samples with times '<= end_age'.
-            for rotation_feature in partially_optimised_rotations:
+            for rotation_feature in partially_optimised_rotation_features:
                 total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
                 if total_reconstruction_pole:
                     fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
