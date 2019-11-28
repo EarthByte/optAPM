@@ -31,9 +31,9 @@ data_model = 'Global_1000-0_Model_2017'
 
 # The model name is suffixed to various output filenames.
 if data_model.startswith('Global_Model_WD_Internal_Release'):
-    model_name = "run7_old_tm"
+    model_name = "svn1618_run8"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "run8"
+    model_name = "run13"
 else:
     model_name = "run1"
 
@@ -42,12 +42,12 @@ if data_model == 'Global_1000-0_Model_2017':
     start_age = 1000
 else:
     start_age = 410
-end_age = 0
 # Note: You can set 'end_age' to a non-zero value if you are continuing an interrupted run.
 #       In this case the workflow will attempt to re-use the existing partially optimised rotation file.
 #       This can save a lot of time by skipping the optimisations already done by the interrupted optimisation run.
 #       But be sure to set 'end_age' back to zero when finished.
 #       Also this currently only works properly if 'interval' is the same for the interrupted and continued runs (as it should be).
+end_age = 0
 interval = 10
 
 models = 100
@@ -74,18 +74,32 @@ original_rotation_filenames = [os.path.relpath(abs_path, datadir) for abs_path i
 #   2) explicitly list all the topology files (you need to list the filenames).
 #
 # 1) Automatically gather all '.gpml' and '.gpmlz' files (and make filenames relative to the 'data/' directory).
-topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
-        glob.glob(os.path.join(datadir, data_model, '*.gpml')) + glob.glob(os.path.join(datadir, data_model, '*.gpmlz'))]
+#topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
+#        glob.glob(os.path.join(datadir, data_model, '*.gpml')) + glob.glob(os.path.join(datadir, data_model, '*.gpmlz'))]
 # 2) Explicitly list all the topology files (must be relative to the 'data/' directory).
 #topology_filenames = [
 #  'Global_Model_WD_Internal_Release_2019_v2/topology_file1.gpml',
 #  'Global_Model_WD_Internal_Release_2019_v2/topology_file2.gpml',
 #]
+if data_model == 'Global_1000-0_Model_2017':
+    # Starting at SVN rev 1624 there are other GPML files that we don't need to include.
+    topology_filenames = [
+        'Global_1000-0_Model_2017/1000-410-Convergence_T12_APWP.gpml',
+        'Global_1000-0_Model_2017/1000-410-Divergence_T12_APWP.gpml',
+        'Global_1000-0_Model_2017/1000-410-Topologies_T12_APWP.gpml',
+        'Global_1000-0_Model_2017/1000-410-Transforms_T12_APWP.gpml',
+        'Global_1000-0_Model_2017/Global_Mesozoic-Cenozoic_plate_boundaries_Young_et_al_APWP.gpml',
+        'Global_1000-0_Model_2017/Global_Paleozoic_plate_boundaries_Young_et_al_APWP.gpml',
+        'Global_1000-0_Model_2017/TopologyBuildingBlocks_Young_et_al.gpml',
+    ]
+else:
+    topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
+            glob.glob(os.path.join(datadir, data_model, '*.gpml')) + glob.glob(os.path.join(datadir, data_model, '*.gpmlz'))]
 
 # The continental polygons file (relative to the 'data/' directory) used for plate velocity calculations (when plate velocity is enabled).
 # NOTE: Set to None to use topologies instead (which includes continental and oceanic crust).
 if data_model == 'Global_1000-0_Model_2017':
-    plate_velocity_continental_polygons_file = 'Global_1000-0_Model_2017/StaticGeometries/GSHHS_l_coastlines.gpmlz'
+    plate_velocity_continental_polygons_file = 'Global_1000-0_Model_2017/New_polygons_static_changes.gpml'
 else:
     plate_velocity_continental_polygons_file = None
 
@@ -103,9 +117,9 @@ else:
     gplates_net_rotation_filename = None
 
 if data_model.startswith('Global_Model_WD_Internal_Release'):
-    ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
-    isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
-    isocob_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
+    ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v2.gpml'
+    isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v2.gpml'
+    isocob_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v2.gpml'
 elif data_model == 'Global_1000-0_Model_2017':
     #
     # For (data_model == 'Global_1000-0_Model_2017') or (data_model == 'Muller++_2015_AREPS_CORRECTED') ...
@@ -118,9 +132,9 @@ elif data_model == 'Global_1000-0_Model_2017':
     #       THIS IS OK IF WE'RE NOT INCLUDING FRACTURE ZONES (BECAUSE THEN THESE FILES ARE NOT USED FOR FINAL OPTIMISED ROTATIONS).
     #
     ##################################################################################################################################
-    ridge_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v1.gpml'
-    isochron_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v1.gpml'
-    isocob_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v1.gpml'
+    ridge_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v2.gpml'
+    isochron_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v2.gpml'
+    isocob_file = 'Global_Model_WD_Internal_Release_2019_v2/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v2.gpml'
 else:
     #
     # Original files used in original optimisation script...
@@ -174,11 +188,12 @@ def get_trench_migration_params(age):
         return True, 1.0, None
     elif data_model == 'Global_1000-0_Model_2017':
         tm_bounds = [0, 30]
-        if age <= 80:
-            return True, 1.0, tm_bounds
-        else:
-            # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-            return True, 2.0, tm_bounds  # 2.0 gives a *multiplicative* weight of 0.5
+        return True, 1.0, tm_bounds
+        #if age <= 80:
+        #    return True, 1.0, tm_bounds
+        #else:
+        #    # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
+        #    return True, 2.0, tm_bounds  # 2.0 gives a *multiplicative* weight of 0.5
     else:
         return True, 1.0, None
 
@@ -193,9 +208,11 @@ def get_plate_velocity_params(age):
     # Note: Use units of mm/yr (same as km/Myr)...
     #pv_bounds = [0, 60]
     
-    if data_model == 'Global_1000-0_Model_2017':
+    if data_model.startswith('Global_Model_WD_Internal_Release'):
+        return False, 1.0, None
+    elif data_model == 'Global_1000-0_Model_2017':
         pv_bounds = [0, 60]
-        return True, 1.0, pv_bounds
+        return False, 1.0, pv_bounds
     else:
         return True, 1.0, None
 
