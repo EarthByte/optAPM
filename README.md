@@ -21,9 +21,12 @@ Other Python module prerequisites are:
 
 * PlateTectonicTools - https://github.com/EarthByte/PlateTectonicTools
 * numpy
+* scipy
 * pandas
 * pmagpy
+* xlrd (apparently required for Excel support)
 * NLopt
+* mpi4py
 
 ## Configuration
 
