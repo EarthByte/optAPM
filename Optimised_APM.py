@@ -244,9 +244,6 @@ if __name__ == '__main__':
         enable_hotspot_trails, hotspot_trails_weight, hotspot_trails_bounds = get_hotspot_trail_params(ref_rotation_start_age)
         enable_plate_velocity, plate_velocity_weight, plate_velocity_bounds = get_plate_velocity_params(ref_rotation_start_age)
         
-        # Determine reference plate ID and PMAG rotation file (which could vary over time).
-        ref_rotation_plate_id, pmag_rotfile = get_reference_params(ref_rotation_start_age)
-        
         # When using mpi4py we only prepare the data in one process (the one with rank/ID 0).
         if use_parallel != MPI4PY or mpi_rank == 0:
             
@@ -267,6 +264,12 @@ if __name__ == '__main__':
             # The results are saved to the file 'pv_file'.
             # Note: The file only contains points and plate IDs partitioned at time 'ref_rotation_start_age'.
             plate_velocity_partitioner.generate_points_and_plate_ids(ref_rotation_start_age)
+            
+            # Determine reference plate ID (which could vary over time) and reference rotation file.
+            ref_rotation_plate_id, ref_rotation_file = get_reference_params(ref_rotation_start_age)
+            # If a reference rotation file is not provided then default to using no-net-rotation model.
+            if not ref_rotation_file:
+                ref_rotation_file = no_net_rotation_model.get_no_net_rotation_filename()
             
             current_search_radius = search_radius
             current_models = models
@@ -302,7 +305,7 @@ if __name__ == '__main__':
             # --------------------------------------------------------------------
 
             # Load all data
-            data = ms.dataLoader(datadir, rotfile, pmag_rotfile, tm_file=tm_file, pv_file=pv_file, nnr_rotfile=nnr_rotfile, 
+            data = ms.dataLoader(datadir, rotfile, ref_rotation_file, tm_file=tm_file, pv_file=pv_file, nnr_rotfile=nnr_rotfile, 
                                  ridge_file=ridge_file, isochron_file=isochron_file, isocob_file=isocob_file, 
                                  hst_file=hst_file, hs_file=hs_file, interpolated_hotspots=interpolated_hotspots)
 

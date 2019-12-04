@@ -78,7 +78,7 @@ class ModelSetup():
 
 
     @staticmethod
-    def dataLoader(datadir, rot_file, pmag_rot_file=None, tm_file=None, pv_file=None, nnr_rotfile=None,
+    def dataLoader(datadir, rot_file, ref_rot_file=None, tm_file=None, pv_file=None, nnr_rotfile=None,
                    ridge_file=None, isochron_file=None, isocob_file=None, hst_file=None, hs_file=None,
                    interpolated_hotspots=None):
 
@@ -86,11 +86,11 @@ class ModelSetup():
         rotation_file = datadir + rot_file
         rotation_model = pgp.RotationModel(rotation_file)
 
-        # Create pmag rotation model
-        if pmag_rot_file:
+        # Create reference rotation model
+        if ref_rot_file:
 
-            pmag_rotation_file = datadir + pmag_rot_file
-            pmag_rotation_model = pgp.RotationModel(pmag_rotation_file)
+            ref_rotation_file = datadir + ref_rot_file
+            ref_rotation_model = pgp.RotationModel(ref_rotation_file)
 
         # Check for and load optional arguments
         if tm_file:
@@ -143,7 +143,7 @@ class ModelSetup():
         # Return all loaded data
         data = [rotation_model, rotation_file, trench_migration_file, plate_velocity_file, no_net_rotation_file,
                 features_ri, RidgeFile_subset, features_iso, IsochronFile_subset, features_isocob, IsoCOBFile_subset,
-                hs_trails, hotspots, pmag_rotation_model, pmag_rotation_file, interpolated_hotspot_data]
+                hs_trails, hotspots, ref_rotation_model, ref_rotation_file, interpolated_hotspot_data]
 
         print "- Data loaded"
         print " "
@@ -202,8 +202,8 @@ class ModelSetup():
          IsoCOBFile_subset,
          hs_trails,
          hotspots,
-         pmag_rotation_model,
-         pmag_rotation_file,
+         ref_rotation_model,
+         ref_rotation_file,
          interpolated_hotspot_data) = data[:16]
 
         # Translate params array
@@ -307,10 +307,10 @@ class ModelSetup():
 
             print "- Auto-calc palaeomagnetic"
 
-            ref_rot = pmag_rotation_model.get_rotation(np.double(ref_rotation_start_age), ref_rotation_plate_id, 0)
+            ref_rot = ref_rotation_model.get_rotation(np.double(ref_rotation_start_age), ref_rotation_plate_id, 0)
             ref_rot_pole, ref_rot_angle = ref_rot.get_euler_pole_and_angle()
 
-            ref_rot_of_interest = pmag_rotation_model.get_rotation(np.double(rotation_age_of_interest_age), ref_rotation_plate_id, 0)
+            ref_rot_of_interest = ref_rotation_model.get_rotation(np.double(rotation_age_of_interest_age), ref_rotation_plate_id, 0)
             ref_rot_of_interest_pole, ref_rot_of_interest_angle = ref_rot_of_interest.get_euler_pole_and_angle()
 
             # Convert finite rotations to lat, lon and degrees
@@ -328,7 +328,7 @@ class ModelSetup():
             ref_rot_latitude = ref_rot_latitude
             ref_rot_angle = ref_rot_angle
 
-            ref_rot_of_interest = pmag_rotation_model.get_rotation(np.double(rotation_age_of_interest_age), ref_rotation_plate_id, 0)
+            ref_rot_of_interest = ref_rotation_model.get_rotation(np.double(rotation_age_of_interest_age), ref_rotation_plate_id, 0)
             ref_rot_of_interest_pole, ref_rot_of_interest_angle = ref_rot_of_interest.get_euler_pole_and_angle()
 
 

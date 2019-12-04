@@ -218,21 +218,28 @@ def get_plate_velocity_params(age):
 
 
 #
-# Which reference plate ID and PMAG rotation file to use at which age.
+# Which reference plate ID and rotation file to use at a specific age.
 #
 def get_reference_params(age):
+    """
+    Returns a 2-tuple containg reference plate ID and reference rotation filename (or None).
+    
+    If reference rotation filename is None then it means the no-net-rotation model should be used.
+    """
     if data_model == 'Global_1000-0_Model_2017':
         if age <= 550:
             ref_rotation_plate_id = 701
-            pmag_rotfile = 'Global_1000-0_Model_2017/pmag/550_0_Palaeomagnetic_Africa_S.rot'
+            #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/550_0_Palaeomagnetic_Africa_S.rot'
+            ref_rotation_file = None  # Use NNR
         else:
             ref_rotation_plate_id = 101
-            pmag_rotfile = 'Global_1000-0_Model_2017/pmag/1000_550_Laurentia_pmag_reference.rot'
+            #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/1000_550_Laurentia_pmag_reference.rot'
+            ref_rotation_file = None  # Use NNR
     else:
         ref_rotation_plate_id = 701
-        pmag_rotfile = 'Palaeomagnetic_Africa_S.rot'
+        ref_rotation_file = 'Palaeomagnetic_Africa_S.rot'
     
-    return ref_rotation_plate_id, pmag_rotfile
+    return ref_rotation_plate_id, ref_rotation_file
 
 
 search = "Initial"
