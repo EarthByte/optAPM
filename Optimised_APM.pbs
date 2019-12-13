@@ -1,8 +1,30 @@
 #!/bin/bash
-#PBS -N mpi4py-python-2.7.9-openmpi-gcc
-#PBS -P BGH
-#PBS -l select=5:ncpus=5:mem=8Gb:mpiprocs=5,walltime=5:00:00
 
+# Name.
+#PBS -N mpi4py-python-2.7.9-openmpi-gcc
+
+# Project.
+#PBS -P BGH
+
+# 50 CPUs.
+#
+# Ideally the number of seed models (eg, 100) divided by this number
+# should be an integer (eg, 100 / 50 = 2).
+# This is because each MPI process gets allocated a fixed number of seed models.
+# If it's not an integer then some processes get allocated more than others
+# (which causes the processes allocated fewer seed models to idle while waiting).
+#PBS -l select=10:ncpus=5:mpiprocs=5:mem=5Gb
+
+# Time limit.
+#PBS -l walltime=2:00:00
+
+# Queue.
+#
+# Dietmar has a strategic allocation.
+# So allocating over 24 cores no longer results in a long queue delay (compared to not specifying the queue).
+#PBS -q alloc-dm
+
+# Set up the environment.
 module load glew
 module load proj
 module load gdal
@@ -17,4 +39,5 @@ module load openmpi-gcc
 cd $PBS_O_WORKDIR
 export PYTHONPATH=$PYTHONPATH:/home/jscannon/gplates/builds/latest/python-api-2013-jul-25-build/bin
 
-mpirun -np 25 python Optimised_APM.py
+# Run the job.
+mpirun -np 50 python Optimised_APM.py
