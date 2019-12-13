@@ -31,25 +31,42 @@ data_model = 'Global_1000-0_Model_2017'
 
 # The model name is suffixed to various output filenames.
 if data_model.startswith('Global_Model_WD_Internal_Release'):
-    model_name = "svn1618_run8"
+    model_name = "svn1618_run1"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "run13"
+    model_name = "svn1628_run1"
 else:
     model_name = "run1"
 
 
+# Start age.
 if data_model == 'Global_1000-0_Model_2017':
     start_age = 1000
 else:
     start_age = 410
+
+# End age.
+#
 # Note: You can set 'end_age' to a non-zero value if you are continuing an interrupted run.
 #       In this case the workflow will attempt to re-use the existing partially optimised rotation file.
 #       This can save a lot of time by skipping the optimisations already done by the interrupted optimisation run.
 #       But be sure to set 'end_age' back to zero when finished.
 #       Also this currently only works properly if 'interval' is the same for the interrupted and continued runs (as it should be).
 end_age = 0
-interval = 10
 
+# Time interval.
+if data_model.startswith('Global_Model_WD_Internal_Release'):
+    interval = 10
+elif data_model == 'Global_1000-0_Model_2017':
+    # 5My works well with using a no-net-rotation reference frame (instead of PMAG), and is about as fast as 10My.
+    interval = 5
+else:
+    interval = 10
+
+# Number of seed models.
+#
+# Note: If 'search_radius' is changed then this should also be changed in proportion to the search area and vice versa.
+#       The proportion of globe covered by search is "0.5*(1-cos(search_radius))".
+#       This ensures the spatial density of seed models remains the same.
 models = 100
 
 # The original rotation files (relative to the 'data/' directory).
@@ -99,7 +116,7 @@ else:
 # The continental polygons file (relative to the 'data/' directory) used for plate velocity calculations (when plate velocity is enabled).
 # NOTE: Set to None to use topologies instead (which includes continental and oceanic crust).
 if data_model == 'Global_1000-0_Model_2017':
-    plate_velocity_continental_polygons_file = 'Global_1000-0_Model_2017/New_polygons_static_changes.gpml'
+    plate_velocity_continental_polygons_file = 'Global_1000-0_Model_2017/shapes_continents.gpml'
 else:
     plate_velocity_continental_polygons_file = None
 
@@ -188,12 +205,11 @@ def get_trench_migration_params(age):
         return True, 1.0, None
     elif data_model == 'Global_1000-0_Model_2017':
         tm_bounds = [0, 30]
-        return True, 1.0, tm_bounds
-        #if age <= 80:
-        #    return True, 1.0, tm_bounds
-        #else:
-        #    # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-        #    return True, 2.0, tm_bounds  # 2.0 gives a *multiplicative* weight of 0.5
+        if age <= 80:
+            return True, 1.0, tm_bounds
+        else:
+            # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
+            return True, 1.0, tm_bounds  # 1.0 gives a *multiplicative* weight of 1.0
     else:
         return True, 1.0, None
 
@@ -212,7 +228,7 @@ def get_plate_velocity_params(age):
         return False, 1.0, None
     elif data_model == 'Global_1000-0_Model_2017':
         pv_bounds = [0, 60]
-        return False, 1.0, pv_bounds
+        return True, 1.0, pv_bounds
     else:
         return True, 1.0, None
 
@@ -227,14 +243,16 @@ def get_reference_params(age):
     If reference rotation filename is None then it means the no-net-rotation model should be used.
     """
     if data_model == 'Global_1000-0_Model_2017':
-        if age <= 550:
-            ref_rotation_plate_id = 701
-            #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/550_0_Palaeomagnetic_Africa_S.rot'
-            ref_rotation_file = None  # Use NNR
-        else:
-            ref_rotation_plate_id = 101
-            #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/1000_550_Laurentia_pmag_reference.rot'
-            ref_rotation_file = None  # Use NNR
+        ref_rotation_plate_id = 5  # Use optimised absolute reference frame
+        ref_rotation_file = None  # Use NNR
+        #if age <= 550:
+        #    ref_rotation_plate_id = 701
+        #    #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/550_0_Palaeomagnetic_Africa_S.rot'
+        #    ref_rotation_file = None  # Use NNR
+        #else:
+        #    ref_rotation_plate_id = 101
+        #    #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/1000_550_Laurentia_pmag_reference.rot'
+        #    ref_rotation_file = None  # Use NNR
     else:
         ref_rotation_plate_id = 701
         ref_rotation_file = 'Palaeomagnetic_Africa_S.rot'

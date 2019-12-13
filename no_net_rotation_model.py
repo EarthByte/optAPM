@@ -4,6 +4,7 @@ import numpy as np
 import os.path
 import pygplates
 import sys
+import warnings
 
 
 class NoNetRotationModel(object):
