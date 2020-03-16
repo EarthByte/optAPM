@@ -267,9 +267,36 @@ if __name__ == '__main__':
             
             # Determine reference plate ID (which could vary over time) and reference rotation file.
             ref_rotation_plate_id, ref_rotation_file = get_reference_params(ref_rotation_start_age)
-            # If a reference rotation file is not provided then default to using no-net-rotation model.
+            
             if not ref_rotation_file:
-                ref_rotation_file = no_net_rotation_model.get_no_net_rotation_filename()
+                #
+                # Testing getting reference rotation from no-net-rotation versus the previous optimised interval.
+                #
+                if False:  # no-net-rotation...
+                    # If a reference rotation file is not provided then default to using no-net-rotation model.
+                    ref_rotation_file = no_net_rotation_model.get_no_net_rotation_filename()
+                
+                else:  # previous optimised interval...
+                    # If a reference rotation file is not provided then default to using reference plate rotation from previous optimisation interval.
+                    ref_rotation_file = rotfile
+                
+            # Ensure the optimised rotation file has valid rotations from start to end of current interval by
+            # re-using the absolute optimisation from start of previous interval (end of current interval).
+            # Once we've optimised the current interval we'll overwrite it, but it can get used before then
+            # so it should have a reasonable value.
+            #
+            #   R(0->ts,000->ref_plate) = R(0->te,000->005) * R(0->ts,005->ref_plate)
+            #
+            rotation_model = pgp.RotationModel(os.path.join(datadir, rotfile))
+            plate_rotation_005_rel_000 = rotation_model.get_rotation(
+                    ref_rotation_end_age, 5, fixed_plate_id=0)
+            plate_rotation_ref_plate_rel_005 = rotation_model.get_rotation(
+                    ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=5)
+            plate_rotation_ref_plate_rel_000 = plate_rotation_005_rel_000 * plate_rotation_ref_plate_rel_005
+            optimised_rotation_updater.update_optimised_rotation(
+                    plate_rotation_ref_plate_rel_000,
+                    ref_rotation_plate_id,
+                    ref_rotation_start_age)
             
             current_search_radius = search_radius
             current_models = models

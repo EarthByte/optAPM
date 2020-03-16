@@ -243,16 +243,17 @@ def get_reference_params(age):
     If reference rotation filename is None then it means the no-net-rotation model should be used.
     """
     if data_model == 'Global_1000-0_Model_2017':
-        ref_rotation_plate_id = 5  # Use optimised absolute reference frame
-        ref_rotation_file = None  # Use NNR
-        #if age <= 550:
-        #    ref_rotation_plate_id = 701
-        #    #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/550_0_Palaeomagnetic_Africa_S.rot'
-        #    ref_rotation_file = None  # Use NNR
-        #else:
-        #    ref_rotation_plate_id = 101
-        #    #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/1000_550_Laurentia_pmag_reference.rot'
-        #    ref_rotation_file = None  # Use NNR
+        #ref_rotation_plate_id = 5  # Use optimised absolute reference frame
+        #ref_rotation_file = None  # Use NNR
+        
+        if age <= 550:
+            ref_rotation_plate_id = 701
+            #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/550_0_Palaeomagnetic_Africa_S.rot'
+            ref_rotation_file = None  # Use NNR (hack: or optimised rotation file)
+        else:
+            ref_rotation_plate_id = 101
+            #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/1000_550_Laurentia_pmag_reference.rot'
+            ref_rotation_file = None  # Use NNR (hack: or optimised rotation file)
     else:
         ref_rotation_plate_id = 701
         ref_rotation_file = 'Palaeomagnetic_Africa_S.rot'
