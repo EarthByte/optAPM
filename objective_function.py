@@ -360,6 +360,9 @@ class ObjectiveFunction(object):
             # Calculate trench orthogonal velocity
             tm_vel_orth = np.abs(trench_vel) * -np.cos(np.radians(trench_obl)) 
 
+            # Mean of trench orthogonal velocity.
+            tm_mean_vel_orth = np.sum(tm_vel_orth) / len(tm_vel_orth)
+
             # Mean of absolute trench orthogonal velocity.
             tm_mean_abs_vel_orth = np.sum(np.abs(tm_vel_orth)) / len(tm_vel_orth)
 
@@ -410,9 +413,10 @@ class ObjectiveFunction(object):
             # Penalise out-of-bound cost values (if requested).
             if self.data_bounds[2]:
                 tm_lower_bound, tm_upper_bound = self.data_bounds[2]
-                # Note that we compare the mean of absolute trench orthogonal velocity (not 'tm_eval').
+                # Note that we compare the mean of trench orthogonal velocity (not 'tm_eval').
+                # Note that we're not comparing 'absolute' velocity, so negative/positive values are trench advance/retreat.
                 # Also note that mean and bounds velocities are in same units of mm/yr (equivalent to km/Myr).
-                if tm_mean_abs_vel_orth < tm_lower_bound or tm_mean_abs_vel_orth > tm_upper_bound:
+                if tm_mean_vel_orth < tm_lower_bound or tm_mean_vel_orth > tm_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
                     tm_eval += 10000.0
             
