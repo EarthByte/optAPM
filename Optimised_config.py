@@ -1,4 +1,5 @@
 import glob
+import math
 import os.path
 import warnings
 
@@ -33,7 +34,7 @@ data_model = 'Global_1000-0_Model_2017'
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     model_name = "svn1618_run1"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "svn1628_run1"
+    model_name = "svn1628_run10"
 else:
     model_name = "run1"
 
@@ -62,12 +63,20 @@ elif data_model == 'Global_1000-0_Model_2017':
 else:
     interval = 10
 
-# Number of seed models.
+# Seed model rotation poles are populated within a small circle of the search radius (degrees) about the reference pole.
+search_radius = 180
+
+# Number of seed models if the search radius were to cover the entire globe.
 #
-# Note: If 'search_radius' is changed then this should also be changed in proportion to the search area and vice versa.
-#       The proportion of globe covered by search is "0.5*(1-cos(search_radius))".
+# In the past we typically used models=100 and search radius=60, which equates to model_density=400.
+model_density = 400
+
+# Calculate the actual number of seed models used.
+#
+# Note: If 'search_radius' is changed then is automatically changed in proportion to the search area.
+#       The proportion of globe covered by search is "0.5*(1-cos(search_radius))" where 1.0 means the entire globe.
 #       This ensures the spatial density of seed models remains the same.
-models = 100
+models = int(1e-4 + model_density * 0.5 * (1 - math.cos(math.radians(search_radius))))
 
 # The original rotation files (relative to the 'data/' directory).
 #
@@ -193,7 +202,7 @@ def get_net_rotation_params(age):
             return True, 5.0, None  # 5.0 gives a *multiplicative* weight of 0.2
     elif data_model == 'Global_1000-0_Model_2017':
         nr_bounds = (0.08, 0.20)
-        return True, 1.0, nr_bounds
+        return  True, 1.0, nr_bounds  # 1.0 gives a *multiplicative* weight of 1.0
     else:
         return True, 1.0, None
 
@@ -262,8 +271,7 @@ def get_reference_params(age):
 
 
 search = "Initial"
-search_radius = 60
-# If True then temporarily expand search radius to 90 whenever the reference plate changes.
+# If True then temporarily expand search radius to 180 whenever the reference plate changes.
 # Normally the reference plate stays constant at Africa (701), but does switch to 101 for the 1Ga model.
 # It's off by default since it doesn't appear to change the results, and may sometimes cause job to fail
 # on Artemis (presumably since 'models' is increased by a factor of 2.5) - although problem manifested

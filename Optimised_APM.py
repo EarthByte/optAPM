@@ -302,16 +302,14 @@ if __name__ == '__main__':
             current_models = models
             if expand_search_radius_on_ref_plate_switches and i > 0 and search == 'Initial':
                 # If the reference plate ID used in this iteration differs from the last iteration then temporarily
-                # expand the search diameter to 90 degrees since the two reference plate poles might differ a lot.
-                # Is 90 as high as we can go?
+                # expand the search diameter to 180 degrees since the two reference plate poles might differ a lot.
                 last_ref_rotation_plate_id, _ = get_reference_params(age_range[i-1])
                 if ref_rotation_plate_id != last_ref_rotation_plate_id:
-                    current_search_radius = 90
+                    current_search_radius = 180
                     # Expand number of models by the increase in area of small circle search radius 2*PI*(1 - cos(small_circle_radius)).
-                    # NOTE: The values given in search radius appear to be diameters (so halving them).
                     current_models = int(
-                        (1.0 - math.cos(0.5 * math.radians(current_search_radius))) /
-                        (1.0 - math.cos(0.5 * math.radians(search_radius)))
+                        (1.0 - math.cos(math.radians(current_search_radius))) /
+                        (1.0 - math.cos(math.radians(search_radius)))
                         * models + 0.5)
                     print "Temporarily expanding search diameter to {0} from {1} at {2}Ma due to change in reference plate.".format(
                         current_search_radius, search_radius, ref_rotation_start_age)
@@ -449,6 +447,7 @@ if __name__ == '__main__':
             # For example, the 'objective_function' module will in turn import what it needs (so we don't have to).
             from objective_function import ObjectiveFunction
             import nlopt
+            import sys
             
             # Load up the object function object once (eg, load rotation files).
             # NLopt will then call it multiple times.
@@ -483,8 +482,12 @@ if __name__ == '__main__':
             #sys.stdout.flush()
 
             # To debug the weighted cost functions (net rotation, trench migration, etc).
+            #print 'Min objective function costs', np.min(obj_f.debug_data_array, axis=0)
+            #print 'Max objective function costs', np.max(obj_f.debug_data_array, axis=0)
+            #print 'Std objective function costs', np.std(obj_f.debug_data_array, axis=0)
             #print 'Mean objective function costs', np.mean(obj_f.debug_data_array, axis=0)
             #print 'Median objective function costs', np.median(obj_f.debug_data_array, axis=0)
+            #print 'Optimal cost', minf
             #sys.stdout.flush()
 
             return xopt, minf
