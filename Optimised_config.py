@@ -204,7 +204,7 @@ def get_trench_migration_params(age):
     if data_model.startswith('Global_Model_WD_Internal_Release'):
         return True, 1.0, None
     elif data_model == 'Global_1000-0_Model_2017':
-        tm_bounds = [0, 30]
+        tm_bounds = [-30, 30]
         if age <= 80:
             return True, 1.0, tm_bounds
         else:
