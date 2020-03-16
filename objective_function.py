@@ -541,7 +541,7 @@ class ObjectiveFunction(object):
 
         # Fracture zones
         try:
-            if fz_eval:
+            if self.data_array[0] == True:
                 opt_eval = opt_eval + (fz_eval * scale_fracture_zones)
                 debug_data.append(fz_eval * scale_fracture_zones)
         except:
@@ -550,7 +550,7 @@ class ObjectiveFunction(object):
 
         # Net rotation
         try:
-            if nr_eval:
+            if self.data_array[1] == True:
                 opt_eval = opt_eval + (nr_eval * scale_net_rotation)
                 debug_data.append(nr_eval * scale_net_rotation)
         except:
@@ -559,7 +559,7 @@ class ObjectiveFunction(object):
 
         # Trench migration
         try:
-            if tm_eval:
+            if self.data_array[2] == True:
                 opt_eval = opt_eval + (tm_eval * scale_trench_migration)
                 debug_data.append(tm_eval * scale_trench_migration)
         except:
@@ -568,7 +568,7 @@ class ObjectiveFunction(object):
 
         # Hotspot reconstruction distance + spherical dispersion statistics
         try:
-            if hs_dist_eval and self.data_array[3] == True:
+            if self.data_array[3] == True:
 
                 # Distance only
                 #opt_eval = opt_eval + hs_dist_eval
@@ -589,7 +589,7 @@ class ObjectiveFunction(object):
 
         # Plate velocities
         try:
-            if pv_eval:
+            if self.data_array[4] == True:
                 opt_eval = opt_eval + (pv_eval * scale_plate_velocity)
                 debug_data.append(pv_eval * scale_plate_velocity)
         except:
