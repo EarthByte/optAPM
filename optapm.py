@@ -392,6 +392,8 @@ class ModelSetup():
 
             for i in xrange(0, num_points):
 
+                # Generate uniformly distributed random points on a unit sphere.
+                
                 theta = 2 * np.pi * np.random.random()
                 phi = np.arccos(2 * np.random.random() - 1.0)
 

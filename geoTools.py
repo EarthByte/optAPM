@@ -145,6 +145,9 @@ def global_points_uniform(samples, plotResult=False, projection='robin'):
     checkLatLon
 
     Simple function to check incoming lat and lon are within correct ranges.
+    
+    If the longitude is outside [-180, 180] then it is wrapped by 360 degrees to bring it into that range.
+    If the latitude is outside [-90, 90] then it is moved to the other side of the North (90) or South (-90) pole.
 """
 def checkLatLon(lat, lon):
 
@@ -156,20 +159,34 @@ def checkLatLon(lat, lon):
 
         lon_corrected = lon + 360
 
-    elif lon >= -180 and lon <= 180:
+    else:
 
         lon_corrected = lon
 
 
     if lat > 90:
 
-        lat_corrected = -180 + lat
+        # Instead of wrapping from North to South pole we move to the other side of the North pole
+        # (which also involves shifting the longitude by 180 degrees).
+        
+        lat_corrected = 180 - lat
+        
+        lon_corrected = 180 + lon_corrected
+        if lon_corrected > 180:
+            lon_corrected = -360 + lon_corrected
 
     elif lat < -90:
 
-        lat_corrected = lat + 180
+        # Instead of wrapping from South to North pole we move to the other side of the South pole
+        # (which also involves shifting the longitude by 180 degrees).
+        
+        lat_corrected = -180 - lat
+        
+        lon_corrected = 180 + lon_corrected
+        if lon_corrected > 180:
+            lon_corrected = -360 + lon_corrected
 
-    elif lat >= -90 and lat <= 90:
+    else:
 
         lat_corrected = lat
 
