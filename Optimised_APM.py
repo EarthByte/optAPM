@@ -268,17 +268,17 @@ if __name__ == '__main__':
             # Determine reference plate ID (which could vary over time) and reference rotation file.
             ref_rotation_plate_id, ref_rotation_file = get_reference_params(ref_rotation_start_age)
             
-            if not ref_rotation_file:
-                #
-                # Testing getting reference rotation from no-net-rotation versus the previous optimised interval.
-                #
-                if False:  # no-net-rotation...
-                    # If a reference rotation file is not provided then default to using no-net-rotation model.
-                    ref_rotation_file = no_net_rotation_model.get_no_net_rotation_filename()
-                
-                else:  # previous optimised interval...
-                    # If a reference rotation file is not provided then default to using reference plate rotation from previous optimisation interval.
-                    ref_rotation_file = rotfile
+            #
+            # Testing getting reference rotation from no-net-rotation versus the previous optimised interval versus rotation file.
+            #
+            if ref_rotation_file == USE_NNR_REFERENCE_FRAME:
+                # No-net-rotation...
+                # If a reference rotation file is not provided then default to using no-net-rotation model.
+                ref_rotation_file = no_net_rotation_model.get_no_net_rotation_filename()
+            elif ref_rotation_file == USE_OPTIMISED_REFERENCE_FRAME:
+                # Previous optimised interval...
+                # If a reference rotation file is not provided then default to using reference plate rotation from previous optimisation interval.
+                ref_rotation_file = rotfile
                 
             # Ensure the optimised rotation file has valid rotations from start to end of current interval by
             # re-using the absolute optimisation from start of previous interval (end of current interval).

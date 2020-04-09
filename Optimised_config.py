@@ -245,6 +245,8 @@ def get_plate_velocity_params(age):
 #
 # Which reference plate ID and rotation file to use at a specific age.
 #
+USE_NNR_REFERENCE_FRAME = 0
+USE_OPTIMISED_REFERENCE_FRAME = 1
 def get_reference_params(age):
     """
     Returns a 2-tuple containg reference plate ID and reference rotation filename (or None).
@@ -252,17 +254,25 @@ def get_reference_params(age):
     If reference rotation filename is None then it means the no-net-rotation model should be used.
     """
     if data_model == 'Global_1000-0_Model_2017':
-        #ref_rotation_plate_id = 5  # Use optimised absolute reference frame
-        #ref_rotation_file = None  # Use NNR
-        
-        if age <= 550:
-            ref_rotation_plate_id = 701
-            #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/550_0_Palaeomagnetic_Africa_S.rot'
-            ref_rotation_file = None  # Use NNR (hack: or optimised rotation file)
+        # Choose NNR, Optimsed or Africa reference frame.
+        reference_frame = USE_OPTIMISED_REFERENCE_FRAME
+
+        if reference_frame == USE_NNR_REFERENCE_FRAME:
+            ref_rotation_file = USE_NNR_REFERENCE_FRAME
+            ref_rotation_plate_id = 5  # Use optimised absolute reference frame
+        elif reference_frame == USE_OPTIMISED_REFERENCE_FRAME:
+            ref_rotation_file = USE_OPTIMISED_REFERENCE_FRAME
+            if age <= 550:
+                ref_rotation_plate_id = 701
+            else:
+                ref_rotation_plate_id = 101
         else:
-            ref_rotation_plate_id = 101
-            #ref_rotation_file = 'Global_1000-0_Model_2017/pmag/1000_550_Laurentia_pmag_reference.rot'
-            ref_rotation_file = None  # Use NNR (hack: or optimised rotation file)
+            if age <= 550:
+                ref_rotation_plate_id = 701
+                ref_rotation_file = 'Global_1000-0_Model_2017/pmag/550_0_Palaeomagnetic_Africa_S.rot'
+            else:
+                ref_rotation_plate_id = 101
+                ref_rotation_file = 'Global_1000-0_Model_2017/pmag/1000_550_Laurentia_pmag_reference.rot'
     else:
         ref_rotation_plate_id = 701
         ref_rotation_file = 'Palaeomagnetic_Africa_S.rot'
