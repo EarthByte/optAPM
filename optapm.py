@@ -379,7 +379,7 @@ class ModelSetup():
         seed_angs = []
 
 
-        # Generate uniform distribution of start seeds
+        # Generate uniform random distribution of start seeds
         if search_type == 'Random':
 
             if search == "Initial":
@@ -500,24 +500,24 @@ class ModelSetup():
             # print " "
 
 
+        # Generate uniform non-random distribution of points on a unit sphere.
+        elif search_type == 'Uniform':
 
-        if search_type == 'Uniform':
-
-            if search == "Initial":
-
-                # Works for search radius of 60
-                #num_points = models * 4
-                num_points = models * 5
-
-            elif search == "Secondary":
-
-                if geographical_uncertainty == 30:
-
-                    num_points = models * 15
-
-                elif geographical_uncertainty == 15:
-
-                    num_points = models * 60
+            #if search == "Initial":
+            #
+            #    # Works for search radius of 60
+            #    #num_points = models * 4
+            #    num_points = models * 5
+            #
+            #elif search == "Secondary":
+            #
+            #    if geographical_uncertainty == 30:
+            #
+            #        num_points = models * 15
+            #
+            #    elif geographical_uncertainty == 15:
+            #
+            #        num_points = models * 60
 
             # angle = np.pi * (3 - np.sqrt(5))
             # theta = angle * np.arange(num_points)
@@ -538,21 +538,31 @@ class ModelSetup():
             #     lats.append(point.get_latitude())
             #     lons.append(point.get_longitude())
 
+            # 'models' points covers a search radius of 'geographical_uncertainty' so
+            # number points covering entire globe is 1/search_area.
+            num_points_float = models * 1.0 / (0.5*(1-math.cos(math.radians(geographical_uncertainty))))
+            num_longitude_points = int(math.ceil(math.sqrt(num_points_float)))
+            num_latitude_points = num_longitude_points
+            num_points = num_longitude_points * num_latitude_points
+            #print('num_points:', num_points)
+
             lons = []
             lats = []
 
-            for i in xrange(0, num_points):
+            for lon_index in xrange(0, num_longitude_points):
+                for lat_index in xrange(0, num_latitude_points):
 
-                theta = 2 * np.pi * np.random.random()
-                phi = np.arccos(2 * np.random.random() - 1.0)
+                    theta = 2 * np.pi * ((lon_index + 0.5) / float(num_longitude_points))
+                    phi = np.arccos(2 * ((lat_index + 0.5) / float(num_latitude_points)) - 1.0)
+                    #print('  ', theta, phi)
 
-                x = np.cos(theta) * np.sin(phi)
-                y = np.sin(theta) * np.sin(phi)
-                z = np.cos(phi)
+                    x = np.cos(theta) * np.sin(phi)
+                    y = np.sin(theta) * np.sin(phi)
+                    z = np.cos(phi)
 
-                point = pgp.convert_point_on_sphere_to_lat_lon_point((x,y,z))
-                lats.append(point.get_latitude())
-                lons.append(point.get_longitude())
+                    point = pgp.convert_point_on_sphere_to_lat_lon_point((x,y,z))
+                    lats.append(point.get_latitude())
+                    lons.append(point.get_longitude())
 
             # Extract points within latitudinal zone of interest
             sample_lats = []
@@ -583,11 +593,10 @@ class ModelSetup():
             for i in xrange(0, len(start_seeds_rotated)):
 
                 seed = [[start_seeds_rotated[i][0]], [start_seeds_rotated[i][1]], ref_rot_angle]
-                #seed = [[start_seeds_rotated[i][0]], [start_seeds_rotated[i][1]], ang_gaussian_array[0][i]]
+
                 seed_lons.append(start_seeds_rotated[i][0])
                 seed_lats.append(start_seeds_rotated[i][1])
                 seed_angs.append(ref_rot_angle)
-                #seed_angs.append(ang_gaussian_array[0][i])
 
                 if seed not in seed_history:
 
