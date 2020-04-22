@@ -172,6 +172,7 @@ def resolve_subduction_zones(
 # - subduction zone absolute velocity obliquity angle (angle between subduction zone normal vector and absolute velocity vector)
 # - length of arc segment (in degrees) that current point is on
 # - subducting arc normal azimuth angle (clockwise starting at North, ie, 0 to 360 degrees) at current point
+# - subducting zone plate ID
 #
 # NOTE: Velocities are calculated from 'time' to 'time - velocity_delta_time'.
 #       It is assumed that the resolved subduction zones were resolved to time 'time', which
@@ -326,7 +327,8 @@ def subduction_absolute_motion(
                     absolute_velocity_magnitude,
                     absolute_obliquity_degrees,
                     math.degrees(arc_length),
-                    math.degrees(subducting_arc_normal_azimuth)))
+                    math.degrees(subducting_arc_normal_azimuth),
+                    subduction_zone_plate_id))
     
     # Return data sorted since it's easier to compare results (when at least lon/lat is sorted).
     return sorted(output_data)
