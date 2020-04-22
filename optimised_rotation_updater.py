@@ -141,7 +141,7 @@ class OptimisedRotationUpdater(object):
         else:
             # Start with identity rotation at time 0Ma.
             rotation_time_samples_005_rel_000.append(
-                pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'optAPM @absage))
+                pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'optAPM @absage'))
         
         # Add a rotation at each age in 'end_age + interval' to 'start_age' (inclusive) at 'interval' steps.
         for ref_rotation_start_age in np.arange(end_age + interval, start_age + interval, interval):
