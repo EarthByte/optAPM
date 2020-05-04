@@ -35,7 +35,8 @@ class ObjectiveFunction(object):
             PID,
             CPID,
             data_array,
-            data_bounds,
+            cost_func_array,
+            bounds_array,
             trench_migration_file,
             plate_velocity_file,
             ref_rotation_end_age,
@@ -63,7 +64,8 @@ class ObjectiveFunction(object):
         self.PID = PID
         self.CPID = CPID
         self.data_array = data_array
-        self.data_bounds = data_bounds
+        self.bounds_array = bounds_array
+        self.cost_func_array = cost_func_array
         self.trench_migration_file = trench_migration_file
         self.plate_velocity_file = plate_velocity_file
         self.ref_rotation_end_age = ref_rotation_end_age
@@ -195,13 +197,13 @@ class ObjectiveFunction(object):
             fz = optimisation_methods.Calc_Median(rotation_model_updated, self.PID, 
                                                   self.seafloor_ages, self.Lats, self.Lons, 
                                                   self.spreading_directions)
-
-
-            fz_eval = fz[0] + fz[1]
+            
+            # Delegate cost evaluation to cost function.
+            fz_eval = self.cost_func_array[0](fz)
             
             # Penalise out-of-bound cost values (if requested).
-            if self.data_bounds[0]:
-                fz_lower_bound, fz_upper_bound = self.data_bounds[0]
+            if self.bounds_array[0]:
+                fz_lower_bound, fz_upper_bound = self.bounds_array[0]
                 # TODO: Might need to compare 'fz[1]' (ie, the  mean) instead of 'fz_eval'.
                 if fz_eval < fz_lower_bound or fz_eval > fz_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
@@ -230,11 +232,12 @@ class ObjectiveFunction(object):
             # Sum the net rotation absolute angles over 'nr_timesteps' to get full 'interval'.
             nr_over_interval = np.sum(np.abs(PTangle1))
             
-            nr_eval = nr_over_interval + np.mean(np.abs(PTangle1))
+            # Delegate cost evaluation to cost function.
+            nr_eval = self.cost_func_array[1](PTLong1, PTLat1, PTangle1, SPLong, SPLat, SPangle, SPLong_NNR, SPLat_NNR, SPangle_NNR, nr_over_interval)
             
             # Penalise out-of-bound cost values (if requested).
-            if self.data_bounds[1]:
-                nr_lower_bound, nr_upper_bound = self.data_bounds[1]
+            if self.bounds_array[1]:
+                nr_lower_bound, nr_upper_bound = self.bounds_array[1]
                 # 'nr_over_interval' is over whole 'interval', but the bounded values are in deg/Myr,
                 # so convert our NR to deg/Myr (which is the units of the lower/upper bounds).
                 nr_deg_per_myr = nr_over_interval / self.interval
@@ -326,6 +329,8 @@ class ObjectiveFunction(object):
 
             # tm_eval = tmp_tm_eval * self.trench_migration_weight
 
+            raise NotImplementedError("Trench migration cost no longer implemented using old convergence script - use new script instead")
+
 
 
         # New method
@@ -342,16 +347,8 @@ class ObjectiveFunction(object):
                                                        velocity_delta_time=self.interval)
 
             # Process tm_stats to extract values for use in cost function
-            trench_vel = []
-            trench_obl = []
-
-            for i in xrange(0, len(tm_stats)):
-
-                trench_vel.append(tm_stats[i][2])
-                trench_obl.append(tm_stats[i][3])
-
-            trench_vel = np.array(trench_vel)
-            trench_obl = np.array(trench_obl)
+            trench_vel = np.array([tm_stat[2] for tm_stat in tm_stats])
+            trench_obl = np.array([tm_stat[3] for tm_stat in tm_stats])
 
             # Scale velocities from cm/yr to mm/yr.
             # Note that mm/yr is same as km/Myr.
@@ -365,54 +362,13 @@ class ObjectiveFunction(object):
 
             # Mean of absolute trench orthogonal velocity.
             tm_mean_abs_vel_orth = np.sum(np.abs(tm_vel_orth)) / len(tm_vel_orth)
-
-            # trench_numTotal = len(tm_vel_orth)
-            # trench_numRetreating = len(np.where(tm_vel_orth > 0)[0])
-            # trench_numAdvancing = len(tm_vel_orth) - trench_numRetreating
-            # trench_percent_retreat = round((np.float(trench_numRetreating) / np.float(trench_numTotal)) * 100, 2)
-            # trench_percent_advance = 100. - trench_percent_retreat
-            # trench_sumAbsVel_n = np.sum(np.abs(tm_vel_orth)) / len(tm_vel_orth)
-            # trench_numOver30 = len(np.where(tm_vel_orth > 30)[0])
-            # trench_numLessNeg30 = len(np.where(tm_vel_orth < -30)[0])
-
-            # Calculate cost
-            #tm_eval_1 = trench_percent_advance * 10
-            #tm_eval_2 = trench_sumAbsVel_n * 15
-
-            # 1. trench percent advance + trench abs vel mean
-            #tm_eval = (tm_eval_1 + tm_eval_2) / 2
-
-            # 2. trench_abs_vel_mean orthogonal
-            tm_eval_2 = tm_mean_abs_vel_orth
-
-            # 3. number of trenches in advance
-            #tm_eval_3 = trench_numAdvancing * 2
-
-            # 4. abs median
-            #tm_eval = np.median(abs(np.array(tm_vel_orth)))
-
-            # 5. standard deviation
-            tm_eval_5 = np.std(tm_vel_orth)
-
-            # 6. variance
-            #tm_stats = stats.describe(tm_vel_orth)
-            #tm_eval_6 = tm_stats.variance
-
-            # 7. trench absolute motion abs vel mean
-            #tm_eval_7 = (np.sum(np.abs(trench_vel)) / len(trench_vel)) * 15
-
-            tm_eval = (tm_eval_2 + tm_eval_5) * 3
             
-            # Original equation
-            #tm_eval = ((tm_eval_5 * (trench_numRetreating * trench_sumAbsVel_n)) / \
-            #           (trench_numTotal - (trench_numOver30 + trench_numLessNeg30)))
-            
-            #tm_eval = (tm_eval_2 + tm_eval_5 + trench_numAdvancing) / trench_numRetreating
-            
+            # Delegate cost evaluation to cost function.
+            tm_eval = self.cost_func_array[2](trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth)
             
             # Penalise out-of-bound cost values (if requested).
-            if self.data_bounds[2]:
-                tm_lower_bound, tm_upper_bound = self.data_bounds[2]
+            if self.bounds_array[2]:
+                tm_lower_bound, tm_upper_bound = self.bounds_array[2]
                 # Note that we compare the mean of trench orthogonal velocity (not 'tm_eval').
                 # Note that we're not comparing 'absolute' velocity, so negative/positive values are trench advance/retreat.
                 # Also note that mean and bounds velocities are in same units of mm/yr (equivalent to km/Myr).
@@ -430,17 +386,13 @@ class ObjectiveFunction(object):
             hs = ObjectiveFunctions.hotspot_trail_misfit(self.trail_data, self.ref_rotation_start_age, 
                                                          rotation_model_updated, self.use_trail_age_uncertainty,
                                                          self.trail_age_uncertainty_ellipse)
-
+            
             if self.use_trail_age_uncertainty == False:
 
-                tmp_distance_median = np.median(hs[0])
-                tmp_distance_sd = np.std(hs[0])
+                distance_median = np.median(hs[0])
+                distance_sd = np.std(hs[0])
 
-                hs_dist_eval = tmp_distance_median + tmp_distance_sd
-
-
-            elif self.use_trail_age_uncertainty == True:
-
+            else:
                 weighted_dist = []
 
                 # Positively weight modelled distances that are less than uncertainty limit
@@ -455,16 +407,15 @@ class ObjectiveFunction(object):
                         weighted_dist.append(hs[0][i] * 2)
 
 
-                tmp_distance_median = np.median(weighted_dist)
-                tmp_distance_sd = np.std(weighted_dist)
-
-                hs_dist_eval = tmp_distance_median + tmp_distance_sd
-                #hs_dist_eval = tmp_distance_median
-                #hs_dist_eval = tmp_distance_sd
+                distance_median = np.median(weighted_dist)
+                distance_sd = np.std(weighted_dist)
+            
+            # Delegate cost evaluation to cost function.
+            hs_dist_eval = self.cost_func_array[3](hs, distance_median, distance_sd)
             
             # Penalise out-of-bound cost values (if requested).
-            if self.data_bounds[3]:
-                hs_lower_bound, hs_upper_bound = self.data_bounds[3]
+            if self.bounds_array[3]:
+                hs_lower_bound, hs_upper_bound = self.bounds_array[3]
                 # TODO: Might need to compare (possibly weighted) mean instead of 'hs_dist_eval'.
                 if hs_dist_eval < hs_lower_bound or hs_dist_eval > hs_upper_bound:
                     # Arbitrary penalty on cost function (might need some tuning)
@@ -479,8 +430,8 @@ class ObjectiveFunction(object):
         #
         if self.data_array[4] == True:
             
-            # Calculate velocity magnitudes at all pre-calculated grid points ('self.pv_data').
-            velocity_magnitudes = []
+            # Calculate velocity vectors at all pre-calculated grid points ('self.pv_data').
+            velocity_vectors = []
             
             # 'self.pv_data' contains multi-points (and each multi-point has a plate ID).
             # Each multi-point represents those grid points that fall within a resolved plate
@@ -498,22 +449,25 @@ class ObjectiveFunction(object):
                 
                 # There is only one (multi-point) geometry per feature but assume there could be more.
                 for multi_point in multi_point_feature.get_geometries():
-                    velocity_vectors = pgp.calculate_velocities(
+                    multi_point_velocity_vectors = pgp.calculate_velocities(
                             multi_point,
                             equivalent_stage_rotation,
                             self.interval,
                             # Units of km/Myr (equivalent to mm/yr)...
                             velocity_units=pgp.VelocityUnits.kms_per_my)
-                    velocity_magnitudes.extend(velocity_vector.get_magnitude()
-                            for velocity_vector in velocity_vectors)
+                    velocity_vectors.extend(multi_point_velocity_vectors)
+
+            # Velocity vectors at all pre-calculated grid points.
+            velocity_magnitudes = [velocity_vector.get_magnitude() for velocity_vector in velocity_vectors]
             
             median_velocity = np.median(velocity_magnitudes)
             
-            pv_eval = median_velocity
+            # Delegate cost evaluation to cost function.
+            pv_eval = self.cost_func_array[4](velocity_vectors, velocity_magnitudes, median_velocity)
             
             # Penalise out-of-bound cost values (if requested).
-            if self.data_bounds[4]:
-                pv_lower_bound, pv_upper_bound = self.data_bounds[4]
+            if self.bounds_array[4]:
+                pv_lower_bound, pv_upper_bound = self.bounds_array[4]
                 # Note that we compare the median velocity (not 'pv_eval').
                 # Currently they're the same, but might not be in future.
                 # Also note that median and bounds velocities are in same units of mm/yr (equivalent to km/Myr).

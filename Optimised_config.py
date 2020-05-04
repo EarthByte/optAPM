@@ -34,7 +34,7 @@ data_model = 'Global_1000-0_Model_2017'
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     model_name = "svn1618_run1"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "svn1628_run14"
+    model_name = "svn1628_run18"
 else:
     model_name = "run1"
 
@@ -171,12 +171,13 @@ else:
 
 
 #
-# Which components are enabled and their weightings and optional restricted bounds.
+# Which components are enabled and their weightings and cost function and optional restricted bounds.
 #
-# Each return value is a 3-tuple:
+# Each return value is a 4-tuple:
 #  1. Enable boolean (True or False),
 #  2. Weight value (float),
-#  3. Optional restricted bounds (2-tuple of min/max cost, or None).
+#  3. Cost function (function accepting parameters that are specific to the component being optimised),
+#  4. Optional restricted bounds (2-tuple of min/max cost, or None).
 #
 # For restricted bounds, use None if you are not restricting.
 # Otherwise use a (min, max) tuple.
@@ -184,62 +185,145 @@ else:
 # NOTE: The weights are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
 #
 def get_fracture_zone_params(age):
+    # Cost function - see "objective_function.py" for definition of function arguments...
+    def cost_function(fz):
+        # NOTE: Import any modules used in this function here
+        #       (since this function's code might be serialised over the network to remote nodes).
+        return fz[0] + fz[1]
+
     # Disable fracture zones.
-    return False, 1.0, None
+    return False, 1.0, cost_function, None
 
 def get_net_rotation_params(age):
+    # Cost function - see "objective_function.py" for definition of function arguments...
+    def cost_function(PTLong1, PTLat1, PTangle1, SPLong, SPLat, SPangle, SPLong_NNR, SPLat_NNR, SPangle_NNR, nr_over_interval):
+        # NOTE: Import any modules used in this function here
+        #       (since this function's code might be serialised over the network to remote nodes).
+        import numpy as np
+        return nr_over_interval + np.mean(np.abs(PTangle1))
+
     # Note: Use units of degrees/Myr...
     #nr_bounds = (0.08, 0.20)
     
     if data_model.startswith('Global_Model_WD_Internal_Release'):
         if age <= 80:
-            return True, 1.0, None
+            return True, 1.0, cost_function, None
         elif age <= 170:
             # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-            return  True, 2.0, None  # 2.0 gives a *multiplicative* weight of 0.5
+            return  True, 2.0, cost_function, None  # 2.0 gives a *multiplicative* weight of 0.5
         else:
             # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-            return True, 5.0, None  # 5.0 gives a *multiplicative* weight of 0.2
+            return True, 5.0, cost_function, None  # 5.0 gives a *multiplicative* weight of 0.2
     elif data_model == 'Global_1000-0_Model_2017':
         nr_bounds = (0.08, 0.20)
-        return  True, 1.0, nr_bounds  # 1.0 gives a *multiplicative* weight of 1.0
+        return  True, 1.0, cost_function, nr_bounds  # 1.0 gives a *multiplicative* weight of 1.0
     else:
-        return True, 1.0, None
+        return True, 1.0, cost_function, None
 
 def get_trench_migration_params(age):
+    # Cost function - see "objective_function.py" for definition of function arguments...
+    def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
+        # NOTE: Import any modules used in this function here
+        #       (since this function's code might be serialised over the network to remote nodes).
+        import numpy as np
+
+        # trench_numTotal = len(tm_vel_orth)
+        # trench_numRetreating = len(np.where(tm_vel_orth > 0)[0])
+        # trench_numAdvancing = len(tm_vel_orth) - trench_numRetreating
+        # trench_percent_retreat = round((np.float(trench_numRetreating) / np.float(trench_numTotal)) * 100, 2)
+        # trench_percent_advance = 100. - trench_percent_retreat
+        # trench_sumAbsVel_n = np.sum(np.abs(tm_vel_orth)) / len(tm_vel_orth)
+        # trench_numOver30 = len(np.where(tm_vel_orth > 30)[0])
+        # trench_numLessNeg30 = len(np.where(tm_vel_orth < -30)[0])
+
+        # Calculate cost
+        #tm_eval_1 = trench_percent_advance * 10
+        #tm_eval_2 = trench_sumAbsVel_n * 15
+
+        # 1. trench percent advance + trench abs vel mean
+        #tm_eval = (tm_eval_1 + tm_eval_2) / 2
+
+        # 2. trench_abs_vel_mean orthogonal
+        tm_eval_2 = tm_mean_abs_vel_orth
+
+        # 3. number of trenches in advance
+        #tm_eval_3 = trench_numAdvancing * 2
+
+        # 4. abs median
+        #tm_eval = np.median(abs(np.array(tm_vel_orth)))
+
+        # 5. standard deviation
+        tm_eval_5 = np.std(tm_vel_orth)
+
+        # 6. variance
+        #tm_stats = stats.describe(tm_vel_orth)
+        #tm_eval_6 = tm_stats.variance
+
+        # 7. trench absolute motion abs vel mean
+        #tm_eval_7 = (np.sum(np.abs(trench_vel)) / len(trench_vel)) * 15
+
+        tm_eval = (tm_eval_2 + tm_eval_5) * 3
+        
+        # Original equation
+        #tm_eval = ((tm_eval_5 * (trench_numRetreating * trench_sumAbsVel_n)) / \
+        #           (trench_numTotal - (trench_numOver30 + trench_numLessNeg30)))
+        
+        #tm_eval = (tm_eval_2 + tm_eval_5 + trench_numAdvancing) / trench_numRetreating
+
+        return tm_eval
+        
     # Note: Use units of mm/yr (same as km/Myr)...
     #tm_bounds = [0, 30]
     
     if data_model.startswith('Global_Model_WD_Internal_Release'):
-        return True, 1.0, None
+        return True, 1.0, cost_function, None
     elif data_model == 'Global_1000-0_Model_2017':
+        # Override default cost function for 1Ga model - see "objective_function.py" for definition of function arguments...
+        def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
+            # NOTE: Import any modules used in this function here
+            #       (since this function's code might be serialised over the network to remote nodes).
+            import numpy as np
+            return 16.0 * np.mean(np.abs(np.where(tm_vel_orth > 0, 0.1 * tm_vel_orth, tm_vel_orth)))
+        
         tm_bounds = [-30, 30]
         if age <= 80:
-            return True, 1.0, tm_bounds
+            return True, 1.0, cost_function, tm_bounds
         else:
             # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-            return True, 1.0, tm_bounds  # 1.0 gives a *multiplicative* weight of 1.0
+            return True, 1.0, cost_function, tm_bounds  # 1.0 gives a *multiplicative* weight of 1.0
     else:
-        return True, 1.0, None
+        return True, 1.0, cost_function, None
 
 def get_hotspot_trail_params(age):
+    # Cost function - see "objective_function.py" for definition of function arguments...
+    def cost_function(hs, distance_median, distance_sd):
+        # NOTE: Import any modules used in this function here
+        #       (since this function's code might be serialised over the network to remote nodes).
+        return distance_median + distance_sd
+
     # Only use hotspot trails for 0-80Ma.
     if age <= 80:
-        return True, 1.0, None
+        return True, 1.0, cost_function, None
     else:
-        return False, 1.0, None
+        return False, 1.0, cost_function, None
 
 def get_plate_velocity_params(age):
+    # Cost function - see "objective_function.py" for definition of function arguments...
+    def cost_function(velocity_vectors, velocity_magnitudes, median_velocity):
+        # NOTE: Import any modules used in this function here
+        #       (since this function's code might be serialised over the network to remote nodes).
+        return median_velocity
+
     # Note: Use units of mm/yr (same as km/Myr)...
     #pv_bounds = [0, 60]
     
     if data_model.startswith('Global_Model_WD_Internal_Release'):
-        return False, 1.0, None
+        return False, 1.0, cost_function, None
     elif data_model == 'Global_1000-0_Model_2017':
         pv_bounds = [0, 60]
-        return True, 1.0, pv_bounds
+        return True, 1.0, cost_function, pv_bounds
     else:
-        return True, 1.0, None
+        return True, 1.0, cost_function, None
 
 
 #
@@ -287,7 +371,7 @@ search = "Initial"
 # on Artemis (presumably since 'models' is increased by a factor of 2.5) - although problem manifested
 # as failure to read the rotation file being optimised, so it was probably something else.
 expand_search_radius_on_ref_plate_switches = False
-rotation_uncertainty = 30
+rotation_uncertainty = 180
 auto_calc_ref_pole = True
 
 model_stop_condition = 'threshold'

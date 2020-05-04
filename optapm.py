@@ -17,22 +17,19 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-# Required libraries
-import pygplates as pgp
+from HotSpotLoader import GetHotSpotTrailsFromGeoJSON, GetHotSpotLocationsFromGeoJSON
+import geoTools
+import isopolate
+import json
+import math
 import numpy as np
 import pandas as pd
-
 import pickle
-import random
-import textwrap
-import geoTools
 import pmagpy.ipmag as ipmag
 import pmagpy.pmag as pmag
-import isopolate
-import math
-import json
-
-from HotSpotLoader import GetHotSpotTrailsFromGeoJSON, GetHotSpotLocationsFromGeoJSON
+import pygplates as pgp
+import random
+import textwrap
 
 # The optimization workflow doesn't actually need to plot so we won't require user to install these modules.
 # If the user plots then we'll get an AttributeError, in which case the try/except part should be removed.
@@ -219,20 +216,17 @@ class ModelSetup():
             interpolation_resolution,
             rotation_age_of_interest,
             enable_fracture_zones, enable_net_rotation, enable_trench_migration, enable_hotspot_trails, enable_plate_velocity,
+            fz_weight, nr_weight, tm_weight, hs_weight, pv_weight,
+            fracture_zone_cost_func, net_rotation_cost_func, trench_migration_cost_func, hotspot_trails_cost_func, plate_velocity_cost_func,
             fracture_zone_bounds, net_rotation_bounds, trench_migration_bounds, hotspot_trails_bounds, plate_velocity_bounds,
             ref_rot_longitude,
             ref_rot_latitude,
             ref_rot_angle,
             auto_calc_ref_pole,
             search,
-            fz_weight,
-            nr_weight,
-            tm_weight,
-            hs_weight,
-            pv_weight,
             include_chains,
             interpolated_hotspot_trails,
-            tm_method) = params[:34]
+            tm_method) = params[:39]
 
         #print fz_weight, nr_weight, tm_weight, hs_weight, pv_weight
 
@@ -248,8 +242,8 @@ class ModelSetup():
 
         data_array_labels_short = ['FZ', 'NR', 'TM', 'HS', 'PV']
         data_array = [enable_fracture_zones, enable_net_rotation, enable_trench_migration, enable_hotspot_trails, enable_plate_velocity]
-        
-        data_bounds = [fracture_zone_bounds, net_rotation_bounds, trench_migration_bounds, hotspot_trails_bounds, plate_velocity_bounds]
+        cost_func_array = [fracture_zone_cost_func, net_rotation_cost_func, trench_migration_cost_func, hotspot_trails_cost_func, plate_velocity_cost_func]
+        bounds_array = [fracture_zone_bounds, net_rotation_bounds, trench_migration_bounds, hotspot_trails_bounds, plate_velocity_bounds]
 
         # Array containing the name of all chains to be included in optimisation
         if ref_rotation_start_age <= 80:
@@ -276,8 +270,8 @@ class ModelSetup():
 
                 print "- " + data_array_labels[i] + ": weight(" + str(weights_array[i]) + ")"
                 
-                if data_bounds[i]:
-                    print "  - bounds" + str(data_bounds[i])
+                if bounds_array[i]:
+                    print "  - bounds" + str(bounds_array[i])
 
         print " "
         print "Termination:"
@@ -1049,7 +1043,7 @@ class ModelSetup():
         startingConditions = [x, opt_n, N, lb, ub, model_stop_condition, max_iter,
                               rotation_file, ref_rotation_start_age, ref_rotation_end_age, ref_rotation_plate_id,
                               Lats, Lons, spreading_directions, spreading_asymmetries, seafloor_ages, PID, CPID,
-                              data_array, data_bounds, trench_migration_file, plate_velocity_file, no_net_rotation_file,
+                              data_array, cost_func_array, bounds_array, trench_migration_file, plate_velocity_file, no_net_rotation_file,
                               reformArray, trail_data, start_seeds, rotation_age_of_interest_age, data_array_labels_short,
                               ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
                               seed_lons, seed_lats, ang_gaussian_array]
