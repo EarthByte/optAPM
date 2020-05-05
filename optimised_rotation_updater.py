@@ -46,6 +46,13 @@ class OptimisedRotationUpdater(object):
         self.reference_params_function = reference_params_function
         self.model_name = model_name
         
+        # First check that Africa has a zero present-day rotation.
+        original_rotation_model = pygplates.RotationModel([os.path.join(self.data_dir, original_rotation_filename)
+            for original_rotation_filename in original_rotation_filenames])
+        if not original_rotation_model.get_rotation(0.0, 701).represents_identity_rotation():
+            # If an exception is raised here then the original rotation model needs to be fixed before running the optimisation workflow.
+            raise RuntimeWarning('Original rotation model has a non-zero finite rotation for Africa at present day.')
+        
         # The single combined optimised rotation filename (relative to the 'data/' directory).
         self.optimised_rotation_filename = os.path.join(
                 data_model, 'optimisation', 'optimised_rotation_model_' + self.model_name + '.rot')
