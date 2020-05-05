@@ -34,7 +34,7 @@ data_model = 'Global_1000-0_Model_2017'
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     model_name = "svn1618_run1"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "svn1628_run18"
+    model_name = "svn1683_run18"
 else:
     model_name = "run1"
 
@@ -109,14 +109,14 @@ original_rotation_filenames = [os.path.relpath(abs_path, datadir) for abs_path i
 #]
 if data_model == 'Global_1000-0_Model_2017':
     # Starting at SVN rev 1624 there are other GPML files that we don't need to include.
-    topology_filenames = [
-        'Global_1000-0_Model_2017/1000-410-Convergence_T12_APWP.gpml',
-        'Global_1000-0_Model_2017/1000-410-Divergence_T12_APWP.gpml',
-        'Global_1000-0_Model_2017/1000-410-Topologies_T12_APWP.gpml',
-        'Global_1000-0_Model_2017/1000-410-Transforms_T12_APWP.gpml',
-        'Global_1000-0_Model_2017/Global_Mesozoic-Cenozoic_plate_boundaries_Young_et_al_APWP.gpml',
-        'Global_1000-0_Model_2017/Global_Paleozoic_plate_boundaries_Young_et_al_APWP.gpml',
-        'Global_1000-0_Model_2017/TopologyBuildingBlocks_Young_et_al.gpml',
+    topology_filenames = [   # svn 1683...
+        'Global_1000-0_Model_2017/250-0_plate_boundaries_Merdith_et_al.gpml',
+        'Global_1000-0_Model_2017/410-250_plate_boundaries_Merdith_et_al.gpml',
+        'Global_1000-0_Model_2017/1000-410-Convergence_Merdith_et_al.gpml',
+        'Global_1000-0_Model_2017/1000-410-Divergence_Merdith_et_al.gpml',
+        'Global_1000-0_Model_2017/1000-410-Topologies_Merdith_et_al.gpml',
+        'Global_1000-0_Model_2017/1000-410-Transforms_Merdith_et_al.gpml',
+        'Global_1000-0_Model_2017/TopologyBuildingBlocks_Merdith_et_al.gpml',
     ]
 else:
     topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
@@ -125,7 +125,7 @@ else:
 # The continental polygons file (relative to the 'data/' directory) used for plate velocity calculations (when plate velocity is enabled).
 # NOTE: Set to None to use topologies instead (which includes continental and oceanic crust).
 if data_model == 'Global_1000-0_Model_2017':
-    plate_velocity_continental_polygons_file = 'Global_1000-0_Model_2017/shapes_continents.gpml'
+    plate_velocity_continental_polygons_file = 'Global_1000-0_Model_2017/shapes_continents_Merdith_et_al.gpml'
 else:
     plate_velocity_continental_polygons_file = None
 
@@ -278,12 +278,12 @@ def get_trench_migration_params(age):
     if data_model.startswith('Global_Model_WD_Internal_Release'):
         return True, 1.0, cost_function, None
     elif data_model == 'Global_1000-0_Model_2017':
-        # Override default cost function for 1Ga model - see "objective_function.py" for definition of function arguments...
-        def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
-            # NOTE: Import any modules used in this function here
-            #       (since this function's code might be serialised over the network to remote nodes).
-            import numpy as np
-            return 16.0 * np.mean(np.abs(np.where(tm_vel_orth > 0, 0.1 * tm_vel_orth, tm_vel_orth)))
+        # # Override default cost function for 1Ga model - see "objective_function.py" for definition of function arguments...
+        # def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
+        #     # NOTE: Import any modules used in this function here
+        #     #       (since this function's code might be serialised over the network to remote nodes).
+        #     import numpy as np
+        #     return 16.0 * np.mean(np.abs(np.where(tm_vel_orth > 0, 0.1 * tm_vel_orth, tm_vel_orth)))
         
         tm_bounds = [-30, 30]
         if age <= 80:
