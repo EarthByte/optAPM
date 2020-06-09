@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from no_net_rotation_model import NoNetRotationModel
 from optimised_rotation_updater import OptimisedRotationUpdater
 from plate_velocity_partitioner import PlateVelocityPartitioner
+from continent_fragmentation import ContinentFragmentation
 from trench_resolver import TrenchResolver
 
 # All the config parameters are now in a separate module 'Optimised_config' that also
@@ -183,6 +184,16 @@ if __name__ == '__main__':
             # The filename used to store the (plate velocity) points and associated plate IDs at the reconstruction time.
             # The same filename is used for all reconstruction times (it just gets overwritten at each time).
             pv_file = plate_velocity_partitioner.get_plate_velocity_filename()
+
+            # Continental fragmentation (global perimater-to-area ratio) will be used to adjust the plate velocities weight.
+            #
+            # First calculate through all time to find normalisation factor. This is so that approx 1.0 will represent maximum
+            # fragmentation when later using optimised rotation model to calculate fragmentation at each time interval.
+            continent_fragmentation = ContinentFragmentation(
+                    datadir,
+                    original_rotation_filenames,
+                    topology_features,
+                    age_range)
             
             
             print "Rotation file to be used: ", rotfile
@@ -267,7 +278,7 @@ if __name__ == '__main__':
                     # Previous optimised interval...
                     # If a reference rotation file is not provided then default to using reference plate rotation from previous optimisation interval.
                     ref_rotation_file = rotfile
-                    
+
                 # Ensure the optimised rotation file has valid rotations from start to end of current interval by
                 # re-using the absolute optimisation from start of previous interval (end of current interval).
                 # Once we've optimised the current interval we'll overwrite it, but it can get used before then
@@ -275,10 +286,10 @@ if __name__ == '__main__':
                 #
                 #   R(0->ts,000->ref_plate) = R(0->te,000->005) * R(0->ts,005->ref_plate)
                 #
-                rotation_model = pgp.RotationModel(os.path.join(datadir, rotfile))
-                plate_rotation_005_rel_000 = rotation_model.get_rotation(
+                _rotation_model = pgp.RotationModel(os.path.join(datadir, rotfile))
+                plate_rotation_005_rel_000 = _rotation_model.get_rotation(
                         ref_rotation_end_age, 5, fixed_plate_id=0)
-                plate_rotation_ref_plate_rel_005 = rotation_model.get_rotation(
+                plate_rotation_ref_plate_rel_005 = _rotation_model.get_rotation(
                         ref_rotation_start_age, ref_rotation_plate_id, fixed_plate_id=5)
                 plate_rotation_ref_plate_rel_000 = plate_rotation_005_rel_000 * plate_rotation_ref_plate_rel_005
                 optimised_rotation_updater.update_optimised_rotation(
@@ -312,6 +323,17 @@ if __name__ == '__main__':
                 enable_trench_migration, trench_migration_weight, trench_migration_cost_func, trench_migration_bounds = get_trench_migration_params(ref_rotation_start_age)
                 enable_hotspot_trails, hotspot_trails_weight, hotspot_trails_cost_func, hotspot_trails_bounds = get_hotspot_trail_params(ref_rotation_start_age)
                 enable_plate_velocity, plate_velocity_weight, plate_velocity_cost_func, plate_velocity_bounds = get_plate_velocity_params(ref_rotation_start_age)
+                
+                # Multiply the plate velocity weight by the normalised fragmentation index for the current time.
+                # This means fragmented continents can be constrained by plate velocities more than un-fragmented (eg, supercontinents).
+                #
+                # NOTE: 'rotfile' has been updated above to have valid rotations from start to end of current interval,
+                #       so it should be fine to use at the start of current interval.
+                #       However, actually, we don't currently use the optimised rotation model. Instead we use the original rotation model
+                #       since optimisation is just an absolute offset that does not change the layout of the dynamic topologies and hence
+                #       doesn't affect the fragmentation.
+                normalised_continent_fragmentation_index = continent_fragmentation.get_fragmentation(ref_rotation_start_age)
+                plate_velocity_weight *= normalised_continent_fragmentation_index
 
                 # Gather parameters
                 params = [current_search_radius, rotation_uncertainty, search_type, current_models, model_stop_condition, max_iter,
