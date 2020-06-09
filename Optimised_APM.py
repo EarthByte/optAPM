@@ -232,13 +232,6 @@ if __name__ == '__main__':
             #ref_rotation_end_age = 0.
             
             
-            # Determine which components are enabled and their weightings (which could vary over time).
-            enable_fracture_zones, fracture_zone_weight, fracture_zone_cost_func, fracture_zone_bounds = get_fracture_zone_params(ref_rotation_start_age)
-            enable_net_rotation, net_rotation_weight, net_rotation_cost_func, net_rotation_bounds = get_net_rotation_params(ref_rotation_start_age)
-            enable_trench_migration, trench_migration_weight, trench_migration_cost_func, trench_migration_bounds = get_trench_migration_params(ref_rotation_start_age)
-            enable_hotspot_trails, hotspot_trails_weight, hotspot_trails_cost_func, hotspot_trails_bounds = get_hotspot_trail_params(ref_rotation_start_age)
-            enable_plate_velocity, plate_velocity_weight, plate_velocity_cost_func, plate_velocity_bounds = get_plate_velocity_params(ref_rotation_start_age)
-            
             # When using mpi4py we only prepare the data in one process (the one with rank/ID 0).
             if use_parallel != MPI4PY or mpi_rank == 0:
                 
@@ -312,6 +305,13 @@ if __name__ == '__main__':
                         print ""
 
                 # --------------------------------------------------------------------
+                
+                # Determine which components are enabled and their weightings (which could vary over time).
+                enable_fracture_zones, fracture_zone_weight, fracture_zone_cost_func, fracture_zone_bounds = get_fracture_zone_params(ref_rotation_start_age)
+                enable_net_rotation, net_rotation_weight, net_rotation_cost_func, net_rotation_bounds = get_net_rotation_params(ref_rotation_start_age)
+                enable_trench_migration, trench_migration_weight, trench_migration_cost_func, trench_migration_bounds = get_trench_migration_params(ref_rotation_start_age)
+                enable_hotspot_trails, hotspot_trails_weight, hotspot_trails_cost_func, hotspot_trails_bounds = get_hotspot_trail_params(ref_rotation_start_age)
+                enable_plate_velocity, plate_velocity_weight, plate_velocity_cost_func, plate_velocity_bounds = get_plate_velocity_params(ref_rotation_start_age)
 
                 # Gather parameters
                 params = [current_search_radius, rotation_uncertainty, search_type, current_models, model_stop_condition, max_iter,
@@ -334,9 +334,9 @@ if __name__ == '__main__':
                 startingConditions = ms.modelStartConditions(params, data, plot)
 
                 # Marshal each cost function into a code string so we can pass it over the network.
-                cost_func_array = startingConditions[19]
+                cost_func_array = startingConditions[20]
                 cost_func_code_string_array = [marshal.dumps(cost_func.func_code) for cost_func in cost_func_array]
-                startingConditions[19] = cost_func_code_string_array
+                startingConditions[20] = cost_func_code_string_array
             
             
             if use_parallel == MPI4PY:
@@ -401,13 +401,11 @@ if __name__ == '__main__':
                 Lats, Lons,
                 spreading_directions, spreading_asymmetries, seafloor_ages,
                 PID, CPID,
-                data_array,
-                cost_func_code_string_array,        
-                bounds_array,
+                data_array, weights_array, cost_func_code_string_array, bounds_array,
                 trench_migration_file, plate_velocity_file, no_net_rotation_file, reformArray, trail_data,
                 start_seeds, rotation_age_of_interest_age, data_array_labels_short,
                 ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
-                seed_lons, seed_lats) = startingConditions[:34]
+                seed_lons, seed_lats) = startingConditions[:35]
 
             if auto_calc_ref_pole == False:
 
@@ -433,10 +431,10 @@ if __name__ == '__main__':
 
             def run_optimisation(x, opt_n, N, lb, ub, model_stop_condition, max_iter, interval, rotation_file, 
                                 no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions, 
-                                spreading_asymmetries, seafloor_ages, PID, CPID, data_array, cost_func_code_string_array,
-                                bounds_array, trench_migration_file, plate_velocity_file, ref_rotation_end_age, ref_rotation_plate_id,
-                                reformArray, trail_data, fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight,
-                                plate_velocity_weight, use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method):
+                                spreading_asymmetries, seafloor_ages, PID, CPID,
+                                data_array, weights_array, cost_func_code_string_array, bounds_array,
+                                trench_migration_file, plate_velocity_file, ref_rotation_end_age, ref_rotation_plate_id,
+                                reformArray, trail_data, use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method):
 
                 # Make sure remote nodes/cores also import these modules (when running code in parallel).
                 #
@@ -462,9 +460,8 @@ if __name__ == '__main__':
                 # NLopt will call this as 'obj_f(x, grad)' because 'obj_f' has a '__call__' method.
                 obj_f = ObjectiveFunction(
                         interval, rotation_file, no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions,
-                        spreading_asymmetries, seafloor_ages, PID, CPID, data_array, cost_func_array, bounds_array, trench_migration_file,
-                        plate_velocity_file, ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
-                        fracture_zone_weight, net_rotation_weight, trench_migration_weight, hotspot_trails_weight, plate_velocity_weight,
+                        spreading_asymmetries, seafloor_ages, PID, CPID, data_array, weights_array, cost_func_array, bounds_array,
+                        trench_migration_file, plate_velocity_file, ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
                         use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method)
                 
                 opt = nlopt.opt(nlopt.LN_COBYLA, opt_n)
@@ -511,13 +508,10 @@ if __name__ == '__main__':
                             no_net_rotation_file=no_net_rotation_file, ref_rotation_start_age=ref_rotation_start_age, 
                             Lats=Lats, Lons=Lons, spreading_directions=spreading_directions, spreading_asymmetries=spreading_asymmetries,
                             seafloor_ages=seafloor_ages, PID=PID, CPID=CPID,
-                            data_array=data_array, cost_func_code_string_array=cost_func_code_string_array, bounds_array=bounds_array,
+                            data_array=data_array, weights_array=weights_array, cost_func_code_string_array=cost_func_code_string_array, bounds_array=bounds_array,
                             trench_migration_file=trench_migration_file, plate_velocity_file=plate_velocity_file,
                             ref_rotation_end_age=ref_rotation_end_age, ref_rotation_plate_id=ref_rotation_plate_id,
-                            reformArray=reformArray, trail_data=trail_data, fracture_zone_weight=fracture_zone_weight,
-                            net_rotation_weight=net_rotation_weight, trench_migration_weight=trench_migration_weight,
-                            hotspot_trails_weight=hotspot_trails_weight, plate_velocity_weight=plate_velocity_weight,
-                            use_trail_age_uncertainty=use_trail_age_uncertainty,
+                            reformArray=reformArray, trail_data=trail_data, use_trail_age_uncertainty=use_trail_age_uncertainty,
                             trail_age_uncertainty_ellipse=trail_age_uncertainty_ellipse, tm_method=tm_method)
 
             # Start timer for current time step.

@@ -1043,7 +1043,7 @@ class ModelSetup():
         startingConditions = [x, opt_n, N, lb, ub, model_stop_condition, max_iter,
                               rotation_file, ref_rotation_start_age, ref_rotation_end_age, ref_rotation_plate_id,
                               Lats, Lons, spreading_directions, spreading_asymmetries, seafloor_ages, PID, CPID,
-                              data_array, cost_func_array, bounds_array, trench_migration_file, plate_velocity_file, no_net_rotation_file,
+                              data_array, weights_array, cost_func_array, bounds_array, trench_migration_file, plate_velocity_file, no_net_rotation_file,
                               reformArray, trail_data, start_seeds, rotation_age_of_interest_age, data_array_labels_short,
                               ref_rot_longitude, ref_rot_latitude, ref_rot_angle,
                               seed_lons, seed_lats, ang_gaussian_array]

@@ -35,6 +35,7 @@ class ObjectiveFunction(object):
             PID,
             CPID,
             data_array,
+            weights_array,
             cost_func_array,
             bounds_array,
             trench_migration_file,
@@ -43,11 +44,6 @@ class ObjectiveFunction(object):
             ref_rotation_plate_id,
             reformArray,
             trail_data,
-            fracture_zone_weight,
-            net_rotation_weight,
-            trench_migration_weight,
-            hotspot_trails_weight,
-            plate_velocity_weight,
             use_trail_age_uncertainty,
             trail_age_uncertainty_ellipse,
             tm_method):
@@ -64,6 +60,7 @@ class ObjectiveFunction(object):
         self.PID = PID
         self.CPID = CPID
         self.data_array = data_array
+        self.weights_array = weights_array
         self.bounds_array = bounds_array
         self.cost_func_array = cost_func_array
         self.trench_migration_file = trench_migration_file
@@ -72,11 +69,6 @@ class ObjectiveFunction(object):
         self.ref_rotation_plate_id = ref_rotation_plate_id
         self.reformArray = reformArray
         self.trail_data = trail_data
-        self.fracture_zone_weight = fracture_zone_weight
-        self.net_rotation_weight = net_rotation_weight
-        self.trench_migration_weight = trench_migration_weight
-        self.hotspot_trails_weight = hotspot_trails_weight
-        self.plate_velocity_weight = plate_velocity_weight
         self.use_trail_age_uncertainty = use_trail_age_uncertainty
         self.trail_age_uncertainty_ellipse = trail_age_uncertainty_ellipse
         self.tm_method = tm_method
@@ -209,7 +201,7 @@ class ObjectiveFunction(object):
                     # Arbitrary penalty on cost function (might need some tuning)
                     fz_eval += 10000.0
 
-            fz_eval /= self.fracture_zone_weight
+            fz_eval /= self.weights_array[0]
 
 
 
@@ -245,7 +237,7 @@ class ObjectiveFunction(object):
                     # Arbitrary penalty on cost function (might need some tuning)
                     nr_eval += 10000.0
 
-            nr_eval /= self.net_rotation_weight
+            nr_eval /= self.weights_array[1]
 
 
 
@@ -282,30 +274,30 @@ class ObjectiveFunction(object):
             trench_percent_advance = 100. - trench_percent_retreat
 
             # Calculate cost
-            #tm_eval_1 = (trench_percent_advance * 10) / self.trench_migration_weight
-            #tm_eval_2 = (trench_sumAbsVel_n * 15) / self.trench_migration_weight
+            #tm_eval_1 = (trench_percent_advance * 10) / self.weights_array[2]
+            #tm_eval_2 = (trench_sumAbsVel_n * 15) / self.weights_array[2]
 
             # 1. trench percent advance + trench abs vel mean
             #tm_eval = (tm_eval_1 + tm_eval_2) / 2
 
             # 2. trench_abs_vel_mean
-            #tm_eval_2 = (np.sum(np.abs(trench_vel)) / len(trench_vel)) / self.trench_migration_weight
+            #tm_eval_2 = (np.sum(np.abs(trench_vel)) / len(trench_vel)) / self.weights_array[2]
 
             # 3. number of trenches in advance
-            #tm_eval_3 = (trench_numAdvancing * 2) / self.trench_migration_weight
+            #tm_eval_3 = (trench_numAdvancing * 2) / self.weights_array[2]
 
             # 4. abs median
-            #tm_eval_4 = np.median(abs(trench_vel)) / self.trench_migration_weight
+            #tm_eval_4 = np.median(abs(trench_vel)) / self.weights_array[2]
 
             # 5. standard deviation
-            #tm_eval_5 = np.std(trench_vel) / self.trench_migration_weight
+            #tm_eval_5 = np.std(trench_vel) / self.weights_array[2]
 
             # 6. variance
             #tm_stats = stats.describe(trench_vel)
-            #tm_eval = tm_stats.variance / self.trench_migration_weight
+            #tm_eval = tm_stats.variance / self.weights_array[2]
 
             # 7. trench absolute motion abs vel mean
-            #tm_eval_7 = ((np.sum(np.abs(trench_vel)) / len(trench_vel)) * 15) / self.trench_migration_weight
+            #tm_eval_7 = ((np.sum(np.abs(trench_vel)) / len(trench_vel)) * 15) / self.weights_array[2]
 
             #tm_eval = tm_eval_5
 
@@ -313,21 +305,21 @@ class ObjectiveFunction(object):
 
             #---- old ones
             # Minimise trench advance
-            # tm_eval_1 = ((trench_percent_advance * 10) / self.trench_migration_weight)**2
-            #tm_eval_1 = (trench_percent_advance * 10) / self.trench_migration_weight
+            # tm_eval_1 = ((trench_percent_advance * 10) / self.weights_array[2])**2
+            #tm_eval_1 = (trench_percent_advance * 10) / self.weights_array[2]
 
             # Minimise trench velocities
-            # tm_eval_2 = ((trench_sumAbsVel_n * 15) / self.trench_migration_weight)**2
-            #tm_eval_2 = (trench_sumAbsVel_n * 15) / self.trench_migration_weight
+            # tm_eval_2 = ((trench_sumAbsVel_n * 15) / self.weights_array[2])**2
+            #tm_eval_2 = (trench_sumAbsVel_n * 15) / self.weights_array[2]
 
             # Minimise trenches moving very fast (< or > 30)
-            #tm_eval_3 = (trench_numOver30 + trench_numLessNeg30) * self.trench_migration_weight
+            #tm_eval_3 = (trench_numOver30 + trench_numLessNeg30) * self.weights_array[2]
 
             # # V1 (Original)
             # tmp_tm_eval = ((trench_vel_SD * (trench_numRetreating * trench_sumAbsVel_n)) / \
             #                (trench_numTotal - (trench_numOver30 + trench_numLessNeg30)))
 
-            # tm_eval = tmp_tm_eval * self.trench_migration_weight
+            # tm_eval = tmp_tm_eval * self.weights_array[2]
 
             raise NotImplementedError("Trench migration cost no longer implemented using old convergence script - use new script instead")
 
@@ -376,7 +368,7 @@ class ObjectiveFunction(object):
                     # Arbitrary penalty on cost function (might need some tuning)
                     tm_eval += 10000.0
             
-            tm_eval /= self.trench_migration_weight
+            tm_eval /= self.weights_array[2]
 
 
         # Hotspot trail distance misfit
@@ -421,7 +413,7 @@ class ObjectiveFunction(object):
                     # Arbitrary penalty on cost function (might need some tuning)
                     hs_dist_eval += 10000.0
             
-            hs_dist_eval /= self.hotspot_trails_weight
+            hs_dist_eval /= self.weights_array[3]
  
 
 
@@ -475,7 +467,7 @@ class ObjectiveFunction(object):
                     # Arbitrary penalty on cost function (might need some tuning)
                     pv_eval += 10000.0
             
-            pv_eval /= self.plate_velocity_weight
+            pv_eval /= self.weights_array[4]
 
 
 
