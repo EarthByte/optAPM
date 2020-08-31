@@ -624,13 +624,13 @@ if __name__ == '__main__':
                     costs.append(xopt[j][1])
 
 
-                rmin = np.array(rmin)
-                rmean = np.array(rmean)
+                print('rmin:', rmin)
+                min_results.append(np.array(rmin[['Age', 'Ang', 'Lat', 'Lon', 'Minimum', 'Model']])[0])
+                mean_results.append(np.array(rmean[['Age', 'Ang', 'Lat', 'Lon', 'Minimum', 'Model']])[0])
 
-                min_results.append(rmin[0])
-                mean_results.append(rmean[0])
-
+                ang = min_results[-1][1]
                 plat, plon = geoTools.checkLatLon(min_results[-1][2], min_results[-1][3])
+                #print("plat/plon/ang:", plat, plon, ang)
 
 
                 # end_time = round(time.time() - start, 2)
@@ -646,8 +646,8 @@ if __name__ == '__main__':
                 # Update the optimised rotation file with result
 
                 optimised_rotation_ref_plate_rel_000 = pgp.FiniteRotation(
-                        (np.double(round(plat, 2)), np.double(round(plon, 2))),
-                        np.radians(np.double(round(min_results[-1][1], 2))))
+                        (plat, plon),
+                        math.radians(ang))
                 
                 optimised_rotation_updater.update_optimised_rotation(
                         optimised_rotation_ref_plate_rel_000,
