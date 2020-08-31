@@ -78,6 +78,7 @@ SCALAR_COVERAGE_SPREADING_ASYMMETRY = 'SpreadingAsymmetry'
 SCALAR_COVERAGE_SPREADING_RATE = 'SpreadingRate'
 SCALAR_COVERAGE_FULL_SPREADING_RATE = 'FullSpreadingRate'
 SCALAR_COVERAGE_SPREADING_DIRECTION = 'SpreadingDirection'
+SCALAR_COVERAGE_SPREADING_OBLIQUITY = 'SpreadingObliquity'
 SCALAR_COVERAGE_AGE = 'Age'
 
 # Scalar types.
@@ -85,6 +86,7 @@ SCALAR_TYPE_SPREADING_ASYMMETRY = pygplates.ScalarType.create_gpml(SCALAR_COVERA
 SCALAR_TYPE_SPREADING_RATE = pygplates.ScalarType.create_gpml(SCALAR_COVERAGE_SPREADING_RATE)
 SCALAR_TYPE_FULL_SPREADING_RATE = pygplates.ScalarType.create_gpml(SCALAR_COVERAGE_FULL_SPREADING_RATE)
 SCALAR_TYPE_SPREADING_DIRECTION = pygplates.ScalarType.create_gpml(SCALAR_COVERAGE_SPREADING_DIRECTION)
+SCALAR_TYPE_SPREADING_OBLIQUITY = pygplates.ScalarType.create_gpml(SCALAR_COVERAGE_SPREADING_OBLIQUITY)
 SCALAR_TYPE_AGE = pygplates.ScalarType.create_gpml(SCALAR_COVERAGE_AGE)
 
 # Known scalar coverages.
@@ -93,6 +95,7 @@ KNOWN_SCALAR_COVERAGES = set([
         SCALAR_COVERAGE_SPREADING_RATE,
         SCALAR_COVERAGE_FULL_SPREADING_RATE,
         SCALAR_COVERAGE_SPREADING_DIRECTION,
+        SCALAR_COVERAGE_SPREADING_OBLIQUITY,
         SCALAR_COVERAGE_AGE])
 
 
@@ -145,7 +148,7 @@ def _filter_plate_pairs(features, plate_pairs):
     while feature_index < len(features):
         feature = features[feature_index]
         
-        # Get left and right plate ids (if one form or another), otherwise remove the current feature.
+        # Get left and right plate ids (in one form or another), otherwise remove the current feature.
         left_right_plate_ids = _get_left_right_plate_ids(feature)
         if left_right_plate_ids:
             left_plate_id, right_plate_id = left_right_plate_ids
@@ -300,18 +303,20 @@ def _join_adjacent_features(features, distance_threshold_radians, print_debug_ou
 # keeps matching points latitude aligned (in coordinate system of stage rotation),
 # except for the non-overlapping latitude regions at the ends.
 #
+# The stage rotation pole should be in the present day reference frame (since young/old polylines are present day).
+#
 # Also 'stage_pole_angle_radians' must not be zero (identity rotation).
 # 
 def _calc_spreading_asymmetries(
         young_polyline,
         old_polyline,
-        stage_rotation_pole,
+        stage_rotation_pole_for_present_day_geometry,
         stage_pole_angle_radians):
     
     asymmetries = []
     
     # Store pole as a pygplates.Vector3D instead of a pygplates.PointOnSphere.
-    stage_rotation_vector = pygplates.Vector3D(stage_rotation_pole.to_xyz())
+    stage_rotation_vector_for_present_day_geometry = pygplates.Vector3D(stage_rotation_pole_for_present_day_geometry.to_xyz())
     abs_stage_pole_angle_radians = abs(stage_pole_angle_radians)
     
     for point_index in range(len(young_polyline)):
@@ -332,12 +337,12 @@ def _calc_spreading_asymmetries(
         # pygplates.PolylineOnSphere.rotation_interpolate().
         
         young_vector_perp_pole = pygplates.Vector3D.cross(
-                pygplates.Vector3D.cross(stage_rotation_vector, young_polyline[point_index].to_xyz()),
-                stage_rotation_vector)
+                pygplates.Vector3D.cross(stage_rotation_vector_for_present_day_geometry, young_polyline[point_index].to_xyz()),
+                stage_rotation_vector_for_present_day_geometry)
         
         old_vector_perp_pole = pygplates.Vector3D.cross(
-                pygplates.Vector3D.cross(stage_rotation_vector, old_polyline[point_index].to_xyz()),
-                stage_rotation_vector)
+                pygplates.Vector3D.cross(stage_rotation_vector_for_present_day_geometry, old_polyline[point_index].to_xyz()),
+                stage_rotation_vector_for_present_day_geometry)
         
         try:
             angle_between_young_and_old_points = pygplates.Vector3D.angle_between(
@@ -369,15 +374,20 @@ def _calc_spreading_asymmetries(
 # If 'output_scalar_types' is empty then 'spreading_asymmetries' is ignored.
 #
 # If 'tessellate_threshold_radians' is None then no tessellation is performed.
+#
+# The stage rotation should be in the present day reference frame (since interpolated polyline is present day).
 # 
 def _add_tessellated_scalar_coverages(
         interpolated_polyline,
         tessellate_threshold_radians,
         output_scalar_types,
         spreading_asymmetries,
-        stage_rotation,
+        stage_rotation_for_present_day_geometry,
+        inverse_present_day_rotation,
         interpolated_time,
-        stage_rotation_time_interval):
+        stage_rotation_time_interval,
+        rotation_model,
+        interpolated_isochron_plate_id):
     
     # If not outputting scalar coverages then just tessellate (if requested) and return.
     if not output_scalar_types:
@@ -438,29 +448,59 @@ def _add_tessellated_scalar_coverages(
     if SCALAR_TYPE_SPREADING_ASYMMETRY in output_scalar_types:
         scalar_coverages[SCALAR_TYPE_SPREADING_ASYMMETRY] = spreading_asymmetries
     
-    # Output spreading rate/direction scalar coverage (if requested) - per-point spreading rate/direction values.
+    # Output spreading rate/direction/obliquity scalar coverage (if requested) - per-point spreading rate/direction values.
     if (SCALAR_TYPE_SPREADING_RATE in output_scalar_types or
         SCALAR_TYPE_FULL_SPREADING_RATE in output_scalar_types or
-        SCALAR_TYPE_SPREADING_DIRECTION in output_scalar_types):
+        SCALAR_TYPE_SPREADING_DIRECTION in output_scalar_types or
+        SCALAR_TYPE_SPREADING_OBLIQUITY in output_scalar_types):
         
         interpolated_points = interpolated_polyline.get_points()
         
         # Calculate full spreading velocities at the points of the interpolated/tessellated polyline.
-        full_spreading_velocity_vectors = pygplates.calculate_velocities(
+        #
+        # First we calculate velocities at present day using the present day polyline point locations and the
+        # stage rotation in the present day reference frame.
+        full_spreading_velocity_vectors_at_present_day = pygplates.calculate_velocities(
                 interpolated_points,
-                stage_rotation,
+                stage_rotation_for_present_day_geometry,
                 stage_rotation_time_interval)
-        
+        #
+        # Then reconstruct the points and velocities from present day to their reconstructed positions/directions at the
+        # interpolated isochron's birth time (time of crustal accretion) since we're recording a snapshot of crustal accretion.
+        #
+        # A small issue is there might be a non-zero finite rotation at present day, so we cannot assume the un-reconstructed
+        # isochron is the same as the isochron reconstructed to present day. We're working with isochron geometry at present day
+        # so we need to reverse reconstruct it to its un-reconstructed position 'inverse[R(0, A->Plate)] * geometry_present_day'
+        # before we can reconstruct it to its begin time (time of crustal accretion).
+        #
+        #   geometry_moving_plate = R(0->begin_time, A->Plate) * geometry_present_day
+        #                         = R(begin_time, A->Plate) * inverse[R(0, A->Plate)] * geometry_present_day
+        #
+        # ...where '0->t' means reconstructing from its "present day" (not un-reconstructed) position to time 't'.
+        #
+        # Note: We can't just calculate 'R(0->begin_time, A->Plate)' in one call to 'rotation_model.get_rotation(interpolated_time, interpolated_isochron_plate_id, 0)'
+        # because explicitly setting the 'from_time' argument to '0' results in pyGPlates (versions < 0.27) assuming that the present day rotation is zero
+        # (and so it essentially just calculates 'R(begin_time, A->Plate)' instead of 'R(begin_time, A->Plate) * inverse[R(0, A->Plate)]').
+        # So to ensure the same results for pyGPlates versions before and after 0.27, we'll exclude the 'from_time' argument for 'R(begin_time, A->Plate)'
+        # so versions >= 0.27 don't calculate 'R(0->begin_time, A->Plate)' and explicitly include 'inverse[R(0, A->Plate)]' so that versions < 0.27 are accounted for.
+        # 
+        #
+        interpolated_isochron_reconstruction = rotation_model.get_rotation(interpolated_time, interpolated_isochron_plate_id) * inverse_present_day_rotation
+        full_spreading_velocity_vectors = [interpolated_isochron_reconstruction * velocity
+            for velocity in full_spreading_velocity_vectors_at_present_day]
+        reconstructed_interpolated_points = [interpolated_isochron_reconstruction * point
+            for point in interpolated_points]
+
         # Convert global 3D velocity vectors to local (magnitude, azimuth, inclination) tuples (one tuple per point).
         full_spreading_velocities = pygplates.LocalCartesian.convert_from_geocentric_to_magnitude_azimuth_inclination(
-                interpolated_points,
+                reconstructed_interpolated_points,
                 full_spreading_velocity_vectors)
         
         # Extract the 'magnitude' element of each velocity tuple (if requested) and adjust for asymmetry.
         if SCALAR_TYPE_SPREADING_RATE in output_scalar_types:
             # Convert asymmetry from range [-1,1] to [0,1] and multiply by the full spreading velocity.
             spreading_rates = [0.5 * (spreading_asymmetries[point_index] + 1) * full_spreading_velocities[point_index][0]
-                    for point_index in range(len(interpolated_points))]
+                    for point_index in range(len(full_spreading_velocities))]
             scalar_coverages[SCALAR_TYPE_SPREADING_RATE] = spreading_rates
         
         # Extract the 'magnitude' element of each velocity tuple (if requested).
@@ -470,8 +510,108 @@ def _add_tessellated_scalar_coverages(
         
         # Extract the 'azimuth' element of each velocity tuple (if requested).
         if SCALAR_TYPE_SPREADING_DIRECTION in output_scalar_types:
-            spreading_directions = [math.degrees(velocity[1]) for velocity in full_spreading_velocities]
+            spreading_directions = []
+            for velocity in full_spreading_velocities:
+                spreading_direction = math.degrees(velocity[1])
+                # Since spreading at crustal accretion is in two opposite directions,
+                # we pick the direction with the smaller azimuth (an azimuth is in the range [0, 360]).
+                # For example, for an azimuth of 225 and its opposite (225 - 180 = 45) we choose 45.
+                if spreading_direction > 180:
+                    spreading_direction -= 180
+                spreading_directions.append(spreading_direction)
             scalar_coverages[SCALAR_TYPE_SPREADING_DIRECTION] = spreading_directions
+        
+        # Calculate deviation of spreading direction from isochron normal.
+        if SCALAR_TYPE_SPREADING_OBLIQUITY in output_scalar_types:
+            spreading_obliquities = []
+
+            # First calculate a normal for each arc segment (between two adjacent points)
+            # in the interpolated polyline.
+            segment_normals = []
+            for segment in interpolated_polyline.get_segments():
+                if segment.is_zero_length():
+                    segment_normal = None
+                else:
+                    segment_normal = segment.get_great_circle_normal()
+                
+                segment_normals.append(segment_normal)
+            
+            # For each isochron point calculate a spreading obliquity for its two adjoining arc segment normals and then
+            # average the two obliquities (if both are ridges, ie, less than 45 degrees), or take the one obliquity that
+            # is a ridge (if other is transform), or both are transforms so hard-wire obliquity to 90 degrees.
+            num_points = len(interpolated_points)
+            for point_index in range(num_points):
+                # Normal of segment before current point.
+                if point_index > 0:
+                    prev_normal = segment_normals[point_index - 1]
+                else:
+                    prev_normal = None
+                
+                # Normal of segment after current point.
+                if point_index < num_points - 1:
+                    next_normal = segment_normals[point_index]
+                else:
+                    next_normal = None
+                
+                #
+                # The angle between the velocity and normal vectors is in the range [0, 180].
+                #
+                # Obliquity is how much the small circle of spreading rotation pole (-/+ velocity_vector)
+                # deviates from the perpendicular line at the isochron point (-/+ normal).
+                # This is the minimum deviation of 'velocity_vector' and '-velocity_vector' from 'normal' and '-normal'.
+                # Obliquity angle is in range [0, 90].
+                #
+
+                velocity_vector = full_spreading_velocity_vectors_at_present_day[point_index]
+
+                # Calculate spreading obliquity for previous normal. If there is no previous normal or
+                # obliquity is larger than 45 degrees then set to None.
+                if prev_normal:
+                    # Range [0,180].
+                    spreading_obliquity_for_prev_normal = math.degrees(pygplates.Vector3D.angle_between(
+                        velocity_vector,
+                        prev_normal))
+                    # Range [0,90].
+                    if spreading_obliquity_for_prev_normal > 90:
+                        spreading_obliquity_for_prev_normal = 180 - spreading_obliquity_for_prev_normal
+                    # Exclude transform sections (obliquity larger than 45 degrees).
+                    if spreading_obliquity_for_prev_normal > 45:
+                        spreading_obliquity_for_prev_normal = None
+                else:
+                    spreading_obliquity_for_prev_normal = None
+                
+                # Calculate spreading obliquity for next normal. If there is no next normal or
+                # obliquity is larger than 45 degrees then set to None.
+                if next_normal:
+                    # Range [0,180].
+                    spreading_obliquity_for_next_normal = math.degrees(pygplates.Vector3D.angle_between(
+                        velocity_vector,
+                        next_normal))
+                    # Range [0,90].
+                    if spreading_obliquity_for_next_normal > 90:
+                        spreading_obliquity_for_next_normal = 180 - spreading_obliquity_for_next_normal
+                    # Exclude transform sections (obliquity larger than 45 degrees).
+                    if spreading_obliquity_for_next_normal > 45:
+                        spreading_obliquity_for_next_normal = None
+                else:
+                    spreading_obliquity_for_next_normal = None
+                
+                if (spreading_obliquity_for_prev_normal is not None and
+                    spreading_obliquity_for_next_normal is not None):
+                    # Both previous and next normals have ridge-like spreading obliquities.
+                    spreading_obliquity = 0.5 * (spreading_obliquity_for_prev_normal + spreading_obliquity_for_next_normal)
+                elif spreading_obliquity_for_prev_normal is not None:
+                    # Only previous normal has ridge-like spreading obliquity.
+                    spreading_obliquity = spreading_obliquity_for_prev_normal
+                elif spreading_obliquity_for_next_normal is not None:
+                    # Only next normal has ridge-like spreading obliquity.
+                    spreading_obliquity = spreading_obliquity_for_next_normal
+                else:
+                    # Is a transform, so hard-wire to 90 degrees.
+                    spreading_obliquity = 90
+
+                spreading_obliquities.append(spreading_obliquity)
+            scalar_coverages[SCALAR_TYPE_SPREADING_OBLIQUITY] = spreading_obliquities
     
     # Output age scalar coverage (if requested) - per-point age values.
     if SCALAR_TYPE_AGE in output_scalar_types:
@@ -609,7 +749,7 @@ def join_adjacent_features_with_same_type_and_begin_time_and_plate_ids(features,
     for feature in features:
         begin_time, end_time = feature.get_valid_time()
         
-        # Get left and right plate ids (if one form or another), otherwise skip the current feature.
+        # Get left and right plate ids (in one form or another), otherwise skip the current feature.
         left_right_plate_ids = _get_left_right_plate_ids(feature)
         if not left_right_plate_ids:
             if print_debug_output >= 1:
@@ -629,7 +769,7 @@ def join_adjacent_features_with_same_type_and_begin_time_and_plate_ids(features,
     joined_features = []
     
     # Iterate over the groups (lists) of features to join and attempt to join.
-    for join_feature_group in join_feature_groups.itervalues():
+    for join_feature_group in join_feature_groups.values():
         # Join any adjacent features in the group - this potentially modifies 'join_feature_group'.
         _remove_features_with_duplicate_geometries(join_feature_group)
         joined_features.extend(
@@ -708,7 +848,7 @@ def interpolate_isochrons(
              extensions) does not support reading (when filenames specified)
     
     
-    The following optional keyword arguments are supported by *kwargs*:\n"
+    The following optional keyword arguments are supported by *kwargs*:
 
     +-------------------------------------+-------+---------+-----------------------------------------------------------------------------+
     | Name                                | Type  | Default | Description                                                                 |
@@ -726,7 +866,8 @@ def interpolate_isochrons(
     +-------------------------------------+-------+---------+-----------------------------------------------------------------------------+
     | output_scalar_spreading_asymmetry   | bool  | False   | Store spreading asymmetry at each point in each interpolated isochron.      |
     |                                     |       |         | This is in the range [-1,1] where 0 represents half-stage rotation,         |
-    |                                     |       |         | 1 represents full-stage rotation and -1 represents zero stage rotation.     |
+    |                                     |       |         | -1 represents spreading only on the conjugate flank and                     |
+    |                                     |       |         | +1 represents spreading only on the flank containing the isochron.          |
     |                                     |       |         | This will stored under the 'gpml:SpreadingAsymmetry' scalar type.           |
     +-------------------------------------+-------+---------+-----------------------------------------------------------------------------+
     | output_scalar_spreading_rate        | bool  | False   | Store spreading rate at each point in each interpolated isochron.           |
@@ -740,8 +881,16 @@ def interpolate_isochrons(
     |                                     |       |         | This will stored under the 'gpml:SpreadingRate' scalar type.                |
     +-------------------------------------+-------+---------+-----------------------------------------------------------------------------+
     | output_scalar_spreading_direction   | bool  | False   | Store spreading direction at each point in each interpolated isochron.      |
-    |                                     |       |         | This is the angle (in degrees) clockwise (East-wise) from North (0 to 360). |
+    |                                     |       |         | This is an angle (in degrees) clockwise (East-wise) from North (0 to 180).  |
+    |                                     |       |         | The lowest azimuth of the two opposite-pointing directions of spreading     |
+    |                                     |       |         | at the time of crustal accretion.                                           |
     |                                     |       |         | This will stored under the 'gpml:SpreadingDirection' scalar type.           |
+    +-------------------------------------+-------+---------+-----------------------------------------------------------------------------+
+    | output_scalar_spreading_obliquity   | bool  | False   | Store spreading obliquity at each point in each interpolated isochron.      |
+    |                                     |       |         | This is an angle from 0 to 90 degrees.                                      |
+    |                                     |       |         | The amount that the small circle of spreading rotation pole deviates from   |
+    |                                     |       |         | the perpendicular line at the ridge point at the time of crustal accretion. |
+    |                                     |       |         | This will stored under the 'gpml:SpreadingObliquity' scalar type.           |
     +-------------------------------------+-------+---------+-----------------------------------------------------------------------------+
     | output_scalar_age                   | bool  | False   | Store age at each point in each interpolated isochron.                      |
     |                                     |       |         | This is the interpolated isochron's age (in Ma). It is constant for all     |
@@ -814,6 +963,8 @@ def interpolate_isochrons(
         output_scalar_types.add(SCALAR_TYPE_FULL_SPREADING_RATE)
     if kwargs.pop('output_scalar_spreading_direction', False):
         output_scalar_types.add(SCALAR_TYPE_SPREADING_DIRECTION)
+    if kwargs.pop('output_scalar_spreading_obliquity', False):
+        output_scalar_types.add(SCALAR_TYPE_SPREADING_OBLIQUITY)
     if kwargs.pop('output_scalar_age', False):
         output_scalar_types.add(SCALAR_TYPE_AGE)
     # Raise error if any unknown keyword arguments.
@@ -839,7 +990,7 @@ def interpolate_isochrons(
     
     # Filter the features if requested.
     if plate_pairs is not None:
-        _filter_plate_pairs(isochron_cob_ridge_features, plate_pairs);
+        _filter_plate_pairs(isochron_cob_ridge_features, plate_pairs)
     
     joined_isochron_cob_ridge_features = join_adjacent_features_with_same_type_and_begin_time_and_plate_ids(
             isochron_cob_ridge_features,
@@ -856,7 +1007,7 @@ def interpolate_isochrons(
     # Group features by conjugate plate ID pairs (plate pair flank).
     feature_groups = {}
     for feature in joined_isochron_cob_ridge_features:
-        # Get left and right plate ids (if one form or another), otherwise skip the current feature.
+        # Get left and right plate ids (in one form or another), otherwise skip the current feature.
         left_right_plate_ids = _get_left_right_plate_ids(feature)
         if not left_right_plate_ids:
             # We shouldn't get here since join_adjacent_features_with_same_type_and_begin_time_and_plate_ids()
@@ -880,13 +1031,13 @@ def interpolate_isochrons(
     # Sort the features in each (plate pair) group by begin time.
     # If begin times are same then sort such that COB features go last since they
     # terminate the sequence of isochrons on the current flank.
-    for feature_group in feature_groups.itervalues():
+    for feature_group in feature_groups.values():
         feature_group.sort(key = lambda feature: (feature.get_valid_time()[0], feature.get_feature_type()==COB_FEATURE_TYPE))
     
     interpolated_features = []
     
     # Iterate over the feature groups (plate pair flanks).
-    for (left_plate_id, right_plate_id), feature_group in feature_groups.iteritems():
+    for (left_plate_id, right_plate_id), feature_group in feature_groups.items():
         if print_debug_output >= 1:
             print(' Interpolating left plate {0}, right plate {1}'.format(left_plate_id, right_plate_id))
             if print_debug_output >= 2:
@@ -899,7 +1050,7 @@ def interpolate_isochrons(
         #
         # Interpolated isochrons have a reconstruction plate ID equal to the left plate ID.
         # We need to use the plate ID assigned to the interpolated isochrons since they'll use that in turn to reconstruct.
-        inverse_present_day_rotation = rotation_model.get_rotation(0, left_plate_id).get_inverse()
+        inverse_present_day_rotation_for_interpolated_isochrons = rotation_model.get_rotation(0, left_plate_id).get_inverse()
         
         # Iterate over the flank's features progressing from oldest time to youngest time.
         # Note that the features have already been sorted by begin time.
@@ -929,9 +1080,9 @@ def interpolate_isochrons(
             #
             # We can't just use the left plate ID because each mid-ocean ridge is added to its two adjacent flanks
             # with swapped left/right plates - so we should use its reconstruction plate ID instead.
-            present_day_rotation = rotation_model.get_rotation(0, old_feature.get_reconstruction_plate_id())
+            present_day_rotation_for_old_feature = rotation_model.get_rotation(0, old_feature.get_reconstruction_plate_id())
             # Note that we don't use 'pygplates.reconstruct' since that excludes features that don't exist at present day.
-            old_feature_geoms = [present_day_rotation * geom for geom in old_feature_geoms]
+            old_feature_geoms = [present_day_rotation_for_old_feature * geom for geom in old_feature_geoms]
             
             # Find the next feature that has a smaller time value and is not a COB.
             young_feature_index = old_feature_index - 1
@@ -1016,13 +1167,52 @@ def interpolate_isochrons(
                     # For more detail see:
                     #   http://www.gplates.org/docs/pygplates/sample-code/pygplates_split_isochron_into_ridges_and_transforms.html
                     #
-                    stage_pole_reference_frame = rotation_model.get_rotation(
-                            old_time, left_plate_id, 0, anchor_plate_id=right_plate_id)
-                    stage_rotation_pole = stage_pole_reference_frame.get_inverse() * stage_rotation_pole
-                    
+                    # However, there's a slight complication because some plates have non-zero finite rotations at present day (0Ma).
+                    # This means the geometry stored in the feature and the geometry reconstructed to present day are in different.
+                    # Normally the geometry in the feature should be in its present day position, but we'll be lenient since that's not always the case.
+                    #
+                    #   geometry_present_day = R(0, A->Left) * geometry_in_feature
+                    #    geometry_in_feature = inverse[R(0, A->Left)] * geometry_present_day
+                    #
+                    # ...where 'R(0, A->Left)' means reconstructing from its "un-reconstructed" position (ie, not present day) to present day.
+                    #
+                    # So now the above equation looks like:
+                    #
+                    #   geometry_moving_plate = R(young, A->Left) * geometry_in_feature
+                    #                         = R(young, A->Right) * R(young, Right->Left) * geometry_in_feature
+                    #                         = R(young, A->Right) * R(old->young, Right->Left) * R(old, Right->Left) * geometry_in_feature
+                    #                         = R(young, A->Right) * R(old->young, Right->Left) * R(old, Right->Left) * inverse[R(0, A->Left)] * geometry_present_day
+                    #
+                    # ...so the present day geometry needs to be rotated by 'R(old, Right->Left) * inverse[R(0, A->Left)]' before the stage rotation
+                    # 'R(old->young, Right->Left)' can be applied to it. Alternatively we can reverse rotate the stage pole (of the stage rotation) by
+                    # the inverse of that so it can be applied to the present day geometry.
+                    #
+                    to_stage_pole_reference_frame_for_present_day_geometry = rotation_model.get_rotation(
+                            old_time, left_plate_id, anchor_plate_id=right_plate_id) * inverse_present_day_rotation_for_interpolated_isochrons
+                    from_stage_pole_reference_frame_for_present_day_geometry = to_stage_pole_reference_frame_for_present_day_geometry.get_inverse()
+                    stage_rotation_pole_for_present_day_geometry = from_stage_pole_reference_frame_for_present_day_geometry * stage_rotation_pole
                     if print_debug_output >= 3:
-                        print('    Stage pole (lat,lon): {0}'.format(stage_rotation_pole.to_lat_lon()))
-                    
+                        print('    Stage pole (lat,lon) for present day geometry: {0}'.format(stage_rotation_pole_for_present_day_geometry.to_lat_lon()))
+
+                    #
+                    # Also the stage rotation gets applied to present day isochron geometries when calculating velocities (well, before being reconstructed
+                    # to the crustal accretion time) so it needs to work with present day geometries.
+                    # Applied to an interpolated isochron with time of appearance 'begin_time' (in range [old, young]):
+                    #
+                    #   geometry_moving_plate = R(begin_time, A->Left) * geometry_in_feature
+                    #                         = R(begin_time, A->Right) * R(begin_time, Right->Left) * geometry_in_feature
+                    #                         = R(begin_time, A->Right) * R(old->begin_time, Right->Left) * R(old, Right->Left) * geometry_in_feature
+                    #                         = R(begin_time, A->Right) * R(young->begin_time, Right->Left) * R(old->young, Right->Left) * R(old, Right->Left) * geometry_in_feature
+                    #                         = R(begin_time, A->Right) * R(young->begin_time, Right->Left) * R(old->young, Right->Left) * R(old, Right->Left) * inverse[R(0, A->Left)] * geometry_present_day
+                    #
+                    # ...so we need to rotate present day geometry by 'R(old, Right->Left) * inverse[R(0, A->Left)]' before the stage rotation 'R(old->young, Right->Left)'
+                    # can be applied to it. Then the stage rotation is applied. And finally we reverse-rotate back again.
+                    # These three operations can be combined into a single stage rotation:
+                    #
+                    #   stage_rotation_for_present_day = inverse[R(old, Right->Left) * inverse[R(0, A->Left)]] * stage_rotation * R(old, Right->Left) * inverse[R(0, A->Left)]
+                    #
+                    stage_rotation_for_present_day_geometry = from_stage_pole_reference_frame_for_present_day_geometry * stage_rotation * to_stage_pole_reference_frame_for_present_day_geometry
+                     
                     if using_interpolation_times:
                         # Create a list of interpolation ratios where:
                         #      0 <= (interpolation_time - young_time) / (old_time - young_time) < 1
@@ -1061,9 +1251,9 @@ def interpolate_isochrons(
                     #
                     # We can't just use the left plate ID because each mid-ocean ridge is added to its two adjacent flanks
                     # with swapped left/right plates - so we should use its reconstruction plate ID instead.
-                    present_day_rotation = rotation_model.get_rotation(0, young_feature.get_reconstruction_plate_id())
+                    present_day_rotation_for_young_feature = rotation_model.get_rotation(0, young_feature.get_reconstruction_plate_id())
                     # Note that we don't use 'pygplates.reconstruct' since that excludes features that don't exist at present day.
-                    young_feature_geoms = [present_day_rotation * geom for geom in young_feature_geoms]
+                    young_feature_geoms = [present_day_rotation_for_young_feature * geom for geom in young_feature_geoms]
                     
                     # Iterate over all old_feature/young_feature geometry pairs.
                     for old_feature_geom in old_feature_geoms:
@@ -1115,7 +1305,7 @@ def interpolate_isochrons(
                                 interpolated_polylines = pygplates.PolylineOnSphere.rotation_interpolate(
                                         young_feature_geom,
                                         old_feature_geom,
-                                        stage_rotation_pole,
+                                        stage_rotation_pole_for_present_day_geometry,
                                         pygplates_interpolate_parameter,
                                         minimum_latitude_overlap_radians,
                                         maximum_latitude_non_overlap_radians,
@@ -1156,7 +1346,7 @@ def interpolate_isochrons(
                                 spreading_asymmetries = _calc_spreading_asymmetries(
                                         interpolated_polylines[0],
                                         interpolated_polylines[-1],
-                                        stage_rotation_pole,
+                                        stage_rotation_pole_for_present_day_geometry,
                                         stage_pole_angle_radians)
                                 
                                 # If we added two extra interpolated polylines (young and old) to
@@ -1190,9 +1380,12 @@ def interpolate_isochrons(
                                             tessellate_threshold_radians,
                                             output_scalar_types,
                                             spreading_asymmetries,
-                                            stage_rotation,
+                                            stage_rotation_for_present_day_geometry,
+                                            inverse_present_day_rotation_for_interpolated_isochrons,
                                             interpolation_time,
-                                            old_time - young_time)
+                                            old_time - young_time,
+                                            rotation_model,
+                                            left_plate_id)
                                     
                                     # Some features had non-zero finite rotations at present day (0Ma).
                                     # To account for this we reconstructed the feature to present day.
@@ -1202,9 +1395,9 @@ def interpolate_isochrons(
                                     # they should use the actual (reconstructed) 0Ma positions.
                                     if output_scalar_types:
                                         coverage_polyline, coverage_scalars = interpolated_polyline
-                                        present_day_feature_geometry = (inverse_present_day_rotation * coverage_polyline, coverage_scalars)
+                                        present_day_feature_geometry = (inverse_present_day_rotation_for_interpolated_isochrons * coverage_polyline, coverage_scalars)
                                     else:
-                                        present_day_feature_geometry = inverse_present_day_rotation * interpolated_polyline
+                                        present_day_feature_geometry = inverse_present_day_rotation_for_interpolated_isochrons * interpolated_polyline
     
                                     # Finally we can create an interpolated isochron.
                                     interpolated_feature = pygplates.Feature.create_reconstructable_feature(
@@ -1252,9 +1445,12 @@ def interpolate_isochrons(
                                             tessellate_threshold_radians,
                                             output_scalar_types,
                                             spreading_asymmetries,
-                                            stage_rotation,
+                                            stage_rotation_for_present_day_geometry,
+                                            inverse_present_day_rotation_for_interpolated_isochrons,
                                             interpolation_time,
-                                            old_time - young_time)
+                                            old_time - young_time,
+                                            rotation_model,
+                                            left_plate_id)
                                     
                                     # Some features had non-zero finite rotations at present day (0Ma).
                                     # To account for this we reconstructed the feature to present day.
@@ -1264,9 +1460,9 @@ def interpolate_isochrons(
                                     # they should use the actual (reconstructed) 0Ma positions.
                                     if output_scalar_types:
                                         coverage_polyline, coverage_scalars = interpolated_polyline
-                                        present_day_feature_geometry = (inverse_present_day_rotation * coverage_polyline, coverage_scalars)
+                                        present_day_feature_geometry = (inverse_present_day_rotation_for_interpolated_isochrons * coverage_polyline, coverage_scalars)
                                     else:
-                                        present_day_feature_geometry = inverse_present_day_rotation * interpolated_polyline
+                                        present_day_feature_geometry = inverse_present_day_rotation_for_interpolated_isochrons * interpolated_polyline
                                     
                                     # Finally we can create an interpolated isochron.
                                     interpolated_feature = pygplates.Feature.create_reconstructable_feature(
@@ -1336,21 +1532,27 @@ if __name__ == "__main__":
             metavar='scalar_type',
             help='Calculate scalar values at each point in each interpolated isochron in the output data. '
                 'NOTE: Only applies when saving to ".gpml" format or saving/exporting to ".xy" format. '
-                'Supported types of scalar data are "{0}", "{1}", "{2}", "{3}" and "{4}". '
+                'Supported types of scalar data are "{0}", "{1}", "{2}", "{3}", "{4}" and "{5}". '
                 'When saving/exporting to ".xy" format, the order of these types determines the order in which the '
-                'associated scalar values are written to each line of ".xy" file (eg, specifing "{4} {1}" generates '
+                'associated scalar values are written to each line of ".xy" file (eg, specifing "{5} {1}" generates '
                 'a line such as '
                 '"10 20 40 5" where longitude=10, latitude=20, age=40Ma and spreading_rate=5Kms/My). '
                 'When saving to ".gpml" format, the order is not important and the scalar values can be '
                 'visualised/coloured in the latest GPlates. '
-                '{0} is in the range [-1,1] (when saving to ".gpml") or [0,100] (when saving/exporting to ".xy"), '
-                '{1} is in Kms/My, {2} is in Kms/My, '
-                '{3} is the angle (in degrees) clockwise (East-wise) from North (0 to 360), '
-                'and {4} is in Ma.'.format(
+                '"{0}" is in the range [-1,1] (when saving to ".gpml") or [0,100] (when saving/exporting to ".xy") where '
+                '-1 represents spreading only on the conjugate flank and +1 represents spreading only on the flank containing the isochron. '
+                '"{1}" is the spreading rate relative to the mid-ocean ridge (taking into account asymmetry) in Kms/My. '
+                '"{2}" is the spreading rate relative to the conjugate plate in Kms/My. '
+                '"{3}" is an angle clockwise (East-wise) from North (0 to 180 degrees) of the lowest azimuth of the '
+                'two opposite-pointing directions of spreading at the time of crustal accretion. '
+                '"{4}" is an angle from 0 to 90 degrees that the small circle of spreading rotation pole deviates from '
+                'the perpendicular line at the ridge point at the time of crustal accretion. And '
+                '"{5}" is the interpolated isochron age in Ma.'.format(
                         SCALAR_COVERAGE_SPREADING_ASYMMETRY,
                         SCALAR_COVERAGE_SPREADING_RATE,
                         SCALAR_COVERAGE_FULL_SPREADING_RATE,
                         SCALAR_COVERAGE_SPREADING_DIRECTION,
+                        SCALAR_COVERAGE_SPREADING_OBLIQUITY,
                         SCALAR_COVERAGE_AGE))
     parser.add_argument('-a', '--anchor', type=int, default=0,
             dest='anchor_plate_id',
@@ -1365,7 +1567,7 @@ if __name__ == "__main__":
             
             try:
                 # Convert strings to integers.
-                integer_values = map(int, values)
+                integer_values = list(map(int, values))
                 list_of_plate_pair_tuples = zip(integer_values[::2], integer_values[1::2])
             except ValueError:
                 raise argparse.ArgumentTypeError("encountered a plate id that is not an integer")
@@ -1486,6 +1688,7 @@ if __name__ == "__main__":
         interpolate_isochrons_kwargs['output_scalar_spreading_rate'] = (SCALAR_COVERAGE_SPREADING_RATE in args.scalar_coverages)
         interpolate_isochrons_kwargs['output_scalar_full_spreading_rate'] = (SCALAR_COVERAGE_FULL_SPREADING_RATE in args.scalar_coverages)
         interpolate_isochrons_kwargs['output_scalar_spreading_direction'] = (SCALAR_COVERAGE_SPREADING_DIRECTION in args.scalar_coverages)
+        interpolate_isochrons_kwargs['output_scalar_spreading_obliquity'] = (SCALAR_COVERAGE_SPREADING_OBLIQUITY in args.scalar_coverages)
         interpolate_isochrons_kwargs['output_scalar_age'] = (SCALAR_COVERAGE_AGE in args.scalar_coverages)
     
     if args.print_debug_output >= 1:
