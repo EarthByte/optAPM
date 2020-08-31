@@ -47,7 +47,7 @@ class ModelSetup():
     @staticmethod
     def dataLoaderHelp():
 
-        print textwrap.dedent("""
+        print(textwrap.dedent("""
             Data Loader
 
             Loads all required data for optimisation routine.
@@ -71,7 +71,7 @@ class ModelSetup():
                 hst_file : GeoJSON hotspot trail data. Relative path to datadir.
                 hs_file : GeoJSON hotspot location data. Relative path to datadir.
 
-            """)
+            """))
 
 
     @staticmethod
@@ -142,8 +142,8 @@ class ModelSetup():
                 features_ri, RidgeFile_subset, features_iso, IsochronFile_subset, features_isocob, IsoCOBFile_subset,
                 hs_trails, hotspots, ref_rotation_model, ref_rotation_file, interpolated_hotspot_data]
 
-        print "- Data loaded"
-        print " "
+        print("- Data loaded")
+        print(" ")
 
         return data
 
@@ -153,7 +153,7 @@ class ModelSetup():
     @staticmethod
     def modelParametersHelp():
 
-        print textwrap.dedent("""
+        print(textwrap.dedent("""
             Model Parameters
 
             Sets all user-selected parameters for the mode run
@@ -179,7 +179,7 @@ class ModelSetup():
             enable_hotspot_trails : Boolean
             enable_plate_velocity : Boolean
 
-            """)
+            """))
 
 
     @staticmethod
@@ -228,7 +228,7 @@ class ModelSetup():
             interpolated_hotspot_trails,
             tm_method) = params[:39]
 
-        #print fz_weight, nr_weight, tm_weight, hs_weight, pv_weight
+        #print(fz_weight, nr_weight, tm_weight, hs_weight, pv_weight)
 
 
         # Set rotation age of interest
@@ -252,44 +252,44 @@ class ModelSetup():
 
             # chains including the pacific
             #include_chains = ['Reunion', 'Louisville', 'Tristan', 'St_Helena', 'Foundation', 'Samoa', 'Cobb', 'Caroline', 'Tasmantid']
-            #print "Hotspot chains used:", str(include_chains)
+            #print("Hotspot chains used:", str(include_chains))
 
         #else:
 
             # chains excluding the pacific
             #include_chains = ['Reunion', 'Tristan', 'St_Helena', 'Tasmantid']
-            #print "Hotspot chains used:", str(include_chains)
+            #print("Hotspot chains used:", str(include_chains))
 
-        print "Optimisation parameters:"
-        print " "
-        print "Data constraints:"
+        print("Optimisation parameters:")
+        print(" ")
+        print("Data constraints:")
 
-        for i in xrange(0, len(data_array)):
+        for i in range(0, len(data_array)):
 
             if data_array[i] == True:
 
-                print "- " + data_array_labels[i] + ": weight(" + str(weights_array[i]) + ")"
+                print("- " + data_array_labels[i] + ": weight(" + str(weights_array[i]) + ")")
                 
                 if bounds_array[i]:
-                    print "  - bounds" + str(bounds_array[i])
+                    print("  - bounds" + str(bounds_array[i]))
 
-        print " "
-        print "Termination:"
+        print(" ")
+        print("Termination:")
 
         if model_stop_condition == "max_iter":
 
-            print "- Maximum iteration: " + str(max_iter)
+            print("- Maximum iteration: " + str(max_iter))
 
         else:
 
-            print "- Threshold"
+            print("- Threshold")
 
 
-        print " "
-        print "Sampling method:"
-        print "- " + search_type
-        print " "
-        print "Reference rotation type:"
+        print(" ")
+        print("Sampling method:")
+        print("- " + search_type)
+        print(" ")
+        print("Reference rotation type:")
 
 
         # Prepare rotation model for updates during optimisation - keeps rotations in memory
@@ -299,7 +299,7 @@ class ModelSetup():
         # Calculate initial reference rotation for the reference plate (eg, Africa) from selected rotation model
         if auto_calc_ref_pole == True:
 
-            print "- Auto-calc palaeomagnetic"
+            print("- Auto-calc palaeomagnetic")
 
             ref_rot = ref_rotation_model.get_rotation(np.double(ref_rotation_start_age), ref_rotation_plate_id, 0)
             ref_rot_pole, ref_rot_angle = ref_rot.get_euler_pole_and_angle()
@@ -316,7 +316,7 @@ class ModelSetup():
 
         elif auto_calc_ref_pole == False:
 
-            print "- User reference"
+            print("- User reference")
 
             ref_rot_longitude = ref_rot_longitude
             ref_rot_latitude = ref_rot_latitude
@@ -328,7 +328,7 @@ class ModelSetup():
 
         # else:
 
-        #     print "Reference rotation type: EarthByte model"
+        #     print("Reference rotation type: EarthByte model")
 
         #     ref_rot = rotation_model.get_rotation(np.double(ref_rotation_start_age), ref_rotation_plate_id, 0)
         #     ref_rot_pole, ref_rot_angle = ref_rot.get_euler_pole_and_angle()
@@ -344,12 +344,12 @@ class ModelSetup():
         # ref_rot_latitude = ref_rot_pole.get_latitude()
         # ref_rot_angle = np.rad2deg(ref_rot_angle)
 
-        print " "
-        print "Reference finite rotation pole for reference plate", ref_rotation_plate_id, "at", ref_rotation_start_age, "Ma:"
-        print "- Lon:", ref_rot_longitude
-        print "- Lat:", ref_rot_latitude
-        print "- Angle:", ref_rot_angle
-        print " "
+        print(" ")
+        print("Reference finite rotation pole for reference plate", ref_rotation_plate_id, "at", ref_rotation_start_age, "Ma:")
+        print("- Lon:", ref_rot_longitude)
+        print("- Lat:", ref_rot_latitude)
+        print("- Angle:", ref_rot_angle)
+        print(" ")
 
 
         ref_rot_of_interest_pole = pgp.convert_point_on_sphere_to_lat_lon_point(ref_rot_of_interest_pole)
@@ -358,10 +358,10 @@ class ModelSetup():
         ref_rot_latitude_of_interest = ref_rot_of_interest_pole.get_latitude()
         ref_rot_angle_of_interest = np.rad2deg(ref_rot_of_interest_angle)
 
-        # print "Reference finite rotation pole for reference plate", ref_rotation_plate_id, "at", rotation_age_of_interest_age, "Ma:"
-        # print "- Lon:", ref_rot_longitude_of_interest
-        # print "- Lat:", ref_rot_latitude_of_interest
-        # print "- Angle:", ref_rot_angle_of_interest
+        # print("Reference finite rotation pole for reference plate", ref_rotation_plate_id, "at", rotation_age_of_interest_age, "Ma:")
+        # print("- Lon:", ref_rot_longitude_of_interest)
+        # print("- Lat:", ref_rot_latitude_of_interest)
+        # print("- Angle:", ref_rot_angle_of_interest)
 
 
         # Calculate start seeds (reference + (models - 1) random starting rotations within uncertainty limits)
@@ -384,7 +384,7 @@ class ModelSetup():
             lons = []
             lats = []
 
-            for i in xrange(0, num_points):
+            for i in range(0, num_points):
 
                 # Generate uniformly distributed random points on a unit sphere.
                 
@@ -403,17 +403,17 @@ class ModelSetup():
             sample_lats = []
             sample_lons = []
 
-            for i in xrange(0, len(lats)):
+            for i in range(0, len(lats)):
 
                 if lats[i] > 90 - geographical_uncertainty:
 
                     sample_lats.append(lats[i])
                     sample_lons.append(lons[i])
 
-            #print len(sample_lats)
+            #print(len(sample_lats))
 
             # Rotate points from pole to reference start seed
-            for i in xrange(0, len(sample_lats)):
+            for i in range(0, len(sample_lats)):
 
                 start_seeds_rotated.append(pmag.dodirot(sample_lons[i], sample_lats[i], ref_rot_longitude, ref_rot_latitude))
 
@@ -431,7 +431,7 @@ class ModelSetup():
             ang_gaussian_array.append(np.random.normal(ref_rot_angle, ang_array_sd, models))
 
             # Create start seeds array
-            for i in xrange(0, len(start_seeds_rotated)):
+            for i in range(0, len(start_seeds_rotated)):
 
                 seed = [[start_seeds_rotated[i][0]], [start_seeds_rotated[i][1]], ref_rot_angle]
 
@@ -444,9 +444,9 @@ class ModelSetup():
                     start_seeds.append(seed)
                     seed_history.append(seed)
 
-            #print len(start_seeds_rotated)
-            #print len(start_seeds)
-            #print len(seed_history)
+            #print(len(start_seeds_rotated))
+            #print(len(start_seeds))
+            #print(len(seed_history))
 
 
             # For secondary minimisation, add inital min result to start seeds
@@ -466,8 +466,8 @@ class ModelSetup():
 
             # (Lon, Lat, Ang)
             start_seeds = np.array(start_seeds)
-            #print start_seeds
-            #print len(start_seeds)
+            #print(start_seeds)
+            #print(len(start_seeds))
 
 
             # Set N to number of models to be run (optimisations)
@@ -485,13 +485,13 @@ class ModelSetup():
             ub.append(np.max(seed_lats) + geographical_uncertainty)
             ub.append(np.max(seed_angs) + rotation_uncertainty)
 
-            # print 'max_lons', np.max(seed_lons)
-            # print 'max_lats', np.max(seed_lats)
-            # print 'min_lons', np.min(seed_lons)
-            # print 'min_lats', np.min(seed_lats)
-            # print " "
-            # print seed_lons
-            # print " "
+            # print('max_lons', np.max(seed_lons))
+            # print('max_lats', np.max(seed_lats))
+            # print('min_lons', np.min(seed_lons))
+            # print('min_lats', np.min(seed_lats))
+            # print(" ")
+            # print(seed_lons)
+            # print(" ")
 
 
         # Generate uniform non-random distribution of points on a unit sphere.
@@ -526,7 +526,7 @@ class ModelSetup():
             # lons = []
             # lats = []
             #
-            # for i in xrange(0, len(points)):
+            # for i in range(0, len(points)):
             #
             #     point = pgp.convert_point_on_sphere_to_lat_lon_point((points[i][0], points[i][1], points[i][2]))
             #     lats.append(point.get_latitude())
@@ -543,8 +543,8 @@ class ModelSetup():
             lons = []
             lats = []
 
-            for lon_index in xrange(0, num_longitude_points):
-                for lat_index in xrange(0, num_latitude_points):
+            for lon_index in range(0, num_longitude_points):
+                for lat_index in range(0, num_latitude_points):
 
                     theta = 2 * np.pi * ((lon_index + 0.5) / float(num_longitude_points))
                     phi = np.arccos(2 * ((lat_index + 0.5) / float(num_latitude_points)) - 1.0)
@@ -562,17 +562,17 @@ class ModelSetup():
             sample_lats = []
             sample_lons = []
 
-            for i in xrange(0, len(lats)):
+            for i in range(0, len(lats)):
 
                 if lats[i] > 90 - geographical_uncertainty:
 
                     sample_lats.append(lats[i])
                     sample_lons.append(lons[i])
 
-            #print len(sample_lats)
+            #print(len(sample_lats))
 
             # Rotate points from pole to reference start seed
-            for i in xrange(0, len(sample_lats)):
+            for i in range(0, len(sample_lats)):
 
                 start_seeds_rotated.append(pmag.dodirot(sample_lons[i], sample_lats[i], ref_rot_longitude, ref_rot_latitude))
 
@@ -584,7 +584,7 @@ class ModelSetup():
             ang_gaussian_array.append(np.random.normal(ref_rot_angle, ang_array_sd, models))
 
             # Create start seeds array
-            for i in xrange(0, len(start_seeds_rotated)):
+            for i in range(0, len(start_seeds_rotated)):
 
                 seed = [[start_seeds_rotated[i][0]], [start_seeds_rotated[i][1]], ref_rot_angle]
 
@@ -597,9 +597,9 @@ class ModelSetup():
                     start_seeds.append(seed)
                     seed_history.append(seed)
 
-            #print len(start_seeds_rotated)
-            #print len(start_seeds)
-            #print len(seed_history)
+            #print(len(start_seeds_rotated))
+            #print(len(start_seeds))
+            #print(len(seed_history))
 
 
             # For secondary minimisation, add inital min result to start seeds
@@ -619,8 +619,8 @@ class ModelSetup():
 
             # (Lon, Lat, Ang)
             start_seeds = np.array(start_seeds)
-            #print start_seeds
-            #print len(start_seeds)
+            #print(start_seeds)
+            #print(len(start_seeds))
 
 
             # Set N to number of models to be run (optimisations)
@@ -638,13 +638,13 @@ class ModelSetup():
             ub.append(np.max(seed_lats) + geographical_uncertainty)
             ub.append(np.max(seed_angs) + rotation_uncertainty)
 
-            # print 'max_lons', np.max(seed_lons)
-            # print 'max_lats', np.max(seed_lats)
-            # print 'min_lons', np.min(seed_lons)
-            # print 'min_lats', np.min(seed_lats)
-            # print " "
-            # print seed_lons
-            # print " "
+            # print('max_lons', np.max(seed_lons))
+            # print('max_lats', np.max(seed_lats))
+            # print('min_lons', np.min(seed_lons))
+            # print('min_lats', np.min(seed_lats))
+            # print(" ")
+            # print(seed_lons)
+            # print(" ")
 
         # Generate a gaussian distribution of start seeds
         elif search_type == 'Fisher':
@@ -673,7 +673,7 @@ class ModelSetup():
                 fdist = ipmag.fishrot(k, models - 1, 0)
 
             # Rotate start seeds to center on reference location
-            for i in xrange(0, len(fdist)):
+            for i in range(0, len(fdist)):
 
                 start_seeds_rotated.append(pmag.dodirot(fdist[i][0], fdist[i][1], ref_rot_longitude, ref_rot_latitude))
 
@@ -686,7 +686,7 @@ class ModelSetup():
 
 
             # Create start seeds array
-            for i in xrange(0, len(start_seeds_rotated)):
+            for i in range(0, len(start_seeds_rotated)):
 
                 if search == "Secondary":
 
@@ -721,8 +721,8 @@ class ModelSetup():
 
             # (Lon, Lat, Ang)
             start_seeds = np.array(start_seeds)
-            #print start_seeds
-            #print len(start_seeds)
+            #print(start_seeds)
+            #print(len(start_seeds))
 
 
             # Set N to number of models to be run (optimisations)
@@ -832,7 +832,7 @@ class ModelSetup():
         x = []
         x_ = []
 
-        for i in xrange(0, len(start_seeds)):
+        for i in range(0, len(start_seeds)):
 
             x_ = []
             x_.append(np.append(start_seeds[i][0], start_seeds[i][1]))
@@ -867,7 +867,7 @@ class ModelSetup():
 
         output_features = isopolate.interpolate_isochrons(rotation_model,
                           [RidgeFile_subset, IsochronFile_subset, IsoCOBFile_subset],
-                          interpolate=np.arange(ref_rotation_end_age, ref_rotation_start_age + 1, interpolation_resolution),
+                          interpolate=range(ref_rotation_end_age, ref_rotation_start_age + 1, interpolation_resolution),
                           #interpolate=0.01,
                           tessellate_threshold_radians=math.radians(0.5),
                           output_scalar_spreading_direction=True,
@@ -975,7 +975,7 @@ class ModelSetup():
         # Build trail data subset
         if interpolated_hotspot_trails == False:
 
-            print '- Using raw hotspot trail data'
+            print('- Using raw hotspot trail data')
 
             trail_data = []
 
@@ -983,7 +983,7 @@ class ModelSetup():
 
                 if item in include_chains:
 
-                    #print item
+                    #print(item)
 
                     trail_data.append({'Chain': hs_trailsDF.Chain[i], 'Lon': hs_trailsDF.Lon[i], 'Lat': hs_trailsDF.Lat[i],
                                        'Age': hs_trailsDF.Age[i], 'Age_err': hs_trailsDF.Age_error[i], 'PlateID': hs_trailsDF.PlateID[i],
@@ -992,7 +992,7 @@ class ModelSetup():
 
         if interpolated_hotspot_trails == True:
 
-            print '- Using interpolated hotspot trail data'
+            print('- Using interpolated hotspot trail data')
 
             trail_data = []
 
@@ -1003,7 +1003,7 @@ class ModelSetup():
                 trail_ages = []
                 trail_plateID = []
 
-                for j in xrange(0, len(interpolated_hotspot_data)):
+                for j in range(0, len(interpolated_hotspot_data)):
 
                     if interpolated_hotspot_data['Chain'][j] == item:
 
@@ -1017,12 +1017,12 @@ class ModelSetup():
                                    'PlateID': tuple(trail_plateID), 'Hotspot_Location': tuple(trail_hotspot)})
 
 
-        print "- Created optimisation input vector"
-        print "- Upper and lower bounds calculated"
-        # print "- Precomputed isopolate output"
-        # print "- Generated hotspot and trail data sets"
-        print " "
-        print "Start seeds generated:", len(seed_lons)
+        print("- Created optimisation input vector")
+        print("- Upper and lower bounds calculated")
+        # print("- Precomputed isopolate output")
+        # print("- Generated hotspot and trail data sets")
+        print(" ")
+        print("Start seeds generated:", len(seed_lons))
 
 
 
@@ -1060,7 +1060,7 @@ class ProcessResults():
 
         constraints = ''
 
-        for i in xrange(0, len(data_array)):
+        for i in range(0, len(data_array)):
 
             if data_array[i] == True:
 
@@ -1073,8 +1073,8 @@ class ProcessResults():
 
         pickle.dump(xopt, open(output_file, 'wb'))
 
-        print "Results saved to:", output_file
-        print " "
+        print("Results saved to:", output_file)
+        print(" ")
 
         return output_file
 
@@ -1092,7 +1092,7 @@ class ProcessResults():
         results_dict = []
         stage_results_dict = []
 
-        for i in xrange(0, len(xopt_)):
+        for i in range(0, len(xopt_)):
 
             # xopt returns as tuple (immutable) - convert to list for wrangling
             xopt_[i] = list(xopt_[i])
@@ -1181,7 +1181,7 @@ class ProcessResults():
 
 
             # Plot all results
-            for i in xrange(0, len(results_dataframe)):
+            for i in range(0, len(results_dataframe)):
 
                 if results_dataframe.iloc[i]['Ang'] < 0:
 
@@ -1199,7 +1199,7 @@ class ProcessResults():
                     pmap.scatter(xall[i], yall[i], marker='.', s=5, color='white', zorder=2)
 
             # Plot top 10%
-            for i in xrange(0, len(top_ten)):
+            for i in range(0, len(top_ten)):
 
                 if top_ten.iloc[i]['Ang'] < 0:
 
@@ -1274,7 +1274,7 @@ class ProcessResults():
 
             constraints = ''
 
-            for i in xrange(0, len(data_array)):
+            for i in range(0, len(data_array)):
 
                 if data_array[i] == True:
 
@@ -1285,21 +1285,21 @@ class ProcessResults():
 
             plt.show()
 
-            print " "
-            print "Reference rotation from " + str(ref_rotation_start_age) + " - " + str(ref_rotation_end_age) + " for plate ID " + str(ref_rotation_plate_id) + "."
-            print "Plot produced from " + str(len(xopt)) + " models. Size of circles proportional to angle magnitude."
-            print "EarthByte reference model: ", rotation_file
-            print " "
-            print "Absolute minimum rotation:"
-            print display(HTML(min_result.to_html(index=False, columns=['Lon', 'Lat', 'Ang'])))
-            print " "
-            print "10% mean rotation:"
-            print display(HTML(top_ten_mean.to_html(index=False, columns=['Lon', 'Lat', 'Ang'])))
-            print " "
-            print "Starting ref rotation:"
-            print "Lon:", ref_rot_longitude, " - Lat:", ref_rot_latitude, " - Ang:", ref_rot_angle
-            # print " "
-            # print "Minimised value:", min_result('Minimum')
+            print(" ")
+            print("Reference rotation from " + str(ref_rotation_start_age) + " - " + str(ref_rotation_end_age) + " for plate ID " + str(ref_rotation_plate_id) + ".")
+            print("Plot produced from " + str(len(xopt)) + " models. Size of circles proportional to angle magnitude.")
+            print("EarthByte reference model: ", rotation_file)
+            print(" ")
+            print("Absolute minimum rotation:")
+            print(display(HTML(min_result.to_html(index=False, columns=['Lon', 'Lat', 'Ang']))))
+            print(" ")
+            print("10% mean rotation:")
+            print(display(HTML(top_ten_mean.to_html(index=False, columns=['Lon', 'Lat', 'Ang']))))
+            print(" ")
+            print("Starting ref rotation:")
+            print("Lon:", ref_rot_longitude, " - Lat:", ref_rot_latitude, " - Ang:", ref_rot_angle)
+            # print(" ")
+            # print("Minimised value:", min_result('Minimum'))
 
         return min_result, top_ten_mean
 
@@ -1321,12 +1321,12 @@ class ObjectiveFunctions():
         trail_num = []
         trail_num = []
 
-        for i in xrange(0, len(trail_data)):
+        for i in range(0, len(trail_data)):
 
             opt_results = []
 
             # Loop through individual trail point data
-            for j in xrange(0, len(trail_data[i]['Lon'])):
+            for j in range(0, len(trail_data[i]['Lon'])):
 
                 if trail_data[i]['Age'][j] <= ref_rotation_start_age:
 
@@ -1349,7 +1349,7 @@ class ObjectiveFunctions():
                 opt_list = []
                 trail_num.append(i)
 
-                for k in xrange(0, len(opt_results)):
+                for k in range(0, len(opt_results)):
 
                     opt_list.append([opt_results[k]['Lon'], opt_results[k]['Lat'], 1.])
 
@@ -1364,7 +1364,7 @@ class ObjectiveFunctions():
         tmp_dist = []
         tmp_kappa = []
 
-        for l in xrange(0, len(opt_stats)):
+        for l in range(0, len(opt_stats)):
 
             tmp_dist.append(geoTools.haversine(opt_stats[l]['dec'], opt_stats[l]['inc'],
                                               trail_data[trail_num[l]]['Hotspot_Location'][1],
@@ -1430,7 +1430,7 @@ class ObjectiveFunctions():
 
                 else:
 
-                    #print Age, plateid
+                    #print(Age, plateid)
                     # Get the stage pole of the plate wrt mantle at the time of the age grid pixel
                     stage_rotation = rotation_model.get_rotation(Age + Delta, int(plateid), Age, 1, int(plateid))
 
@@ -1465,14 +1465,14 @@ class ObjectiveFunctions():
         global_trail_uncertainty = []
         trail_name = []
 
-        for i in xrange(0, len(trail_data)):
+        for i in range(0, len(trail_data)):
 
             if trail_data[i]['Age'][-1] >= ref_rotation_start_age - 10:
 
                 opt_results = []
 
                 # Loop through individual trail point data
-                for j in xrange(0, len(trail_data[i]['Lon'])):
+                for j in range(0, len(trail_data[i]['Lon'])):
 
                     if trail_data[i]['Age'][j] <= ref_rotation_start_age and trail_data[i]['Age'][j] >= ref_rotation_start_age - 10:
 
@@ -1493,7 +1493,7 @@ class ObjectiveFunctions():
                 tmp_hs = []
                 tmp_pid = []
 
-                for i in xrange(0, len(opt_results)):
+                for i in range(0, len(opt_results)):
 
                     tmp_lat.append(opt_results[i]['Lat'])
                     tmp_lon.append(opt_results[i]['Lon'])
@@ -1501,7 +1501,7 @@ class ObjectiveFunctions():
                     tmp_pid.append(opt_results[i]['PlateID'])
                     tmp_hs.append(opt_results[i]['Hotspot_Location'])
 
-            #print tmp_age, tmp_lat, tmp_lon, tmp_hs, tmp_pid
+            #print(tmp_age, tmp_lat, tmp_lon, tmp_hs, tmp_pid)
 
                 # Create synthetic hotspot track
                 relativePlate = tmp_pid[0]
@@ -1510,11 +1510,11 @@ class ObjectiveFunctions():
                 reconstruction_time = times[0]
                 terrane_plateID = 0
 
-                # print 'Chain', chain
-                # print 'relative plate', relativePlate
-                # print 'times', times
-                # print 'hs', tmp_hs[0]
-                # print ""
+                # print('Chain', chain)
+                # print('relative plate', relativePlate)
+                # print('times', times)
+                # print('hs', tmp_hs[0])
+                # print("")
 
                 seed_points_at_digitisation_time = pgp.PointOnSphere(tmp_hs[0])
 
@@ -1564,8 +1564,8 @@ class ObjectiveFunctions():
                 tmp_lon = np.insert(np.array(tmp_lon), 0, tmp_hs[0][1])
                 tmp_lat = np.insert(np.array(tmp_lat), 0, tmp_hs[0][0])
 
-                # print tmp_lat
-                # print tmp_lon
+                # print(tmp_lat)
+                # print(tmp_lon)
 
                 point_distance = []
                 ref_trail_distance = []
@@ -1581,7 +1581,7 @@ class ObjectiveFunctions():
                 # Iterate along motion paths and extract distance metrics
                 if use_trail_age_uncertainty == False:
 
-                    for i in xrange(1, len(tmp_lon)):
+                    for i in range(1, len(tmp_lon)):
 
                         point_distance_tmp = geoTools.haversine(tmp_lon[i], tmp_lat[i], motion_path_lons[0][i], motion_path_lats[0][i])
                         point_distance.append(point_distance_tmp[0])
@@ -1602,7 +1602,7 @@ class ObjectiveFunctions():
 
                 elif use_trail_age_uncertainty == True:
 
-                    for i in xrange(1, len(tmp_lon)):
+                    for i in range(1, len(tmp_lon)):
 
                         point_distance_tmp = geoTools.haversine(tmp_lon[i], tmp_lat[i], motion_path_lons[0][i], motion_path_lats[0][i])
                         point_distance.append(point_distance_tmp[0])

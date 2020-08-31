@@ -153,7 +153,7 @@ def find_polygons_using_points_spatial_tree(
     #
     # 'polygons_and_proxies' is a list of 2-tuples (polygon, polygon_proxy).
     polygons_and_proxies = sorted(
-            ((polygons[index], polygon_proxies[index]) for index in xrange(len(polygons))),
+            ((polygons[index], polygon_proxies[index]) for index in range(len(polygons))),
             key=lambda polygon_and_proxy: polygon_and_proxy[0].get_area(),
             reverse=True)
     
@@ -304,12 +304,12 @@ def _fill_spatial_tree_node_inside_polygon(
 #    lon_grid_spacing_degrees = 360.0 / num_longitudes
 #    
 #    points = []
-#    for lat_index in xrange(num_latitudes):
+#    for lat_index in range(num_latitudes):
 #        # The 0.5 puts the point in the centre of the grid pixel.
 #        # This also avoids sampling right on the poles.
 #        lat = -90 + (lat_index + 0.5) * lat_grid_spacing_degrees
 #        
-#        for lon_index in xrange(num_longitudes):
+#        for lon_index in range(num_longitudes):
 #            # The 0.5 puts the point in the centre of the grid pixel.
 #            # This also avoids sampling right on the dateline where there might be
 #            # age grid or static polygon artifacts.
@@ -333,7 +333,7 @@ def _fill_spatial_tree_node_inside_polygon(
 #        # Similar to 'find_polygons()' except without using a quad tree.
 #        #
 #        polygons_and_features = sorted(
-#                ((polygons[index], polygon_features[index]) for index in xrange(len(polygons))),
+#                ((polygons[index], polygon_features[index]) for index in range(len(polygons))),
 #                key=lambda polygon_and_feature: polygon_and_feature[0].get_area(),
 #                reverse=True)
 #        polygon_features_containing_points = [None] * len(points)

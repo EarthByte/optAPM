@@ -79,7 +79,7 @@ def global_points_rand(samples):
     lats = []
     lons = []
 
-    for i in xrange(0, samples):
+    for i in range(0, samples):
 
         theta = 2 * np.pi * np.random.random()
         phi = np.arccos(2 * np.random.random() - 1.0)
@@ -116,7 +116,7 @@ def global_points_uniform(samples, plotResult=False, projection='robin'):
     points[:,1] = radius * np.sin(theta)
     points[:,2] = z
 
-    for i in xrange(0, len(points)):
+    for i in range(0, len(points)):
 
         point = pgp.convert_point_on_sphere_to_lat_lon_point((points[i][0], points[i][1], points[i][2]))
         lats.append(point.get_latitude())
@@ -208,7 +208,7 @@ def featureScaling(data):
     min_data = np.nanmin(data)
     max_data = np.nanmax(data)
 
-    for i in xrange(0, len(data)):
+    for i in range(0, len(data)):
 
         norm_data.append( (data[i] - min_data) / (max_data - min_data) )
 

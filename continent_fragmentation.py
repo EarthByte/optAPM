@@ -2,6 +2,7 @@ import os
 import os.path
 import pygplates
 import sys
+import numpy as np
 
 
 class ContinentFragmentation(object):
@@ -38,9 +39,14 @@ class ContinentFragmentation(object):
         self.rotation_model = pygplates.RotationModel(rotation_features)
         
         # Find the maximum fragmentation over the age range.
-        print 'Calculating continental fragmentation for {0}-{1}Ma...'.format(age_range[0], age_range[-1])
+        print('Calculating continental fragmentation for {0}-{1}Ma...'.format(age_range[0], age_range[-1]))
         sys.stdout.flush()
-        self.max_fragmentation = max(self._calculate_fragmentation(age) for age in age_range)
+        fragmentations = [self._calculate_fragmentation(age) for age in age_range]
+        self.max_fragmentation = max(fragmentations)
+        #print('min:', np.min(fragmentations) / self.max_fragmentation)
+        #print('mean:', np.mean(fragmentations) / self.max_fragmentation)
+        #print('dev:', np.std(fragmentations) / self.max_fragmentation)
+        #sys.stdout.flush()
     
     
     def get_fragmentation(
@@ -74,4 +80,5 @@ class ContinentFragmentation(object):
             total_perimeter += resolved_topology.get_resolved_boundary().get_arc_length()
             total_area += resolved_topology.get_resolved_boundary().get_area()
 
+        #print(total_perimeter / total_area)
         return total_perimeter / total_area

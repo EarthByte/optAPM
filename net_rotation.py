@@ -194,15 +194,15 @@ class NetRotationResult(object):
         # It appears that 'plate_angular_velocity' is essentially unused in GPlates.
     
     def debug_print(self):
-        print 'weighting_factor:', self.weighting_factor
-        print 'Omega pre weight:', self.rotation_component
+        print('weighting_factor:', self.weighting_factor)
+        print('Omega pre weight:', self.rotation_component)
         if self.weighting_factor != 0:
             omega_post_weight = (1.0 / self.weighting_factor) * self.rotation_component
-            print 'Omega post weight:', omega_post_weight
+            print('Omega post weight:', omega_post_weight)
         net_rotation = self.get_net_rotation()
         if not net_rotation.represents_identity_rotation():
             omega_pole_latitude, omega_pole_longitude, omega_angle_degrees_per_my = net_rotation.get_lat_lon_euler_pole_and_angle_degrees()
-            print 'Omega (pole, angle):', omega_pole_latitude, omega_pole_longitude, omega_angle_degrees_per_my
+            print('Omega (pole, angle):', omega_pole_latitude, omega_pole_longitude, omega_angle_degrees_per_my)
 
 
 def calculate_plate_net_rotation_results_internal_gplates(
@@ -571,6 +571,6 @@ if __name__ == '__main__':
     
     end_time = time.clock()
     
-    print 'Net rotation:', net_rotation
+    print('Net rotation:', net_rotation)
     
-    print 'Net rotation calculation took', (end_time - start_time), 'seconds'
+    print('Net rotation calculation took', (end_time - start_time), 'seconds')

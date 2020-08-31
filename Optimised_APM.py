@@ -56,7 +56,7 @@ if __name__ == '__main__':
             # Alternatively can start cluster in "IPython Clusters" tab of Jupyter notebook and
             # then call 
             rc = ipyparallel.Client(profile='default')
-            print "Cores started: ", len(rc.ids)
+            print("Cores started: ", len(rc.ids))
 
             dview = rc[:]
             dview.block = True
@@ -106,7 +106,7 @@ if __name__ == '__main__':
         # else serial
 
 
-        age_range = np.arange(end_age + interval, start_age + interval, interval)
+        age_range = range(end_age + interval, start_age + interval, interval)
 
         # When using mpi4py we only print and collect/process results in one process (the one with rank/ID 0).
         if use_parallel != MPI4PY or mpi_rank == 0:
@@ -196,19 +196,19 @@ if __name__ == '__main__':
                     age_range)
             
             
-            print "Rotation file to be used: ", rotfile
-            print "TM data:", tm_data_type
-            print "TM method:", tm_method
-            print "Age range for model:", age_range
+            print("Rotation file to be used: ", rotfile)
+            print("TM data:", tm_data_type)
+            print("TM method:", tm_method)
+            print("Age range for model:", age_range
+)
+            print("-------------------------------------------------------------------")
+            print("")
+            print(model_name)
+            print("")
 
-            print "-------------------------------------------------------------------"
-            print ""
-            print model_name
-            print ""
-
-            print "Search type:", search
-            print "Search radius:", search_radius
-            print ""
+            print("Search type:", search)
+            print("Search radius:", search_radius)
+            print("")
             
             # Flush the print statements (for parallel code).
             sys.stdout.flush()
@@ -236,7 +236,7 @@ if __name__ == '__main__':
         # Loop through all times.
         #
         
-        for i in xrange(0, len(age_range)):
+        for i in range(0, len(age_range)):
             
             ref_rotation_start_age = age_range[i]
             ref_rotation_end_age = ref_rotation_start_age - interval
@@ -246,8 +246,8 @@ if __name__ == '__main__':
             # When using mpi4py we only prepare the data in one process (the one with rank/ID 0).
             if use_parallel != MPI4PY or mpi_rank == 0:
                 
-                print "Start age:", ref_rotation_start_age, "Ma"
-                print ""
+                print("Start age:", ref_rotation_start_age, "Ma")
+                print("")
                 
                 # Incrementally build the no-net-rotation model as we go.
                 # The results are updated to the file 'nnr_rotfile'.
@@ -310,10 +310,10 @@ if __name__ == '__main__':
                             (1.0 - math.cos(math.radians(current_search_radius))) /
                             (1.0 - math.cos(math.radians(search_radius)))
                             * models + 0.5)
-                        print "Temporarily expanding search diameter to {0} from {1} at {2}Ma due to change in reference plate.".format(
-                            current_search_radius, search_radius, ref_rotation_start_age)
-                        print "Also proportionately expanding number of models to {0} from {1}.".format(current_models, models)
-                        print ""
+                        print("Temporarily expanding search diameter to {0} from {1} at {2}Ma due to change in reference plate.".format(
+                            current_search_radius, search_radius, ref_rotation_start_age))
+                        print("Also proportionately expanding number of models to {0} from {1}.".format(current_models, models))
+                        print("")
 
                 # --------------------------------------------------------------------
                 
@@ -357,7 +357,8 @@ if __name__ == '__main__':
 
                 # Marshal each cost function into a code string so we can pass it over the network.
                 cost_func_array = startingConditions[20]
-                cost_func_code_string_array = [marshal.dumps(cost_func.func_code) for cost_func in cost_func_array]
+                cost_func_code_string_array = [marshal.dumps(cost_func.__code__ if sys.version_info[0] >= 3 else cost_func.func_code)  # Python 2 vs 3.
+                    for cost_func in cost_func_array]
                 startingConditions[20] = cost_func_code_string_array
             
             
@@ -389,12 +390,12 @@ if __name__ == '__main__':
                         # Divide the 'x' list among the processes.
                         num_x_per_rank = len(xStartingCondition) // mpi_size
                         new_x_list = []
-                        for mpi_index in xrange(mpi_size):
+                        for mpi_index in range(mpi_size):
                             # Each process gets the next 'num_x_per_rank' x values.
                             x_index = mpi_index * num_x_per_rank
                             new_x_list.append(xStartingCondition[x_index : x_index + num_x_per_rank])
                         # Distribute any remaining x values (if any) across the first few processes.
-                        for x_index in xrange(mpi_size * num_x_per_rank, len(xStartingCondition)):
+                        for x_index in range(mpi_size * num_x_per_rank, len(xStartingCondition)):
                             new_x_list[x_index - mpi_size * num_x_per_rank].append(xStartingCondition[x_index])
                         
                         xStartingCondition = new_x_list
@@ -440,8 +441,8 @@ if __name__ == '__main__':
             if use_parallel != MPI4PY or mpi_rank == 0:
                 
                 #print "Number of start seeds generated:", len(start_seeds)
-                print "Optimised models to be run:", len(start_seeds)
-                print " "
+                print("Optimised models to be run:", len(start_seeds))
+                print(" ")
                 
                 # Flush the print statements (for parallel code).
                 sys.stdout.flush()
@@ -570,7 +571,8 @@ if __name__ == '__main__':
                     # ...where there were 5 processes but only 4 'x' values to process.
                     xopt = list(itertools.chain.from_iterable(xopt))
                     
-                    # print 'all xopt', xopt
+                    # print('all xopt', xopt)
+                    # sys.stdout.flush()
                     
             else:
                 
@@ -590,17 +592,17 @@ if __name__ == '__main__':
                 # Find minimum result from all models
                 results = []
 
-                for i in xrange(0, len(xopt)):
+                for i in range(0, len(xopt)):
 
                     results.append(xopt[i][1])
 
                 min_result_index = np.where(results == np.min(results))[0][0]
                 min_result = xopt[min_result_index]
 
-                print " "
-                print "Optimisation complete."
-                print "Models produced:", len(xopt)
-                print " "
+                print(" ")
+                print("Optimisation complete.")
+                print("Models produced:", len(xopt))
+                print(" ")
 
 
                 # Save results to pickle file located as '/model_output/
@@ -617,7 +619,7 @@ if __name__ == '__main__':
                                             plot)
 
 
-                for j in xrange(0, len(xopt)):
+                for j in range(0, len(xopt)):
 
                     costs.append(xopt[j][1])
 
@@ -666,10 +668,10 @@ if __name__ == '__main__':
             main_sec = timedelta(seconds = float(main_end_time))
             main_dt = datetime(1,1,1) + main_sec
 
-            print ""
-            print ""
-            print "Model completed in:"
-            print str(main_dt.day-1) + "d, " + str(main_dt.hour) + "h, " + str(main_dt.minute) + "m, " + str(main_dt.second) + "s."
+            print("")
+            print("")
+            print("Model completed in:")
+            print(str(main_dt.day-1) + "d, " + str(main_dt.hour) + "h, " + str(main_dt.minute) + "m, " + str(main_dt.second) + "s.")
 
 
             # Scaling (mean of 0-50Ma - 20 models)
@@ -681,7 +683,7 @@ if __name__ == '__main__':
             #     HS: 398
 
             # Display result arrays
-            print np.mean(costs)
+            print(np.mean(costs))
 
             # print "Mean of 20 models (0-50Ma)"
             # print ""
@@ -706,6 +708,6 @@ if __name__ == '__main__':
 
     except Exception as e:
 
-        print ""
-        print "! Caught exception: ", e
+        print("")
+        print("! Caught exception: ", e)
         raise

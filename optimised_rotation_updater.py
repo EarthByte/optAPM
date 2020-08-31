@@ -128,7 +128,7 @@ class OptimisedRotationUpdater(object):
         # If we are continuing a previous partial optimisation run then this will be all previous
         # 005-00 rotations computed so far.
         if end_age != 0:
-            print 'Re-using existing partially optimised rotation file from 0Ma to {0}Ma'.format(end_age)
+            print('Re-using existing partially optimised rotation file from 0Ma to {0}Ma'.format(end_age))
             sys.stdout.flush()
             
             # Look for existing 005-000 partially optimised rotation in existing optimised rotation file.
@@ -151,7 +151,7 @@ class OptimisedRotationUpdater(object):
                 pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'optAPM @absage'))
         
         # Add a rotation at each age in 'end_age + interval' to 'start_age' (inclusive) at 'interval' steps.
-        for ref_rotation_start_age in np.arange(end_age + interval, start_age + interval, interval):
+        for ref_rotation_start_age in range(end_age + interval, start_age + interval, interval):
             
             # Get the reference plate ID (which could vary over time).
             ref_rotation_plate_id, _ = self.reference_params_function(ref_rotation_start_age)

@@ -123,8 +123,8 @@ class NoNetRotationModel(object):
         # If we are continuing a previous partial optimisation run then this will be all previous
         # 005-00 no-net-rotations computed so far.
         if end_age != 0:
-            print 'Re-using existing partial no-net-rotation file from 0Ma to {0}Ma: {1}'.format(
-                    end_age, self.no_net_rotation_filename)
+            print('Re-using existing partial no-net-rotation file from 0Ma to {0}Ma: {1}'.format(
+                    end_age, self.no_net_rotation_filename))
             sys.stdout.flush()
             
             # Look for existing 005-000 partial no-net-rotations in existing no-net-rotation file.
@@ -164,12 +164,12 @@ class NoNetRotationModel(object):
         
         
         if self.CREATE_NO_NET_ROTATION_MODEL_AT_INIT:
-            print 'Calculating no-net-rotation model for {0}-{1}Ma...'.format(end_age, start_age)
+            print('Calculating no-net-rotation model for {0}-{1}Ma...'.format(end_age, start_age))
             sys.stdout.flush()
             
             # Calculate no-net-rotation at 1My increments from 'end_age+1' Ma to 'start_age' Ma.
             # We shouldn't need to sample older than 'start_age'.
-            for time in np.arange(end_age + 1, start_age + 1):
+            for time in range(end_age + 1, start_age + 1):
                 
                 #print time
                 #sys.stdout.flush()
@@ -223,7 +223,7 @@ class NoNetRotationModel(object):
             pygplates.FeatureCollection(all_no_net_rotation_features).write(
                     os.path.join(self.data_dir, self.no_net_rotation_filename))
             
-            print '...finished calculating no-net-rotation model.'
+            print('...finished calculating no-net-rotation model.')
             sys.stdout.flush()
         
         # Extra data to keep track of for use in later update
@@ -263,7 +263,7 @@ class NoNetRotationModel(object):
         if ref_rotation_start_age <= self.last_update_time:
             return
         
-        print 'Calculating no-net-rotation model for {0}-{1}Ma...'.format(self.last_update_time, ref_rotation_start_age)
+        print('Calculating no-net-rotation model for {0}-{1}Ma...'.format(self.last_update_time, ref_rotation_start_age))
         sys.stdout.flush()
         
         # Calculate no-net-rotation at 1My increments from where we left off until 'ref_rotation_start_age' Ma.
@@ -272,7 +272,7 @@ class NoNetRotationModel(object):
         # candidate optimised rotation models (that are compared to the no-net-rotation model) are
         # only updated to 'ref_rotation_start_age' and hence sampling older than that would
         # create problems (ie, sample unknown rotations).
-        for time in np.arange(self.last_update_time + 1, ref_rotation_start_age + 1):
+        for time in range(self.last_update_time + 1, ref_rotation_start_age + 1):
             
             #print time
             #sys.stdout.flush()
@@ -325,7 +325,7 @@ class NoNetRotationModel(object):
         pygplates.FeatureCollection(all_no_net_rotation_features).write(
                 os.path.join(self.data_dir, self.no_net_rotation_filename))
         
-        print '...finished calculating no-net-rotation model.'
+        print('...finished calculating no-net-rotation model.')
         sys.stdout.flush()
     
     

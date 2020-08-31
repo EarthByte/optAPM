@@ -215,7 +215,7 @@ class ObjectiveFunction(object):
             #
             # This is important because sampling beyond 'self.ref_rotation_start_age' will create problems
             # since 'rotation_model_updated' has only been updated back to 'self.ref_rotation_start_age'.
-            nr_timesteps = np.arange(self.ref_rotation_end_age, self.ref_rotation_start_age, 1)
+            nr_timesteps = range(self.ref_rotation_end_age, self.ref_rotation_start_age, 1)
 
             PTLong1, PTLat1, PTangle1, SPLong, SPLat, SPangle, SPLong_NNR, SPLat_NNR, SPangle_NNR = \
             optimisation_methods.ApproximateNR_from_features(rotation_model_updated, self.nn_rotation_model, 
@@ -388,7 +388,7 @@ class ObjectiveFunction(object):
                 weighted_dist = []
 
                 # Positively weight modelled distances that are less than uncertainty limit
-                for i in xrange(0, len(hs[0])):
+                for i in range(0, len(hs[0])):
 
                     if hs[0][i] < hs[2][i]:
 

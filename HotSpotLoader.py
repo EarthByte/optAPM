@@ -48,13 +48,13 @@ def GetHotSpotTrails(FNAME):
         if len(chains[name]['age']) < 2:
             continue
     
-        sorted_lists = sorted(it.izip(chains[name]['lon'], chains[name]['lat'],
+        sorted_lists = sorted(zip(chains[name]['lon'], chains[name]['lat'],
                               chains[name]['age'], chains[name]['age_error'],
                               chains[name]['plateid']),
                               key=lambda x: x[2])
     
         chains[name]['lon'], chains[name]['lat'], chains[name]['age'], \
-            chains[name]['age_error'],chains[name]['plateid'] = it.izip(*sorted_lists)
+            chains[name]['age_error'],chains[name]['plateid'] = zip(*sorted_lists)
 
     return chains
 
@@ -109,13 +109,13 @@ def GetHotSpotTrailsFromGeoJSON(FNAME):
         if len(chains[name]['age']) < 2:
             continue
 
-        sorted_lists = sorted(it.izip(chains[name]['lon'], chains[name]['lat'],
+        sorted_lists = sorted(zip(chains[name]['lon'], chains[name]['lat'],
                               chains[name]['age'], chains[name]['age_error'],
                               chains[name]['plateid']),
                               key=lambda x: x[2])
 
         chains[name]['lon'], chains[name]['lat'], chains[name]['age'], \
-            chains[name]['age_error'],chains[name]['plateid'] = it.izip(*sorted_lists)
+            chains[name]['age_error'],chains[name]['plateid'] = zip(*sorted_lists)
 
     return chains
 
