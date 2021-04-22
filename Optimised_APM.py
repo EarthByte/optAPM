@@ -624,7 +624,7 @@ if __name__ == '__main__':
                     costs.append(xopt[j][1])
 
 
-                print('rmin:', rmin)
+                #print('rmin:', rmin)
                 min_results.append(np.array(rmin[['Age', 'Ang', 'Lat', 'Lon', 'Minimum', 'Model']])[0])
                 mean_results.append(np.array(rmean[['Age', 'Ang', 'Lat', 'Lon', 'Minimum', 'Model']])[0])
 

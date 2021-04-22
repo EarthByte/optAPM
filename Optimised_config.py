@@ -34,7 +34,7 @@ data_model = 'Global_1000-0_Model_2017'
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     model_name = "svn1618_run1"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "20200830_git_bbb3940_run23_models4"
+    model_name = "git_20200909_67baa20_run28"
 else:
     model_name = "run1"
 
@@ -207,7 +207,7 @@ def get_net_rotation_params(age):
     
     if data_model.startswith('Global_Model_WD_Internal_Release'):
         if age <= 80:
-            return True, 1.0, cost_function, None
+            return True, 1.0, cost_function, None  # Weight is always 1.0 for 0-80Ma
         elif age <= 170:
             # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
             return  True, 2.0, cost_function, None  # 2.0 gives a *multiplicative* weight of 0.5
@@ -216,7 +216,10 @@ def get_net_rotation_params(age):
             return True, 5.0, cost_function, None  # 5.0 gives a *multiplicative* weight of 0.2
     elif data_model == 'Global_1000-0_Model_2017':
         nr_bounds = (0.08, 0.20)
-        return  True, 1.0, cost_function, nr_bounds  # 1.0 gives a *multiplicative* weight of 1.0
+        if age <= 80:
+            return  True, 1.0, cost_function, nr_bounds  # Weight is always 1.0 for 0-80Ma
+        else:
+            return  True, 1.0, cost_function, nr_bounds  # 1.0 gives a *multiplicative* weight of 1.0
     else:
         return True, 1.0, cost_function, None
 
@@ -276,7 +279,10 @@ def get_trench_migration_params(age):
     #tm_bounds = [0, 30]
     
     if data_model.startswith('Global_Model_WD_Internal_Release'):
-        return True, 1.0, cost_function, None
+        if age <= 80:
+            return True, 1.0, cost_function, None  # Weight is always 1.0 for 0-80Ma
+        else:
+            return True, 1.0, cost_function, None
     elif data_model == 'Global_1000-0_Model_2017':
         # # Override default cost function for 1Ga model - see "objective_function.py" for definition of function arguments...
         # def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
@@ -287,10 +293,10 @@ def get_trench_migration_params(age):
         
         tm_bounds = [-30, 30]
         if age <= 80:
-            return True, 1.0, cost_function, tm_bounds
+            return True, 1.0, cost_function, tm_bounds  # Weight is always 1.0 for 0-80Ma
         else:
             # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-            return True, 1.0, cost_function, tm_bounds  # 1.0 gives a *multiplicative* weight of 1.0
+            return True, 2.0, cost_function, tm_bounds  # 2.0 gives a *multiplicative* weight of 0.5
     else:
         return True, 1.0, cost_function, None
 
@@ -303,7 +309,7 @@ def get_hotspot_trail_params(age):
 
     # Only use hotspot trails for 0-80Ma.
     if age <= 80:
-        return True, 1.0, cost_function, None
+        return True, 1.0, cost_function, None  # Weight is always 1.0 for 0-80Ma
     else:
         return False, 1.0, cost_function, None
 
@@ -318,10 +324,16 @@ def get_plate_velocity_params(age):
     #pv_bounds = [0, 60]
     
     if data_model.startswith('Global_Model_WD_Internal_Release'):
-        return False, 1.0, cost_function, None
+        if age <= 80:
+            return True, 1.0, cost_function, None  # Weight is always 1.0 for 0-80Ma
+        else:
+            return False, 1.0, cost_function, None
     elif data_model == 'Global_1000-0_Model_2017':
         pv_bounds = [0, 60]
-        return True, 1.0, cost_function, pv_bounds
+        if age <= 80:
+            return True, 1.0, cost_function, pv_bounds  # Weight is always 1.0 for 0-80Ma
+        else:
+            return True, 2.0, cost_function, pv_bounds  # 2.0 gives a *multiplicative* weight of 0.5
     else:
         return True, 1.0, cost_function, None
 
