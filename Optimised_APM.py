@@ -333,7 +333,8 @@ if __name__ == '__main__':
                 #       since optimisation is just an absolute offset that does not change the layout of the dynamic topologies and hence
                 #       doesn't affect the fragmentation.
                 normalised_continent_fragmentation_index = continent_fragmentation.get_fragmentation(ref_rotation_start_age)
-                plate_velocity_weight *= normalised_continent_fragmentation_index
+                # NOTE: We divide (instead of multiply) since this is an *inverse* weight (ie, plate velocity constraint cost is *multiplied* by "1.0 / weight").
+                plate_velocity_weight /= normalised_continent_fragmentation_index
 
                 # Gather parameters
                 params = [current_search_radius, rotation_uncertainty, search_type, current_models, model_stop_condition, max_iter,
