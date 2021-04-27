@@ -44,8 +44,9 @@ class TrenchResolver(object):
     def __del__(self):
         # Remove temporary trench migration file.
         try:
-            os.remove(
-                os.path.join(self.data_dir, self.trench_migration_filename))
+            file_to_remove = os.path.join(self.data_dir, self.trench_migration_filename)
+            if os.path.exists(file_to_remove):
+                os.remove(file_to_remove)
         except AttributeError:
             # 'self.trench_migration_filename' might not exist if exception raised inside '__init__()'.
             pass

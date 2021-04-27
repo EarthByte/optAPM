@@ -164,8 +164,6 @@ if __name__ == '__main__':
             # The same filename is used for all reconstruction times (it just gets overwritten at each time).
             tm_file = trench_resolver.get_trench_migration_filename()
             
-            # Generates points and associated plate IDs at each reconstruction time (for plate velocities later on).
-            # Use either topologies (continental+ocean) or just continental.
             if plate_velocity_continental_polygons_file:
                 plate_velocity_plate_features = list(
                     pgp.FeatureCollection(os.path.join(datadir, plate_velocity_continental_polygons_file)))
@@ -173,6 +171,9 @@ if __name__ == '__main__':
             else:
                 plate_velocity_plate_features = topology_features
                 plate_velocity_features_are_topologies = True
+            
+            # Generates points and associated plate IDs at each reconstruction time (for plate velocities later on).
+            # Use either topologies (continental+ocean) or just continental.
             plate_velocity_partitioner = PlateVelocityPartitioner(
                     datadir,
                     original_rotation_filenames,
@@ -180,7 +181,6 @@ if __name__ == '__main__':
                     plate_velocity_features_are_topologies,
                     data_model,
                     plate_velocity_grid_spacing)
-            
             # The filename used to store the (plate velocity) points and associated plate IDs at the reconstruction time.
             # The same filename is used for all reconstruction times (it just gets overwritten at each time).
             pv_file = plate_velocity_partitioner.get_plate_velocity_filename()
@@ -192,9 +192,10 @@ if __name__ == '__main__':
             continent_fragmentation = ContinentFragmentation(
                     datadir,
                     original_rotation_filenames,
-                    topology_features,
+                    plate_velocity_plate_features,
+                    plate_velocity_features_are_topologies,
                     age_range)
-            
+
             
             print("Rotation file to be used: ", rotfile)
             print("TM data:", tm_data_type)

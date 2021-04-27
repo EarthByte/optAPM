@@ -72,8 +72,9 @@ class PlateVelocityPartitioner(object):
     def __del__(self):
         # Remove temporary plate velocity file.
         try:
-            os.remove(
-                os.path.join(self.data_dir, self.plate_velocity_filename))
+            file_to_remove = os.path.join(self.data_dir, self.plate_velocity_filename)
+            if os.path.exists(file_to_remove):
+                os.remove(file_to_remove)
         except AttributeError:
             # 'self.plate_velocity_filename' might not exist if exception raised inside '__init__()'.
             pass
@@ -92,10 +93,10 @@ class PlateVelocityPartitioner(object):
             self,
             ref_rotation_start_age):
         """
-        Generate the resolved trench features at the specified time and save them to the trench migration file.
+        Generate a multipoint for each plate (and associated plate ID) and save them to a file.
         """
         
-        # Resolved topological plate polygons or reconstruct static continental polygons.
+        # Resolve topological plate polygons or reconstruct static continental polygons.
         if self.plate_features_are_topologies:
             # Resolve the topological plate polygons for the current time.
             resolved_topologies = []
