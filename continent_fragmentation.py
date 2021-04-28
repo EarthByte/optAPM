@@ -44,6 +44,11 @@ class ContinentFragmentation(object):
             contouring_longitude_array, contouring_latitude_array = np.meshgrid(lons, lats)
             self.contouring_points = pygplates.MultiPointOnSphere(
                     zip(contouring_latitude_array.flatten(), contouring_longitude_array.flatten()))
+            
+            self.debug_contour_polygons = False
+            if self.debug_contour_polygons:
+                self.debug_contour_polygon_features = []
+                self.debug_time_interval = age_range[1] - age_range[0]
         
         # Load all the original rotation feature collections.
         rotation_features = []
@@ -65,6 +70,10 @@ class ContinentFragmentation(object):
         #print('  mean:', np.mean(list(self.fragmentations.values())) / self.max_fragmentation)
         #print('  dev:', np.std(list(self.fragmentations.values())) / self.max_fragmentation)
         #sys.stdout.flush()
+
+        # Debug output contour polygons to GPML.
+        if self.debug_contour_polygons:
+            pygplates.FeatureCollection(self.debug_contour_polygon_features).write('contour_polygons.gpmlz')
     
     
     def get_fragmentation(
@@ -120,23 +129,26 @@ class ContinentFragmentation(object):
             # Note: Units here are for normalised sphere (so full Earth area is 4*pi).
             #       So 0.03 covers an area of approximately 1,200,000 km^2.
             min_area = 0.03
-            # A contour polygon's area should not be more than the global area.
-            # It seems this can happen when we get a sliver polygon along the dateline (that gets an area of ~8*pi).
-            max_area = 4 * math.pi
-
-            # Debug output contour polygons to GPML.
-            #pygplates.FeatureCollection(
-            #        [pygplates.Feature.create_reconstructable_feature(pygplates.FeatureType.gpml_unclassified_feature, polygon)
-            #            for polygon in reconstructed_contour_polygons if polygon.get_area() > min_area]
-            #        ).write('contours_{0}_{1}.gpmlz'.format(self.contouring_point_spacing_degrees, age))
+            # A contour polygon's area should not be more than half the global area.
+            # It seems this can happen with pygplates revisions prior to 31 when there's a sliver polygon along the dateline
+            # (that gets an area that's a multiple of PI, instead of zero).
+            max_area = 2 * math.pi - 1e-4
 
             for reconstructed_contour_polygon in reconstructed_contour_polygons:
                 reconstructed_contour_polygon_area = reconstructed_contour_polygon.get_area()
-                # Exclude contour polygon if smaller the threshold.
+                # Exclude contour polygon if smaller than the threshold.
                 if (reconstructed_contour_polygon_area > min_area and
                     reconstructed_contour_polygon_area < max_area):
                     total_perimeter += reconstructed_contour_polygon.get_arc_length()
                     total_area += reconstructed_contour_polygon_area
+
+                    # Debug output contour polygons.
+                    if self.debug_contour_polygons:
+                        self.debug_contour_polygon_features.append(
+                                pygplates.Feature.create_reconstructable_feature(
+                                        pygplates.FeatureType.gpml_unclassified_feature,
+                                        reconstructed_contour_polygon,
+                                        valid_time=(age + 0.5 * self.debug_time_interval, age - 0.5 * self.debug_time_interval)))
 
         #print('age:', age, 'frag_index:', total_perimeter / total_area); sys.stdout.flush()
         return total_perimeter / total_area
