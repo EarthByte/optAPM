@@ -325,17 +325,22 @@ if __name__ == '__main__':
                 enable_hotspot_trails, hotspot_trails_weight, hotspot_trails_cost_func, hotspot_trails_bounds = get_hotspot_trail_params(ref_rotation_start_age)
                 enable_plate_velocity, plate_velocity_weight, plate_velocity_cost_func, plate_velocity_bounds = get_plate_velocity_params(ref_rotation_start_age)
                 
-                # Multiply the plate velocity weight by the normalised fragmentation index for the current time.
-                # This means fragmented continents can be constrained by plate velocities more than un-fragmented (eg, supercontinents).
+                # Multiply the plate velocity penalty by the inverse of normalised fragmentation index.
+                # Continents with a large size should be penalized in terms of their speed, and large continents have a low fragmentation index.
+                # So the lower the fragmentation index the higher the penalty should be (hence the inverse of fragmentation index).
                 #
                 # NOTE: 'rotfile' has been updated above to have valid rotations from start to end of current interval,
                 #       so it should be fine to use at the start of current interval.
                 #       However, actually, we don't currently use the optimised rotation model. Instead we use the original rotation model
-                #       since optimisation is just an absolute offset that does not change the layout of the dynamic topologies and hence
+                #       since optimisation is just an absolute offset that does not change the layout of the continents and hence
                 #       doesn't affect the fragmentation.
-                normalised_continent_fragmentation_index = continent_fragmentation.get_fragmentation(ref_rotation_start_age)
-                # NOTE: We divide (instead of multiply) since this is an *inverse* weight (ie, plate velocity constraint cost is *multiplied* by "1.0 / weight").
-                plate_velocity_weight /= normalised_continent_fragmentation_index
+                inverse_normalised_continent_fragmentation_index = 1.0 / continent_fragmentation.get_fragmentation(ref_rotation_start_age)
+                #
+                # NOTE: We divide (instead of multiply) since plate velocity weight (like all weights) is an *inverse* weight
+                #       (ie, the plate velocity constraint cost is multiplied by '1.0 / plate_velocity_weight').
+                #       Hence '1.0 / plate_velocity_weight' becomes 'inverse_normalised_continent_fragmentation_index / plate_velocity_weight' and
+                #       so the constraint cost increases as the fragmentation index decreases (becomes more like a supercontinent).
+                plate_velocity_weight /= inverse_normalised_continent_fragmentation_index
 
                 # Gather parameters
                 params = [current_search_radius, rotation_uncertainty, search_type, current_models, model_stop_condition, max_iter,
