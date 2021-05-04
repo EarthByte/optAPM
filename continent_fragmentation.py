@@ -20,6 +20,10 @@ class ContinentFragmentation(object):
             original_rotation_filenames,  # Relative to the 'data/' directory.
             continent_features,
             continent_features_are_topologies,
+            # Point spacing used when creating continent contours (only used if continent_features_are_topologies is False)...
+            continent_contouring_point_spacing_degrees,
+            # Area threshold (in square radians) when creating continent contours (only used if continent_features_are_topologies is False)...
+            continent_contouring_area_threshold_steradians,
             age_range):
         """
         Load the continent features and use *original* rotation model to calculate fragment through all time to find normalisation factor.
@@ -35,8 +39,8 @@ class ContinentFragmentation(object):
         # When continents are regular static polygons (not dynamic topologies) we need a point grid to calculate
         # contour polygons representing the boundary of reconstructed static polygons that overlap each other.
         if not self.continent_features_are_topologies:
-            # 2.0 degrees seems almost better than 1.0 or 0.5 (which captures too small detail along continent boundary).
-            self.contouring_point_spacing_degrees = 2.0
+            self.contouring_area_threshold_steradians = continent_contouring_area_threshold_steradians
+            self.contouring_point_spacing_degrees = continent_contouring_point_spacing_degrees
             lons = np.arange(-180.0, 180.001, self.contouring_point_spacing_degrees)
             lats = np.arange(-90.0, 90.001, self.contouring_point_spacing_degrees)
             self.contouring_grid_dimensions = len(lats), len(lons)
@@ -78,13 +82,19 @@ class ContinentFragmentation(object):
     
     def get_fragmentation(
             self,
-            age):
+            age,
+            normalize=True):
         """
         Calculate the normalised continental fragmentation index at the specified time.
         """
 
-        # Return a *normalised* version of the pre-calculated fragmentation at age.
-        return self.fragmentations[age] / self.max_fragmentation
+        fragmentation = self.fragmentations[age]
+
+        if normalize:
+            # A *normalised* version of the pre-calculated fragmentation at age.
+            fragmentation /= self.max_fragmentation
+
+        return fragmentation
     
     
     def _calculate_fragmentation(
@@ -126,9 +136,7 @@ class ContinentFragmentation(object):
             reconstructed_contour_polygons = self._calculate_contour_polygons(reconstructed_polygons)
             
             # Contour polygons smaller than this will be excluded.
-            # Note: Units here are for normalised sphere (so full Earth area is 4*pi).
-            #       So 0.03 covers an area of approximately 1,200,000 km^2.
-            min_area = 0.03
+            min_area = self.contouring_area_threshold_steradians
             # A contour polygon's area should not be more than half the global area.
             # It seems this can happen with pygplates revisions prior to 31 when there's a sliver polygon along the dateline
             # (that gets an area that's a multiple of PI, instead of zero).
@@ -150,7 +158,7 @@ class ContinentFragmentation(object):
                                         reconstructed_contour_polygon,
                                         valid_time=(age + 0.5 * self.debug_time_interval, age - 0.5 * self.debug_time_interval)))
 
-        #print('age:', age, 'frag_index:', total_perimeter / total_area); sys.stdout.flush()
+        #print('age:', age, 'frag_index (1/km):', total_perimeter / total_area / 6371.0); sys.stdout.flush()
         return total_perimeter / total_area
     
     

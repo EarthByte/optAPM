@@ -132,6 +132,23 @@ else:
 # The grid spacing (in degrees) between points in the grid used for plate velocity calculations (when plate velocity is enabled).
 plate_velocity_grid_spacing = 2.0
 
+# The grid spacing (in degrees) between points in the grid used for contouring/aggregrating blocks of continental polygons.
+#
+# 2.0 degrees seems almost better than 1.0 or 0.5 (which captures too small detail along continent boundary).
+#
+# NOTE: This only applies if both plate velocity is enabled (see 'get_plate_velocity_params' below) and
+#       'plate_velocity_continental_polygons_file' is specified (ie, not None).
+plate_velocity_continental_fragmentation_point_spacing_degrees = 2.0
+
+# Contour polygons smaller than this will be excluded when contouring/aggregrating blocks of continental polygons.
+# Note: Units here are for normalised sphere (ie, steradians or square radians) so full Earth area is 4*pi.
+#       So 0.03 covers an area of approximately 1,200,000 km^2 (ie, 0.03 * 6371^2, where Earth radius is 6371km).
+#
+# NOTE: This only applies if both plate velocity is enabled (see 'get_plate_velocity_params' below) and
+#       'plate_velocity_continental_polygons_file' is specified (ie, not None).
+plate_velocity_continental_fragmentation_area_threshold_steradians = 0.03
+
+
 # Temporary: Allow input of GPlates exported net rotation file.
 # TODO: Remove when we can calculate net rotation in pygplates for a deforming model.
 #       Currently we can only calculate net rotation in pygplates for non-deforming models.

@@ -194,6 +194,8 @@ if __name__ == '__main__':
                     original_rotation_filenames,
                     plate_velocity_plate_features,
                     plate_velocity_features_are_topologies,
+                    plate_velocity_continental_fragmentation_point_spacing_degrees,
+                    plate_velocity_continental_fragmentation_area_threshold_steradians,
                     age_range)
 
             
