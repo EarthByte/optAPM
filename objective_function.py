@@ -96,6 +96,8 @@ class ObjectiveFunction(object):
         # each candidate rotation model and the plate IDs (and positions).
         if data_array[4]:
             self.pv_data = pgp.FeatureCollection(plate_velocity_file)
+            # Scalar type used to extract plate IDs in each continetal contour coverage geometry.
+            self.plate_id_scalar_type = pgp.ScalarType.create_gpml('PlateID')
 
 
         #
@@ -423,43 +425,113 @@ class ObjectiveFunction(object):
         if self.data_array[4] == True:
             
             # Calculate velocity vectors at all pre-calculated grid points ('self.pv_data').
-            velocity_vectors = []
+            velocity_vectors_in_contours = []
             
-            # 'self.pv_data' contains multi-points (and each multi-point has a plate ID).
-            # Each multi-point represents those grid points that fall within a resolved plate
-            # (or continental polygon) with a particular plate ID. Velocities can then be calculated
-            # using the current updated rotation model and the plate IDs (and positions).
+            # Look at the first multipoint feature (or any for that matter) to see if it came from a continent contour.
+            # This determines whether the multipoints are inside continent features or inside plate topology features.
+            plate_features_are_topologies = not self.pv_data[0].get_shapefile_attribute('is_in_continent_contour')
+
+            # 'self.pv_data' contains multi-points.
             for multi_point_feature in self.pv_data:
-                plate_id = multi_point_feature.get_reconstruction_plate_id()
+                shapefile_attributes = multi_point_feature.get_shapefile_attributes()
                 
-                # Get equivalent stage rotation from 'self.ref_rotation_start_age' to
-                # 'self.ref_rotation_start_age - self.interval'
-                equivalent_stage_rotation = rotation_model_updated.get_rotation(
-                        self.ref_rotation_start_age - self.interval,
-                        plate_id,
-                        self.ref_rotation_start_age)
-                
-                # There is only one (multi-point) geometry per feature but assume there could be more.
-                for multi_point in multi_point_feature.get_geometries():
-                    multi_point_velocity_vectors = pgp.calculate_velocities(
+                # For continents we each multi-point represents a contour polygon.
+                # This is distinguished by the fact that the multipoint feature has a 'is_in_continent_contour' shapefile attribute.
+                if 'is_in_continent_contour' in shapefile_attributes:
+                    #
+                    # Each multi-point represents an aggregate continental polygon (ie, contour around
+                    # continental polygons that abutt/overlap each other).
+                    # Each multi-point can have one or more plate IDs (as a scalar coverage) which are
+                    # contiguous groups (ie, first N points have plate_id_1, next M points have plate_id_2, etc).
+                    #
+                    
+                    # There is only one (multi-point) coverage per feature.
+                    coverage_multipoint, coverage_scalars = multi_point_feature.get_geometry(coverage_return=pgp.CoverageReturn.geometry_and_scalars)
+                    coverage_plate_ids = coverage_scalars[self.plate_id_scalar_type]
+
+                    # Convert plate IDs from float to int since the coverage scalars are stored as floats.
+                    #
+                    # Note that float can represent integers exactly (up to approx 2^53 for double-precision float, which is
+                    # enough for plate IDs, and this precision is retained in the GPML files that store the scalar coverages).
+                    coverage_plate_ids = [int(plate_id) for plate_id in coverage_plate_ids]
+
+                    velocity_vectors_in_contour = []
+
+                    point_index = 0
+                    num_points = len(coverage_multipoint)
+                    while point_index < num_points:
+                        plate_id = coverage_plate_ids[point_index]
+
+                        # Get the first point in the current group of points with the same plate ID.
+                        points_with_plate_id = [coverage_multipoint[point_index]]
+                        point_index += 1
+
+                        # Get the remaining points in the current group of points with the same plate ID.
+                        while point_index < num_points:
+                            # Each multi-point can have one or more plate IDs (as a scalar coverage) which are
+                            # contiguous groups (ie, first N points have plate_id_1, next M points have plate_id_2, etc).
+                            # So we keep accumulating points until the plate ID changes.
+                            if plate_id != coverage_plate_ids[point_index]:
+                                break
+                            points_with_plate_id.append(coverage_multipoint[point_index])
+                            point_index += 1
+
+                        # Get equivalent stage rotation from 'self.ref_rotation_start_age' to
+                        # 'self.ref_rotation_start_age - self.interval'
+                        equivalent_stage_rotation = rotation_model_updated.get_rotation(
+                                self.ref_rotation_start_age - self.interval,
+                                plate_id,
+                                self.ref_rotation_start_age)
+                        
+                        velocity_vectors_in_contour.extend(
+                                pgp.calculate_velocities(
+                                        points_with_plate_id,
+                                        equivalent_stage_rotation,
+                                        self.interval,
+                                        # Units of km/Myr (equivalent to mm/yr)...
+                                        velocity_units=pgp.VelocityUnits.kms_per_my))
+
+                else:
+                    #
+                    # Each multi-point represents those grid points that fall within a resolved plate with a particular plate ID.
+                    # Velocities can then be calculated using the current updated rotation model and the plate IDs (and positions).
+                    #
+                    resolved_plate_id = multi_point_feature.get_reconstruction_plate_id()
+
+                    # Get equivalent stage rotation from 'self.ref_rotation_start_age' to
+                    # 'self.ref_rotation_start_age - self.interval'
+                    equivalent_stage_rotation = rotation_model_updated.get_rotation(
+                            self.ref_rotation_start_age - self.interval,
+                            resolved_plate_id,
+                            self.ref_rotation_start_age)
+                    
+                    # There is only one (multi-point) geometry per feature.
+                    multi_point = multi_point_feature.get_geometry()
+                    velocity_vectors_in_contour = pgp.calculate_velocities(
                             multi_point,
                             equivalent_stage_rotation,
                             self.interval,
                             # Units of km/Myr (equivalent to mm/yr)...
                             velocity_units=pgp.VelocityUnits.kms_per_my)
-                    velocity_vectors.extend(multi_point_velocity_vectors)
-
-            # Velocity vectors at all pre-calculated grid points.
-            velocity_magnitudes = [velocity_vector.get_magnitude() for velocity_vector in velocity_vectors]
-            
-            median_velocity = np.median(velocity_magnitudes)
+                
+                contour_perimeter = shapefile_attributes['contour_perimeter']
+                contour_area = shapefile_attributes['contour_area']
+                
+                velocity_vectors_in_contours.append((contour_perimeter, contour_area, velocity_vectors_in_contour))
             
             # Delegate cost evaluation to cost function.
-            pv_eval = self.cost_func_array[4](velocity_vectors, velocity_magnitudes, median_velocity)
+            pv_eval = self.cost_func_array[4](plate_features_are_topologies, velocity_vectors_in_contours)
             
             # Penalise out-of-bound cost values (if requested).
             if self.bounds_array[4]:
                 pv_lower_bound, pv_upper_bound = self.bounds_array[4]
+
+                # Calculate median of all velocities (in all contours).
+                velocity_magnitudes = []
+                for _, _, velocity_vectors_in_contour in velocity_vectors_in_contours:
+                    velocity_magnitudes.extend(velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour)
+                median_velocity = np.median(velocity_magnitudes)
+
                 # Note that we compare the median velocity (not 'pv_eval').
                 # Currently they're the same, but might not be in future.
                 # Also note that median and bounds velocities are in same units of mm/yr (equivalent to km/Myr).
