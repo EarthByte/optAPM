@@ -427,9 +427,8 @@ class ObjectiveFunction(object):
             # Calculate velocity vectors at all pre-calculated grid points ('self.pv_data').
             velocity_vectors_in_contours = []
             
-            # Look at the first multipoint feature (or any for that matter) to see if it came from a continent contour.
             # This determines whether the multipoints are inside continent features or inside plate topology features.
-            plate_features_are_topologies = not self.pv_data[0].get_shapefile_attribute('is_in_continent_contour')
+            plate_features_are_topologies = True
 
             # 'self.pv_data' contains multi-points.
             for multi_point_feature in self.pv_data:
@@ -438,6 +437,10 @@ class ObjectiveFunction(object):
                 # For continents we each multi-point represents a contour polygon.
                 # This is distinguished by the fact that the multipoint feature has a 'is_in_continent_contour' shapefile attribute.
                 if 'is_in_continent_contour' in shapefile_attributes:
+
+                    # Look at the first multipoint feature (or any for that matter) to see if it came from a continent contour.
+                    plate_features_are_topologies = False
+
                     #
                     # Each multi-point represents an aggregate continental polygon (ie, contour around
                     # continental polygons that abutt/overlap each other).
@@ -531,6 +534,7 @@ class ObjectiveFunction(object):
                 for _, _, velocity_vectors_in_contour in velocity_vectors_in_contours:
                     velocity_magnitudes.extend(velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour)
                 median_velocity = np.median(velocity_magnitudes)
+                #print('pv_eval', pv_eval, 'median_velocity', median_velocity)
 
                 # Note that we compare the median velocity (not 'pv_eval').
                 # Currently they're the same, but might not be in future.

@@ -174,7 +174,7 @@ class PlateVelocityPartitioner(object):
                 continent_polygon_plate_ids.append(reconstructed_feature_geometry.get_feature().get_reconstruction_plate_id())
             
             # Find the reconstructed continental polygon (if any) containing each point.
-            continent_point_plate_ids = points_in_polygons.find_polygons(
+            point_plate_ids = points_in_polygons.find_polygons(
                     self.points,
                     # The reconstructed continental polygons...
                     reconstructed_continent_polygons,
@@ -184,7 +184,7 @@ class PlateVelocityPartitioner(object):
             # Each point is contained by one reconstructed polygon (or none).
             continent_points = []
             continent_point_plate_ids = []
-            for point_index, point_plate_id in enumerate(continent_point_plate_ids):
+            for point_index, point_plate_id in enumerate(point_plate_ids):
                 # If point is not in any continental polygon then it is on oceanic crust and we ignore it.
                 # If it's in two continental polygons then they overlap (which can happen when continental polygons are reconstructed),
                 # in which case we asked for only one of the polygons to be kept by 'points_in_polygons.find_polygons()'.

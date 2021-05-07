@@ -70,6 +70,8 @@ class ContinentFragmentation(object):
 
         # Debug output contour polygons to GPML.
         if self.debug_contour_polygons:
+            # Easiest way to force contour polygons to be generated for all times is to get a *normalized* fragmentation index.
+            self.get_fragmentation(age_range[0], normalize=True)
             pygplates.FeatureCollection(self.debug_contour_polygon_features).write('contour_polygons.gpmlz')
     
     
