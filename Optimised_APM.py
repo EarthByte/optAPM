@@ -168,9 +168,19 @@ if __name__ == '__main__':
                 plate_velocity_plate_features = list(
                     pgp.FeatureCollection(os.path.join(datadir, plate_velocity_continental_polygons_file)))
                 plate_velocity_features_are_topologies = False
+
+                # Continental fragmentation (global perimeter-to-area ratio) will be used to adjust the plate velocities weight.
+                plate_velocity_fragmentation = ContinentFragmentation(
+                        datadir,
+                        original_rotation_filenames,
+                        plate_velocity_plate_features,
+                        plate_velocity_continental_fragmentation_point_spacing_degrees,
+                        plate_velocity_continental_fragmentation_area_threshold_steradians,
+                        age_range)
             else:
                 plate_velocity_plate_features = topology_features
                 plate_velocity_features_are_topologies = True
+                plate_velocity_fragmentation = None
             
             # Generates points and associated plate IDs at each reconstruction time (for plate velocities later on).
             # Use either topologies (continental+ocean) or just continental.
@@ -179,31 +189,18 @@ if __name__ == '__main__':
                     original_rotation_filenames,
                     plate_velocity_plate_features,
                     plate_velocity_features_are_topologies,
+                    plate_velocity_fragmentation,
                     data_model,
                     plate_velocity_grid_spacing)
             # The filename used to store the (plate velocity) points and associated plate IDs at the reconstruction time.
             # The same filename is used for all reconstruction times (it just gets overwritten at each time).
             pv_file = plate_velocity_partitioner.get_plate_velocity_filename()
 
-            # Continental fragmentation (global perimater-to-area ratio) will be used to adjust the plate velocities weight.
-            #
-            # First calculate through all time to find normalisation factor. This is so that approx 1.0 will represent maximum
-            # fragmentation when later using optimised rotation model to calculate fragmentation at each time interval.
-            continent_fragmentation = ContinentFragmentation(
-                    datadir,
-                    original_rotation_filenames,
-                    plate_velocity_plate_features,
-                    plate_velocity_features_are_topologies,
-                    plate_velocity_continental_fragmentation_point_spacing_degrees,
-                    plate_velocity_continental_fragmentation_area_threshold_steradians,
-                    age_range)
-
             
             print("Rotation file to be used: ", rotfile)
             print("TM data:", tm_data_type)
             print("TM method:", tm_method)
-            print("Age range for model:", age_range
-)
+            print("Age range for model:", age_range)
             print("-------------------------------------------------------------------")
             print("")
             print(model_name)
@@ -326,23 +323,6 @@ if __name__ == '__main__':
                 enable_trench_migration, trench_migration_weight, trench_migration_cost_func, trench_migration_bounds = get_trench_migration_params(ref_rotation_start_age)
                 enable_hotspot_trails, hotspot_trails_weight, hotspot_trails_cost_func, hotspot_trails_bounds = get_hotspot_trail_params(ref_rotation_start_age)
                 enable_plate_velocity, plate_velocity_weight, plate_velocity_cost_func, plate_velocity_bounds = get_plate_velocity_params(ref_rotation_start_age)
-                
-                # Multiply the plate velocity penalty by the inverse of normalised fragmentation index.
-                # Continents with a large size should be penalized in terms of their speed, and large continents have a low fragmentation index.
-                # So the lower the fragmentation index the higher the penalty should be (hence the inverse of fragmentation index).
-                #
-                # NOTE: 'rotfile' has been updated above to have valid rotations from start to end of current interval,
-                #       so it should be fine to use at the start of current interval.
-                #       However, actually, we don't currently use the optimised rotation model. Instead we use the original rotation model
-                #       since optimisation is just an absolute offset that does not change the layout of the continents and hence
-                #       doesn't affect the fragmentation.
-                inverse_normalised_continent_fragmentation_index = 1.0 / continent_fragmentation.get_fragmentation(ref_rotation_start_age)
-                #
-                # NOTE: We divide (instead of multiply) since plate velocity weight (like all weights) is an *inverse* weight
-                #       (ie, the plate velocity constraint cost is multiplied by '1.0 / plate_velocity_weight').
-                #       Hence '1.0 / plate_velocity_weight' becomes 'inverse_normalised_continent_fragmentation_index / plate_velocity_weight' and
-                #       so the constraint cost increases as the fragmentation index decreases (becomes more like a supercontinent).
-                plate_velocity_weight /= inverse_normalised_continent_fragmentation_index
 
                 # Gather parameters
                 params = [current_search_radius, rotation_uncertainty, search_type, current_models, model_stop_condition, max_iter,
