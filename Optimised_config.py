@@ -332,10 +332,48 @@ def get_hotspot_trail_params(age):
 
 def get_plate_velocity_params(age):
     # Cost function - see "objective_function.py" for definition of function arguments...
-    def cost_function(velocity_vectors, velocity_magnitudes, median_velocity):
+    def cost_function(plate_features_are_topologies, velocity_vectors_in_contours):
         # NOTE: Import any modules used in this function here
         #       (since this function's code might be serialised over the network to remote nodes).
-        return median_velocity
+        import numpy as np
+
+        if plate_features_are_topologies:
+            #total_plate_perimeter = 0.0
+            #total_plate_area = 0.0
+
+            # Calculate median of all velocities (in all contours/plates).
+            velocity_magnitudes = []
+            for plate_perimeter, plate_area, velocity_vectors_in_contour in velocity_vectors_in_contours:
+                velocity_magnitudes.extend(velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour)
+
+                #total_plate_perimeter += plate_perimeter
+                #total_plate_area += plate_area
+            
+            return np.median(velocity_magnitudes)
+
+        else:  # continent contours...
+            total_contour_weight = 0.0
+            total_contour_weighted_median_velocity = 0.0
+
+            # Calculate a median velocity magnitude for each continent contour.
+            for contour_perimeter, contour_area, velocity_vectors_in_contour in velocity_vectors_in_contours:
+                contour_weight = contour_area / contour_perimeter
+                # Only include the larger contours that exceed an area/perimeter threshold.
+                # Note that 0.1427 corresponds to a perimeter/area of 7 radian^-1 or 0.0011 km^-1 (using a mean Earth radius of 6,371 km).
+                if contour_weight > 0.1427:
+                    median_velocity_in_contour = np.median([velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour])
+
+                    # Continents with a larger area/perimeter ratio should be penalized more in terms of their speed.
+                    # So weight their median velocity more heavily.
+                    total_contour_weighted_median_velocity += contour_weight * median_velocity_in_contour
+                    total_contour_weight += contour_weight
+            
+            # If there were no contours exceeding area/perimeter threshold then no need to penalize, so return zero cost.
+            if total_contour_weight == 0.0:
+                return 0.0
+            
+            # Return the weighted mean of the median velocities of the contours.
+            return total_contour_weighted_median_velocity / total_contour_weight
 
     # Note: Use units of mm/yr (same as km/Myr)...
     #pv_bounds = [0, 60]
