@@ -142,11 +142,11 @@ plate_velocity_continental_fragmentation_point_spacing_degrees = 2.0
 
 # Contour polygons smaller than this will be excluded when contouring/aggregrating blocks of continental polygons.
 # Note: Units here are for normalised sphere (ie, steradians or square radians) so full Earth area is 4*pi.
-#       So 0.03 covers an area of approximately 1,200,000 km^2 (ie, 0.03 * 6371^2, where Earth radius is 6371km).
+#       So 0.1 covers an area of approximately 4,000,000 km^2 (ie, 0.1 * 6371^2, where Earth radius is 6371km).
 #
 # NOTE: This only applies if both plate velocity is enabled (see 'get_plate_velocity_params' below) and
 #       'plate_velocity_continental_polygons_file' is specified (ie, not None).
-plate_velocity_continental_fragmentation_area_threshold_steradians = 0.03
+plate_velocity_continental_fragmentation_area_threshold_steradians = 0.1
 
 
 # Temporary: Allow input of GPlates exported net rotation file.
