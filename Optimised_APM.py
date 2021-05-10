@@ -495,16 +495,17 @@ if __name__ == '__main__':
                 minf = opt.last_optimum_value()
                 
                 # Debug print number of iterations needed to converge.
-                #print opt.get_numevals(), 'iterations performed'
+                #print(opt.get_numevals(), 'iterations performed')
                 #sys.stdout.flush()
 
                 # To debug the weighted cost functions (net rotation, trench migration, etc).
-                #print 'Min objective function costs', np.min(obj_f.debug_data_array, axis=0)
-                #print 'Max objective function costs', np.max(obj_f.debug_data_array, axis=0)
-                #print 'Std objective function costs', np.std(obj_f.debug_data_array, axis=0)
-                #print 'Mean objective function costs', np.mean(obj_f.debug_data_array, axis=0)
-                #print 'Median objective function costs', np.median(obj_f.debug_data_array, axis=0)
-                #print 'Optimal cost', minf
+                #print('Min objective function costs', np.min(obj_f.debug_data_array, axis=0))
+                #print('Max objective function costs', np.max(obj_f.debug_data_array, axis=0))
+                #print('Mean objective function costs', np.mean(obj_f.debug_data_array, axis=0))
+                #print('Std dev objective function costs', np.std(obj_f.debug_data_array, axis=0))
+                #print('Median objective function costs', np.median(obj_f.debug_data_array, axis=0))
+                #print('Median abs dev objective function costs', np.median(np.absolute(obj_f.debug_data_array - np.median(obj_f.debug_data_array, axis=0)), axis=0))
+                #print('Optimal cost', minf)
                 #sys.stdout.flush()
 
                 return xopt, minf
@@ -591,6 +592,7 @@ if __name__ == '__main__':
                 print(" ")
                 print("Optimisation complete.")
                 print("Models produced:", len(xopt))
+                #print('Minimum optimal cost:', np.min(results))
                 print(" ")
 
 

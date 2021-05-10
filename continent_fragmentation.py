@@ -133,11 +133,26 @@ class ContinentFragmentation(object):
         
         # Calculate contour polygons representing the boundary(s) of the reconstructed static polygons that overlap each other.
         reconstructed_contour_polygons = self.get_contour_polygons(reconstructed_polygons)
+        
+        # Contour polygons smaller than this will be excluded.
+        min_area = self.contouring_area_threshold_steradians
+        # A contour polygon's area should not be more than half the global area.
+        # It seems this can happen with pygplates revisions prior to 31 when there's a sliver polygon along the dateline
+        # (that gets an area that's a multiple of PI, instead of zero).
+        max_area = 2 * math.pi - 1e-4
+
+        reconstructed_contour_polygons_above_area_threshold = []
+        for contour_polygon in reconstructed_contour_polygons:
+            # Exclude contour polygon if smaller than the threshold.
+            contour_polygon_area = contour_polygon.get_area()
+            if (contour_polygon_area > min_area and
+                contour_polygon_area < max_area):
+                reconstructed_contour_polygons_above_area_threshold.append(contour_polygon)
 
         # Update total perimeter and area.
-        for reconstructed_contour_polygon in reconstructed_contour_polygons:
-            total_perimeter += reconstructed_contour_polygon.get_arc_length()
-            total_area += reconstructed_contour_polygon.get_area()
+        for contour_polygon in reconstructed_contour_polygons_above_area_threshold:
+            total_perimeter += contour_polygon.get_arc_length()
+            total_area += contour_polygon.get_area()
 
         # Debug output contour polygons.
         if self.debug_contour_polygons:
@@ -146,7 +161,7 @@ class ContinentFragmentation(object):
                             pygplates.FeatureType.gpml_unclassified_feature,
                             reconstructed_contour_polygon,
                             valid_time=(age + 0.5 * self.debug_time_interval, age - 0.5 * self.debug_time_interval))
-                    for reconstructed_contour_polygon in reconstructed_contour_polygons)
+                    for reconstructed_contour_polygon in reconstructed_contour_polygons_above_area_threshold)
 
         #print('age:', age, 'frag_index (1/km):', total_perimeter / total_area / 6371.0); sys.stdout.flush()
         return total_perimeter / total_area
@@ -157,26 +172,11 @@ class ContinentFragmentation(object):
             continent_polygons):
         """
         Find the boundaries of the specified (potentially overlapping/abutting) continent polygons as contour polygons.
+
+        Note that area thresholding is *not* applied here.
         """
 
-        contour_polygons = self._calculate_contour_polygons(continent_polygons)
-        
-        # Contour polygons smaller than this will be excluded.
-        min_area = self.contouring_area_threshold_steradians
-        # A contour polygon's area should not be more than half the global area.
-        # It seems this can happen with pygplates revisions prior to 31 when there's a sliver polygon along the dateline
-        # (that gets an area that's a multiple of PI, instead of zero).
-        max_area = 2 * math.pi - 1e-4
-
-        contour_polygons_above_area_threshold = []
-        for contour_polygon in contour_polygons:
-            # Exclude contour polygon if smaller than the threshold.
-            contour_polygon_area = contour_polygon.get_area()
-            if (contour_polygon_area > min_area and
-                contour_polygon_area < max_area):
-                contour_polygons_above_area_threshold.append(contour_polygon)
-
-        return contour_polygons_above_area_threshold
+        return self._calculate_contour_polygons(continent_polygons)
 
     
     def _calculate_contour_polygons(

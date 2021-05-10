@@ -193,6 +193,9 @@ class PlateVelocityPartitioner(object):
                     continent_point_plate_ids.append(point_plate_id)
             
             # Calculate contour polygons representing the boundary(s) of the reconstructed continental polygons that overlap each other.
+            #
+            # NOTE: We are NOT excluding contours based on area or perimeter/area ratio.
+            #       That determination must be made by the final cost function that calculates the cost (penalty).
             reconstructed_contour_polygons = self.continent_fragmentation.get_contour_polygons(reconstructed_continent_polygons)
             
             # Find the reconstructed contour polygon (if any) containing each continent point.

@@ -136,6 +136,9 @@ plate_velocity_grid_spacing = 2.0
 #
 # 2.0 degrees seems almost better than 1.0 or 0.5 (which captures too small detail along continent boundary).
 #
+# Note: It's probably best to make this the same as 'plate_velocity_grid_spacing' so that the same points used for
+#       calculating velocities are used for generating continent contours.
+#
 # NOTE: This only applies if both plate velocity is enabled (see 'get_plate_velocity_params' below) and
 #       'plate_velocity_continental_polygons_file' is specified (ie, not None).
 plate_velocity_continental_fragmentation_point_spacing_degrees = 2.0
@@ -364,20 +367,44 @@ def get_plate_velocity_params(age):
 
             # Calculate a median velocity magnitude for each continent contour.
             for contour_perimeter, contour_area, velocity_vectors_in_contour in velocity_vectors_in_contours:
+                median_velocity_in_contour = np.median([velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour])
+
+                # Continents with a larger area/perimeter ratio should be penalized more in terms of their speed.
+                # So weight their median velocity more heavily.
                 contour_weight = contour_area / contour_perimeter
                 if contour_weight > contour_weight_threshold:
-                    median_velocity_in_contour = np.median([velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour])
-                    # Continents with a larger area/perimeter ratio should be penalized more in terms of their speed.
-                    # So weight their median velocity more heavily.
-                    contour_weighted_median_velocities.append(contour_weight * median_velocity_in_contour)
+                    contour_weighted_median_velocity = contour_weight * median_velocity_in_contour
+                else:
+                    # We still penalize smaller area/perimeter contours, but much less.
+                    # For the reason we do this: see note below about returning zero cost.
+                    contour_weighted_median_velocity = 0.001 * median_velocity_in_contour
+                
+                contour_weighted_median_velocities.append(contour_weighted_median_velocity)
             
-            # If there were no contours exceeding area/perimeter threshold then no need to penalize, so return zero cost.
+            # If there were no contours at all then just return zero cost.
+            #
+            # This shouldn't happen because we should be getting all contours,
+            # none should be excluded based on area or perimeter/area ratio.
+            #
+            # And note that returning zero cost is generally not a good idea because if the plate velocity cost happens
+            # to be the only cost metric (eg, net rotation and trench migration weights are zero) then the optimizer cannot
+            # find a minimum (since it's likely all model seeds could return zero). In this case the optimizer could just return
+            # any solution. This was observed (when contours below a threshold were given zero weight, which we no longer do)
+            # as very high speed absolute plate motions that zipped back and forth across the globe.
             if not contour_weighted_median_velocities:
                 return 0.0
             
             # Return the mean of the weighted median velocities of the contours.
-            # And make it so a contour weight equal to the threshold amounts to a weight of 1.0.
-            return np.mean(contour_weighted_median_velocities) / contour_weight_threshold
+            #
+            # And scale it so that it roughly matches what we had previously, which was an un-weighted median velocity over all continents and so we want to
+            # undo the weighting which we'll take as the average area/perimeter ratio of all contours (so undoing that means multiplying by average perimeter/area).
+            # So here the scaling factor 7.0 corresponds to a perimeter/area of 7 radian^-1 or 0.0011 km^-1 (using a mean Earth radius of 6,371 km),
+            # which is about the averge perimeter/area of continent contours over time.
+            #
+            # We could instead include this scale factor in the 'scale_plate_velocity' internal scaling factor in the objective function, but it's easier to do it here
+            # (and explain the reason here). And that internal scale factor is usually based on doing a few optimization runs and adjusting the internal scale factors so
+            # that all costs (with equal weighting, eg, net rotation = trench migration = plate velocity = 1.0) come out roughly equal over all geological times.
+            return 7.0 * np.mean(contour_weighted_median_velocities)
 
     # Note: Use units of mm/yr (same as km/Myr)...
     #pv_bounds = [0, 60]
