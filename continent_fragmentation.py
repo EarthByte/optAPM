@@ -2,6 +2,7 @@ import math
 import os
 import os.path
 import points_in_polygons
+import proximity_query
 import pygplates
 from skimage import measure
 import sys
@@ -23,6 +24,8 @@ class ContinentFragmentation(object):
             continent_contouring_point_spacing_degrees,
             # Area threshold (in square radians) when creating continent contours...
             continent_contouring_area_threshold_steradians,
+            # Distance threshold to ensure small gaps between continents are ignored during contouring...
+            continent_contouring_gap_threshold_radians,
             age_range):
         """
         Load the continent features and use *original* rotation model to calculate fragment through all time to find normalisation factor.
@@ -33,6 +36,7 @@ class ContinentFragmentation(object):
 
         # A point grid to calculate contour polygons representing the boundary of reconstructed static polygons that overlap each other.
         self.contouring_area_threshold_steradians = continent_contouring_area_threshold_steradians
+        self.continent_contouring_gap_threshold_radians = continent_contouring_gap_threshold_radians
         self.contouring_point_spacing_degrees = continent_contouring_point_spacing_degrees
         lons = np.arange(-180.0, 180.001, self.contouring_point_spacing_degrees)
         lats = np.arange(-90.0, 90.001, self.contouring_point_spacing_degrees)
@@ -133,24 +137,9 @@ class ContinentFragmentation(object):
         
         # Calculate contour polygons representing the boundary(s) of the reconstructed static polygons that overlap each other.
         reconstructed_contour_polygons = self.get_contour_polygons(reconstructed_polygons)
-        
-        # Contour polygons smaller than this will be excluded.
-        min_area = self.contouring_area_threshold_steradians
-        # A contour polygon's area should not be more than half the global area.
-        # It seems this can happen with pygplates revisions prior to 31 when there's a sliver polygon along the dateline
-        # (that gets an area that's a multiple of PI, instead of zero).
-        max_area = 2 * math.pi - 1e-4
-
-        reconstructed_contour_polygons_above_area_threshold = []
-        for contour_polygon in reconstructed_contour_polygons:
-            # Exclude contour polygon if smaller than the threshold.
-            contour_polygon_area = contour_polygon.get_area()
-            if (contour_polygon_area > min_area and
-                contour_polygon_area < max_area):
-                reconstructed_contour_polygons_above_area_threshold.append(contour_polygon)
 
         # Update total perimeter and area.
-        for contour_polygon in reconstructed_contour_polygons_above_area_threshold:
+        for contour_polygon in reconstructed_contour_polygons:
             total_perimeter += contour_polygon.get_arc_length()
             total_area += contour_polygon.get_area()
 
@@ -161,7 +150,7 @@ class ContinentFragmentation(object):
                             pygplates.FeatureType.gpml_unclassified_feature,
                             reconstructed_contour_polygon,
                             valid_time=(age + 0.5 * self.debug_time_interval, age - 0.5 * self.debug_time_interval))
-                    for reconstructed_contour_polygon in reconstructed_contour_polygons_above_area_threshold)
+                    for reconstructed_contour_polygon in reconstructed_contour_polygons)
 
         #print('age:', age, 'frag_index (1/km):', total_perimeter / total_area / 6371.0); sys.stdout.flush()
         return total_perimeter / total_area
@@ -172,11 +161,26 @@ class ContinentFragmentation(object):
             continent_polygons):
         """
         Find the boundaries of the specified (potentially overlapping/abutting) continent polygons as contour polygons.
-
-        Note that area thresholding is *not* applied here.
         """
 
-        return self._calculate_contour_polygons(continent_polygons)
+        contour_polygons = self._calculate_contour_polygons(continent_polygons)
+        
+        # Contour polygons smaller than this will be excluded.
+        min_area = self.contouring_area_threshold_steradians
+        # A contour polygon's area should not be more than half the global area.
+        # It seems this can happen with pygplates revisions prior to 31 when there's a sliver polygon along the dateline
+        # (that gets an area that's a multiple of PI, instead of zero).
+        max_area = 2 * math.pi - 1e-4
+
+        contour_polygons_above_area_threshold = []
+        for contour_polygon in contour_polygons:
+            # Exclude contour polygon if smaller than the threshold.
+            contour_polygon_area = contour_polygon.get_area()
+            if (contour_polygon_area > min_area and
+                contour_polygon_area < max_area):
+                contour_polygons_above_area_threshold.append(contour_polygon)
+
+        return contour_polygons_above_area_threshold
 
     
     def _calculate_contour_polygons(
@@ -185,16 +189,32 @@ class ContinentFragmentation(object):
         """
         Find the boundaries of the specified (potentially overlapping/abutting) continent polygons as contour polygons.
 
-        Note that code used in this function was copied from code written by Andrew Merdith and Simon Williams.
+        Note that this function is based on code written by Andrew Merdith and Simon Williams:
         See https://github.com/amer7632/pyGPlates_examples/blob/master/Merdith_2019_GPC/Perimeter-to-area-ratio.ipynb
         """
 
         # Find the reconstructed continental polygon (if any) containing each point.
-        continent_polygons_containing_points = points_in_polygons.find_polygons(self.contouring_points, continent_polygons)
+        continent_polygons_containing_points = points_in_polygons.find_polygons(
+                self.contouring_points,
+                continent_polygons)
+
+        # Find the reconstructed continental polygon (if any) near each point.
+        # If a point is outside all polygon but close enough to the outline of a polygon then it's considered inside a contour.
+        # This ensures small gaps between continents are ignored during contouring.
+        continent_polygons_near_points = proximity_query.find_closest_geometries_to_points(
+                self.contouring_points,
+                continent_polygons,
+                distance_threshold_radians=self.continent_contouring_gap_threshold_radians)
 
         zval = []
-        for continent_polygon_containing_point in continent_polygons_containing_points:
-            if continent_polygon_containing_point is not None:
+        for contouring_point_index in range(len(self.contouring_points)):
+            continent_polygon_containing_point = continent_polygons_containing_points[contouring_point_index]
+            continent_polygon_near_point = continent_polygons_near_points[contouring_point_index]
+
+            # If the current point is either inside a continent polygon or close enough to its outline
+            # then mark the point as inside a contour.
+            if (continent_polygon_containing_point is not None or
+                continent_polygon_near_point is not None):
                 zval.append(1)
             else:
                 zval.append(0)

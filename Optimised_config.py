@@ -69,6 +69,8 @@ search_radius = 180
 # Number of seed models if the search radius were to cover the entire globe.
 #
 # In the past we typically used models=100 and search radius=60, which equates to model_density=400.
+#
+# NOTE: Currently, if 'search_type' is 'Uniform', then this will be rounded up to the nearest square (eg, 16, 25, 36).
 model_density = 400
 
 # Calculate the actual number of seed models used.
@@ -147,9 +149,20 @@ plate_velocity_continental_fragmentation_point_spacing_degrees = 2.0
 # Note: Units here are for normalised sphere (ie, steradians or square radians) so full Earth area is 4*pi.
 #       So 0.1 covers an area of approximately 4,000,000 km^2 (ie, 0.1 * 6371^2, where Earth radius is 6371km).
 #
+# Note: Currently we set this to zero and instead rely on the plate velocity cost function below to perform
+#       thresholding based on each contour's perimeter/area ratio.
+#
 # NOTE: This only applies if both plate velocity is enabled (see 'get_plate_velocity_params' below) and
 #       'plate_velocity_continental_polygons_file' is specified (ie, not None).
-plate_velocity_continental_fragmentation_area_threshold_steradians = 0.1
+plate_velocity_continental_fragmentation_area_threshold_steradians = 0.0
+
+# Gaps between continent polygons smaller than this will be excluded when contouring/aggregrating blocks of continental polygons.
+# Note: Units here are for normalised sphere (ie, radians).
+#       So 1.0 radian is approximately 6371 km (where Earth radius is 6371 km).
+#
+# NOTE: This only applies if both plate velocity is enabled (see 'get_plate_velocity_params' below) and
+#       'plate_velocity_continental_polygons_file' is specified (ie, not None).
+plate_velocity_continental_fragmentation_gap_threshold_radians = math.radians(4.0)  # 4 degrees is about 440 km
 
 
 # Temporary: Allow input of GPlates exported net rotation file.
@@ -419,7 +432,7 @@ def get_plate_velocity_params(age):
         if age <= 80:
             return True, 1.0, cost_function, pv_bounds  # Weight is always 1.0 for 0-80Ma
         else:
-            return True, 2.0, cost_function, pv_bounds  # 2.0 gives a *multiplicative* weight of 0.5
+            return True, 2.0, cost_function, pv_bounds  # 1.0 gives a *multiplicative* weight of 0.5
     else:
         return True, 1.0, cost_function, None
 

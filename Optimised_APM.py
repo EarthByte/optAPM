@@ -176,6 +176,7 @@ if __name__ == '__main__':
                         plate_velocity_plate_features,
                         plate_velocity_continental_fragmentation_point_spacing_degrees,
                         plate_velocity_continental_fragmentation_area_threshold_steradians,
+                        plate_velocity_continental_fragmentation_gap_threshold_radians,
                         age_range)
             else:
                 plate_velocity_plate_features = topology_features
