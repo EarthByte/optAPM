@@ -182,18 +182,17 @@ class ContinentFragmentation(object):
         
         # Contour polygons smaller than this will be excluded.
         min_area = self.contouring_area_threshold_steradians
-        # A contour polygon's area should not be more than half the global area.
-        # It seems this can happen with pygplates revisions prior to 31 when there's a sliver polygon along the dateline
-        # (that gets an area that's a multiple of PI, instead of zero).
-        max_area = 2 * math.pi - 1e-4
 
         contour_polygons_above_area_threshold = []
         for contour_polygon in contour_polygons:
             # Exclude contour polygon if smaller than the threshold.
             contour_polygon_area = contour_polygon.get_area()
-            if (contour_polygon_area > min_area and
-                contour_polygon_area < max_area):
-                contour_polygons_above_area_threshold.append(contour_polygon)
+            if contour_polygon_area > min_area:
+                # It seems, with pygplates revisions prior to 31, that a sliver polygon along the dateline can return
+                # an area that's a multiple of 2*PI (instead of zero). So let's exclude exact multiples of 2*PI.
+                contour_polygon_area_fmod_2pi = math.fmod(contour_polygon_area, 2 * math.pi)
+                if contour_polygon_area_fmod_2pi > 1e-6 or contour_polygon_area_fmod_2pi < 2 * math.pi - 1e-6:
+                    contour_polygons_above_area_threshold.append(contour_polygon)
 
         return contour_polygons_above_area_threshold
 
