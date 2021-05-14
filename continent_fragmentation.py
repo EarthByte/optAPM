@@ -59,11 +59,6 @@ class ContinentFragmentation(object):
 
         self.age_range = age_range
         
-        self.debug_contour_polygons = False
-        if self.debug_contour_polygons:
-            self.debug_contour_polygon_features = []
-            self.debug_time_interval = age_range[1] - age_range[0]
-        
         # Load all the original rotation feature collections.
         rotation_features = []
         for rotation_filename in original_rotation_filenames:
@@ -83,11 +78,17 @@ class ContinentFragmentation(object):
         # that'll require calculating fragmentation indices over the entire age range.
         self.max_fragmentation = None
 
-        # Debug output contour polygons to GPML.
-        if self.debug_contour_polygons:
+        # Debug output contours to GPML.
+        self.debug = False
+        if self.debug:
+            self.debug_contour_polygon_features = []
+            self.debug_time_interval = age_range[1] - age_range[0]
+            self.debug_continent_inside_point_features = []
+
             # Easiest way to force contour polygons to be generated for all times is to get a *normalized* fragmentation index.
             self.get_fragmentation(age_range[0], normalize=True)
             pygplates.FeatureCollection(self.debug_contour_polygon_features).write('contour_polygons.gpmlz')
+            pygplates.FeatureCollection(self.debug_continent_inside_point_features).write('continent_inside_points.gpmlz')
     
     
     def get_fragmentation(
@@ -146,6 +147,11 @@ class ContinentFragmentation(object):
         reconstructed_polygons = [pygplates.PolygonOnSphere(reconstructed_feature_geometry.get_reconstructed_geometry())
                 for reconstructed_feature_geometry in reconstructed_feature_geometries]
         
+        if self.debug:
+            # Age is needed by debugging inside contouring function.
+            self.debug_age = age
+            print(age); sys.stdout.flush()
+        
         # Calculate contour polygons representing the boundary(s) of the reconstructed static polygons that overlap each other.
         reconstructed_contour_polygons = self.get_contour_polygons(reconstructed_polygons)
 
@@ -155,7 +161,7 @@ class ContinentFragmentation(object):
             total_area += contour_polygon.get_area()
 
         # Debug output contour polygons.
-        if self.debug_contour_polygons:
+        if self.debug:
             self.debug_contour_polygon_features.extend(
                     pygplates.Feature.create_reconstructable_feature(
                             pygplates.FeatureType.gpml_unclassified_feature,
@@ -237,6 +243,20 @@ class ContinentFragmentation(object):
                 points_inside_contour.append(True)
             else:
                 points_inside_contour.append(False)
+        
+        # If contour debugging then create a debug feature containing all points inside contours.
+        if self.debug:
+            continent_inside_points = []
+
+            for contouring_point_index in range(len(self.contouring_points)):
+                if points_inside_contour[contouring_point_index]:
+                    continent_inside_points.append(self.contouring_points[contouring_point_index])
+
+            continent_inside_points_feature = pygplates.Feature.create_reconstructable_feature(
+                                        pygplates.FeatureType.gpml_unclassified_feature,
+                                        pygplates.MultiPointOnSphere(continent_inside_points),
+                                        valid_time=(self.debug_age + 0.5 * self.debug_time_interval, self.debug_age - 0.5 * self.debug_time_interval))
+            self.debug_continent_inside_point_features.append(continent_inside_points_feature)
         
         num_latitudes = self.contouring_grid_num_latitudes
         num_longitudes = self.contouring_grid_num_longitudes
@@ -514,6 +534,7 @@ class ContinentFragmentation(object):
                     # And make sure the end of the previous segment matches the start of the first segment.
                     # See comment above about adjacency relation for explanatation of exclusive-or.
                     if first_segment_start == (prev_segment_end ^ 0b10):
+                        # Break out of current contour loop (we've completed the contour).
                         break
 
             # Generate a contour polygon from the current loop of contour points.
