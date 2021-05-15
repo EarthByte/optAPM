@@ -5,7 +5,6 @@ import points_in_polygons
 import points_spatial_tree
 import proximity_query
 import pygplates
-from skimage import measure
 import sys
 import numpy as np
 
@@ -269,8 +268,8 @@ class ContinentFragmentation(object):
         #
         # This is a 2D version (surface of the globe) of the 3D Marching Cubes algorithm.
         # However the main difference between this and using skimage.measure.find_contours(),
-        # which also uses the Marching Squares algorithm, is we wrap across the dateline
-        # and handle the poles. In this way we avoid contour polygons clamped to the dateline.
+        # that we used previously and that also uses the Marching Squares algorithm, is we wrap across the
+        # dateline and handle the poles. In this way we avoid contour polygons clamped to the dateline.
         #
         # The way we handle wrapping around the dateline is to have grid points on the dateline (ie, at both longitude -180 and 180).
         # This way lat/lon points on the left side of uniform lat/lon grid of points actually map to the same points on the globe
@@ -539,77 +538,6 @@ class ContinentFragmentation(object):
 
             # Generate a contour polygon from the current loop of contour points.
             contour_polygon = pygplates.PolygonOnSphere(contour_points)
-            contour_polygons.append(contour_polygon)
-
-        return contour_polygons
-
-    
-    def _calculate_contour_polygons_using_skimage_measure_find_contours(
-            self,
-            continent_polygons):
-        """
-        Find the boundaries of the specified (potentially overlapping/abutting) continent polygons as contour polygons.
-
-        Note that this function is based on code written by Andrew Merdith and Simon Williams:
-        See https://github.com/amer7632/pyGPlates_examples/blob/master/Merdith_2019_GPC/Perimeter-to-area-ratio.ipynb
-        And note that there appears to be some issues with this algorithm - sometimes it generates polygons *outside* continent polygons
-        and sometimes (although rarely) does not generate contour polygons around continents (noticed it with very large contours).
-        """
-
-        # Improve efficiency by sharing same spatial tree of contouring points when finding points in polygons and finding points near polygons.
-        spatial_tree_of_contouring_points = points_spatial_tree.PointsSpatialTree(self.contouring_points)
-
-        # Find the reconstructed continental polygon (if any) containing each point.
-        continent_polygons_containing_points = points_in_polygons.find_polygons_using_points_spatial_tree(
-                self.contouring_points,
-                spatial_tree_of_contouring_points,
-                continent_polygons)
-
-        # Find the reconstructed continental polygon (if any) near each point.
-        # If a point is outside all polygon but close enough to the outline of a polygon then it's considered inside a contour.
-        # This ensures small gaps between continents are ignored during contouring.
-        continent_polygons_near_points = proximity_query.find_closest_geometries_to_points_using_points_spatial_tree(
-                self.contouring_points,
-                spatial_tree_of_contouring_points,
-                continent_polygons,
-                distance_threshold_radians=self.continent_contouring_gap_threshold_radians)
-
-        zval = []
-        for contouring_point_index in range(len(self.contouring_points)):
-            continent_polygon_containing_point = continent_polygons_containing_points[contouring_point_index]
-            continent_polygon_near_point = continent_polygons_near_points[contouring_point_index]
-
-            # If the current point is either inside a continent polygon or close enough to its outline
-            # then mark the point as inside a contour.
-            if (continent_polygon_containing_point is not None or
-                continent_polygon_near_point is not None):
-                zval.append(1)
-            else:
-                zval.append(0)
-            
-        bi = np.array(zval).reshape(self.contouring_grid_num_latitudes, self.contouring_grid_num_longitudes)
-    
-        # To handle edge effects, pad grid before making contour polygons.
-        pad_hor = np.zeros((1, bi.shape[1]))
-        pad_ver = np.zeros((bi.shape[0]+1, 1))
-        pad1 = np.vstack((bi, pad_hor))
-        pad2 = np.hstack((pad_ver, pad1))
-        pad3 = np.hstack((pad2, pad_ver))
-        contours = measure.find_contours(pad3, 0.5, fully_connected='low')
-
-        contour_polygons = []
-        for contour in contours:
-            # To handle edge effects again - strip off parts of polygon
-            # due to padding, and adjust from image coordinates to long/lat
-            contour[:,1] = (contour[:,1] * self.contouring_point_spacing_degrees) - 1
-            contour[:,0] = (contour[:,0] * self.contouring_point_spacing_degrees) - 1
-            contour[np.where(contour[:,0] < 0.0), 0] = 0
-            contour[np.where(contour[:,0] > 180.0), 0] = 180
-            contour[np.where(contour[:,1] < 0.0), 1] = 0
-            contour[np.where(contour[:,1] > 360.0), 1] = 360
-            
-            contour_polygon = pygplates.PolygonOnSphere(zip(contour[:,0] - 90, contour[:,1] - 180))
-
             contour_polygons.append(contour_polygon)
 
         return contour_polygons
