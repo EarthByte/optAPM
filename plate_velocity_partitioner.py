@@ -2,6 +2,7 @@ import math
 import os
 import os.path
 import points_in_polygons
+import points_spatial_tree
 import pygplates
 import sys
 
@@ -71,6 +72,9 @@ class PlateVelocityPartitioner(object):
         # Convert a list of (lat,lon) to a pygplates.MultiPointOnSphere
         # (which behaves like an iterable sequence of pygplates.PointOnSphere).
         self.points = pygplates.MultiPointOnSphere(self.points)
+
+        # Improve efficiency by re-using same spatial tree of points over time (when finding points in polygons).
+        self.points_spatial_tree = points_spatial_tree.PointsSpatialTree(self.points)
     
     
     def __del__(self):
@@ -121,8 +125,9 @@ class PlateVelocityPartitioner(object):
                 polygon_plate_ids.append(resolved_topology.get_feature().get_reconstruction_plate_id())
             
             # Find the resolved plate polygon (if any) containing each point.
-            point_polygon_indices = points_in_polygons.find_polygons(
+            point_polygon_indices = points_in_polygons.find_polygons_using_points_spatial_tree(
                     self.points,
+                    self.points_spatial_tree,
                     # The resolved plate polygon geometries...
                     polygons,
                     # The index of each resolved plate polygon (this is what is returned by 'find_polygons')...
@@ -174,8 +179,9 @@ class PlateVelocityPartitioner(object):
                 continent_polygon_plate_ids.append(reconstructed_feature_geometry.get_feature().get_reconstruction_plate_id())
             
             # Find the reconstructed continental polygon (if any) containing each point.
-            point_plate_ids = points_in_polygons.find_polygons(
+            point_plate_ids = points_in_polygons.find_polygons_using_points_spatial_tree(
                     self.points,
+                    self.points_spatial_tree,
                     # The reconstructed continental polygons...
                     reconstructed_continent_polygons,
                     # The plate ID of each reconstructed continent (this is what is returned by 'find_polygons')...
@@ -192,56 +198,61 @@ class PlateVelocityPartitioner(object):
                     continent_points.append(self.points[point_index])
                     continent_point_plate_ids.append(point_plate_id)
             
-            # Calculate contour polygons representing the boundary(s) of the reconstructed continental polygons that overlap each other.
+            # Calculate contours representing the boundary(s) of the reconstructed continental polygons that overlap each other.
             #
-            # NOTE: We are NOT excluding contours based on area or perimeter/area ratio.
+            # NOTE: We are NOT excluding contours based on perimeter/area ratio.
             #       That determination must be made by the final cost function that calculates the cost (penalty).
-            reconstructed_contour_polygons = self.continent_fragmentation.get_contour_polygons(reconstructed_continent_polygons)
+            contoured_continents = self.continent_fragmentation.get_contoured_continents(reconstructed_continent_polygons)
             
-            # Find the reconstructed contour polygon (if any) containing each continent point.
-            continent_point_contour_polygon_indices = points_in_polygons.find_polygons(continent_points,
-                    # The reconstructed contour polygons...
-                    reconstructed_contour_polygons,
-                    # The index of each reconstructed contour polygon (this is what is returned by 'find_polygons')...
-                    list(range(len(reconstructed_contour_polygons))))
+            # Find the contoured continent (if any) containing each continent point.
+            continent_point_contoured_continent_indices = [None] * len(continent_points)
+            # Improve efficiency by re-using spatial tree of continent points.
+            continent_points_spatial_tree = points_spatial_tree.PointsSpatialTree(continent_points)
+            for contoured_continent_index, contoured_continent in enumerate(contoured_continents):
+                # See if any continent points are inside the current contoured continent.
+                continent_points_inside_contoured_continent = contoured_continent.are_points_inside(continent_points, continent_points_spatial_tree)
+                # Record the contoured continent index for any continent points that are inside it.
+                for continent_point_index, continent_point_inside in continent_points_inside_contoured_continent:
+                    if continent_point_inside:
+                        continent_point_contoured_continent_indices[continent_point_index] = contoured_continent_index
             
-            # Dictionary of continent points indexed by contour polygon (use a contour polygon *index* since pygplates.PolygonOnSphere is not hashable).
+            # Dictionary of continent points indexed by contoured continent (use a contoured continent *index*).
             # Each group of continent points is itself a dict mapping continent plate ID to a list of continent points with that plate ID
-            # (because a single contour polygon could encompass continental polygons with different plate IDs).
-            continent_points_by_contour_polygon = {}
+            # (because a single contoured continent could encompass continental polygons with different plate IDs).
+            continent_points_by_contoured_continent = {}
             
-            # Each continent point is contained by one reconstructed contour polygon (or none).
-            for continent_point_index, contour_polygon_index in enumerate(continent_point_contour_polygon_indices):
-                # If point is not in any contour polygons then ignore it.
+            # Each continent point is contained by one contoured continent (or none).
+            for continent_point_index, contoured_continent_index in enumerate(continent_point_contoured_continent_indices):
+                # If point is not in any contoured continents then ignore it.
                 #
-                # This mainly happens when the area of a contour polygon is below the minimum and hence excludes
+                # This mainly happens when the area of a contoured continent is below the minimum and hence excludes
                 # the continental polygons that that contour encompassed. Aside from that, if any other continent
-                # points are outside any contour polygons then it means a contour polygon did not fully encompass
+                # points are outside any contoured continents then it means a contoured continent did not fully encompass
                 # a set of continental polygons. But there shouldn't be many of those points.
-                if contour_polygon_index is None:
+                if contoured_continent_index is None:
                     continue
                 
-                # Create dictionary entry (an empty dict) if first time encountered contour polygon.
-                if contour_polygon_index not in continent_points_by_contour_polygon:
-                    continent_points_by_contour_polygon[contour_polygon_index] = {}
-                continent_points_in_contour_polygon = continent_points_by_contour_polygon[contour_polygon_index]
+                # Create dictionary entry (an empty dict) if first time encountered contoured continent.
+                if contoured_continent_index not in continent_points_by_contoured_continent:
+                    continent_points_by_contoured_continent[contoured_continent_index] = {}
+                continent_points_in_contoured_continent = continent_points_by_contoured_continent[contoured_continent_index]
                 
                 # The current continent point and its plate ID.
                 continent_point = continent_points[continent_point_index]
                 continent_point_plate_id = continent_point_plate_ids[continent_point_index]
                 
                 # Create dictionary entry (an empty list) if first time encountered continent plate ID.
-                if continent_point_plate_id not in continent_points_in_contour_polygon:
-                    continent_points_in_contour_polygon[continent_point_plate_id] = []
+                if continent_point_plate_id not in continent_points_in_contoured_continent:
+                    continent_points_in_contoured_continent[continent_point_plate_id] = []
 
                 # Add current continent point and its plate ID to dictionary entry.
-                continent_points_in_contour_polygon[continent_point_plate_id].append(continent_point)
+                continent_points_in_contoured_continent[continent_point_plate_id].append(continent_point)
             
             # Scalar type used to store plate IDs in each contour coverage geometry.
             plate_id_scalar_type = pygplates.ScalarType.create_gpml('PlateID')
 
             # Generate a multi-point feature for each contour polygon (containing all points associated with contour polygon).
-            for contour_polygon_index, continent_points_in_contour_polygon in continent_points_by_contour_polygon.items():
+            for contoured_continent_index, continent_points_in_contoured_continent in continent_points_by_contoured_continent.items():
                 
                 # Create the multi-point feature.
                 coverage_multi_point_feature = pygplates.Feature()
@@ -250,7 +261,7 @@ class PlateVelocityPartitioner(object):
                 # Note that points are grouped by plate ID (ie, first N points have plate_id_1, next M points have plate_id_2, etc).
                 coverage_points = []
                 coverage_plate_ids = []
-                for continent_plate_id, points_in_continent in continent_points_in_contour_polygon.items():
+                for continent_plate_id, points_in_continent in continent_points_in_contoured_continent.items():
                     coverage_points.extend(points_in_continent)
                     # Each point in the current continent has the same plate ID.
                     coverage_plate_ids.extend([continent_plate_id] * len(points_in_continent))
@@ -261,13 +272,13 @@ class PlateVelocityPartitioner(object):
                 coverage_multi_point_feature.set_geometry((coverage_multipoint, coverage_scalars))
                 
                 # Set some contour parameters for later (using shapefile attributes).
-                contour_polygon = reconstructed_contour_polygons[contour_polygon_index]
+                contoured_continent = contoured_continents[contoured_continent_index]
                 coverage_multi_point_feature.set_shapefile_attributes({
                         # Mark the feature as a continent aggregate (for later in objective function).
                         # Any value will do (the presence of the attribute is all that's checked)...
                         'is_in_continent_contour' : 1,
-                        'contour_perimeter' : contour_polygon.get_arc_length(),
-                        'contour_area' : contour_polygon.get_area()})
+                        'contour_perimeter' : contoured_continent.get_perimeter(),
+                        'contour_area' : contoured_continent.get_area()})
 
                 output_features.append(coverage_multi_point_feature)
         

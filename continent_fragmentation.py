@@ -9,11 +9,139 @@ import sys
 import numpy as np
 
 
+class ContouredContinent(object):
+    """
+    Class to represent the contour around overlapping/abutting continental blocks.
+    """
+    
+    def __init__(self):
+        self._polygons_including_continent = []
+        self._polygons_excluding_continent = []
+    
+
+    def add_polygon(self, polygon, polygon_inside_is_continent):
+        """
+        Add a polygon contour and whether the inside of the polygon represents continental crust.
+
+        If the *outside* of the polygon represents continental crust then it represents an interior hole in the
+        contoured continent or at least an area that is not continental (eg, half the globe is not continental).
+        """
+        if polygon_inside_is_continent:
+            self._polygons_including_continent.append(polygon)
+        else:
+            self._polygons_excluding_continent.append(polygon)
+    
+
+    def get_polygons(self):
+        """The polygon contours representing the boundary of this contoured continent."""
+        polygons = []
+
+        # Add contour polygons regardless of whether include or exclude continent.
+        polygons.extend(self._polygons_including_continent)
+        polygons.extend(self._polygons_excluding_continent)
+
+        return polygons
+    
+
+    def are_points_inside(self, points, points_spatial_tree=None):
+        """Returns a list with same length as 'points' (and in same order) containing True for each point inside this contoured continent."""
+
+        # Improve efficiency by re-using spatial tree of points if caller provides it (otherwise create our own).
+        if not points_spatial_tree:
+            points_spatial_tree = points_spatial_tree.PointsSpatialTree(points)
+
+        inclusive_polygons_containing_points = points_in_polygons.find_polygons_using_points_spatial_tree(
+                points,
+                points_spatial_tree,
+                self._polygons_including_continent,
+                all_polygons=True)
+        exclusive_polygons_containing_points = points_in_polygons.find_polygons_using_points_spatial_tree(
+                points,
+                points_spatial_tree,
+                self._polygons_excluding_continent,
+                all_polygons=True)
+        
+        # By default all points are considered inside this contoured continents unless proven otherwise.
+        points_inside = [True] * len(points)
+        for point_index in range(len(points)):
+
+            # Normally there is just one polygon that includes continent (and zero or more that exclude), and we simply
+            # see if the current point is inside the sole inclusive polygon and not inside any exclusive polygons.
+            #
+            # However with very large contoured continents that are like an annular ring that go right around the globe
+            # it's possible to have 0, 2, 3, etc (ie, anything but 1) polygons that include continent.
+            # When this happens the inside region of the contoured continent is the *intersection* of these *inclusive* polygons.
+            #
+            # Also note that the region of an *inclusive* polygon can overlap the regions of one or more *exclusive* polygons.
+            # So if the current point is inside all *inclusive* polygons it still doesn't necessarily mean its inside the contoured continent.
+
+            # To be inside, the current point must be inside ALL polygons that INCLUDE continental crust.
+            #
+            # Note that this contoured continent might not have any polygons that *include* continental crust.
+            # This is fine because the contoured region is then the entire globe minus the *excluded* regions.
+            # And, in this case, as long as the current point is not inside any excluded regions then it is inside the contoured region.
+            inclusive_polygon_indices = inclusive_polygons_containing_points[point_index]
+            num_inclusive_polygons_containing_point = len(inclusive_polygon_indices) if inclusive_polygon_indices else 0
+            if num_inclusive_polygons_containing_point != len(self._polygons_including_continent):
+                points_inside[point_index] = False
+                continue
+
+            # To be inside, the current point must be NOT be inside ANY polygon that EXCLUDES continental crust.
+            exclusive_polygon_indices = exclusive_polygons_containing_points[point_index]
+            num_exclusive_polygons_containing_point = len(exclusive_polygon_indices) if exclusive_polygon_indices else 0
+            if num_exclusive_polygons_containing_point != 0:
+                points_inside[point_index] = False
+                continue
+        
+        return points_inside
+
+
+    def get_perimeter(self):
+        """Sum of the contours surrounding this contoured continent (in radians)."""
+        perimeter = 0.0
+
+        # Add contour perimeters regardless of whether contour includes or excludes continent.
+        for polygon in self._polygons_including_continent:
+                perimeter += polygon.get_arc_length()
+        for polygon in self._polygons_excluding_continent:
+                perimeter += polygon.get_arc_length()
+        
+        return perimeter
+    
+
+    def get_area(self):
+        """
+        The area of this contoured continent (in steradians).
+        """
+        area = 0.0
+
+        # Add the areas of polygons that include continent and subtract areas of polygons that exclude continent.
+        for polygon in self._polygons_including_continent:
+                area += polygon.get_area()
+        for polygon in self._polygons_excluding_continent:
+                area -= polygon.get_area()
+        
+        # Normally there is just one polygon that includes continent (and zero or more that exclude), and
+        # we simply take the area of that one inclusive polygon and substract the areas of the exclusive polygons.
+        # In this case the following adds zero area.
+        #
+        # However with very large contoured continents that are like an annular ring that go right around the globe
+        # it's possible to have 0, 2, 3, etc (ie, anything but 1) polygons that include continent.
+        # And this is what the following term takes into account. Essentially we need to offset the area by a multiple
+        # of the area of the globe (4*pi steradians). When 0 polygons include continent then we have only exclusive areas
+        # and so we need to subtract them from the area of the globe (hence the following term becomes 4*pi).
+        # When 2 polygons include continent then we need to subtract the area of the globe (hence -4*pi) and when
+        # 3 polygons include continent then we need to subtract twice the area of the globe (hence -8*pi).
+        # This was determined by drawing up a few examples to see the pattern.
+        area -= 4 * math.pi * (len(self._polygons_including_continent) - 1)
+
+        return area
+
+
 class ContinentFragmentation(object):
     """
     Class to calculate continental fragmentation (global perimeter-to-area ratio).
     """
-    
     
     def __init__(
             self,
@@ -55,6 +183,9 @@ class ContinentFragmentation(object):
         contouring_longitude_array, contouring_latitude_array = np.meshgrid(lons, lats)
         self.contouring_points = pygplates.MultiPointOnSphere(
                 zip(contouring_latitude_array.flatten(), contouring_longitude_array.flatten()))
+
+        # Improve efficiency by re-using spatial tree of contouring points over time (when finding points in polygons and finding points near polygons).
+        self.contouring_points_spatial_tree = points_spatial_tree.PointsSpatialTree(self.contouring_points)
 
         self.age_range = age_range
         
@@ -151,22 +282,23 @@ class ContinentFragmentation(object):
             self.debug_age = age
             print(age); sys.stdout.flush()
         
-        # Calculate contour polygons representing the boundary(s) of the reconstructed static polygons that overlap each other.
-        reconstructed_contour_polygons = self.get_contour_polygons(reconstructed_polygons)
+        # Calculate contoured continents representing the boundary(s) of the reconstructed continent polygons that overlap each other.
+        contoured_continents = self.get_contoured_continents(reconstructed_polygons)
 
         # Update total perimeter and area.
-        for contour_polygon in reconstructed_contour_polygons:
-            total_perimeter += contour_polygon.get_arc_length()
-            total_area += contour_polygon.get_area()
+        for contoured_continent in contoured_continents:
+            total_perimeter += contoured_continent.get_perimeter()
+            total_area += contoured_continent.get_area()
 
         # Debug output contour polygons.
         if self.debug:
-            self.debug_contour_polygon_features.extend(
-                    pygplates.Feature.create_reconstructable_feature(
-                            pygplates.FeatureType.gpml_unclassified_feature,
-                            reconstructed_contour_polygon,
-                            valid_time=(age + 0.5 * self.debug_time_interval, age - 0.5 * self.debug_time_interval))
-                    for reconstructed_contour_polygon in reconstructed_contour_polygons)
+            for contoured_continent in contoured_continents:
+                self.debug_contour_polygon_features.extend(
+                        pygplates.Feature.create_reconstructable_feature(
+                                pygplates.FeatureType.gpml_unclassified_feature,
+                                polygon,
+                                valid_time=(age + 0.5 * self.debug_time_interval, age - 0.5 * self.debug_time_interval))
+                        for polygon in contoured_continent.get_polygons())
 
         # Avoid divide-by-zero.
         if total_area == 0.0:
@@ -176,11 +308,11 @@ class ContinentFragmentation(object):
         return total_perimeter / total_area
     
     
-    def get_contour_polygons(
+    def get_contoured_continents(
             self,
             continent_polygons):
         """
-        Find the boundaries of the specified (potentially overlapping/abutting) continent polygons as contour polygons.
+        Find the boundaries of the specified (potentially overlapping/abutting) continent polygons.
         """
 
         contour_polygons = self._calculate_contour_polygons(continent_polygons)
@@ -199,7 +331,16 @@ class ContinentFragmentation(object):
                 if contour_polygon_area_fmod_2pi > 1e-6 or contour_polygon_area_fmod_2pi < 2 * math.pi - 1e-6:
                     contour_polygons_above_area_threshold.append(contour_polygon)
 
-        return contour_polygons_above_area_threshold
+        contoured_continents = []
+
+        for contour_polygon in contour_polygons_above_area_threshold:
+            contoured_continent = ContouredContinent()
+            contour_polygon_inside_is_continent = True
+            contoured_continent.add_polygon(contour_polygon, contour_polygon_inside_is_continent)
+
+            contoured_continents.append(contoured_continent)
+        
+        return contoured_continents
 
     
     def _calculate_contour_polygons(
@@ -209,13 +350,10 @@ class ContinentFragmentation(object):
         Find the boundaries of the specified (potentially overlapping/abutting) continent polygons as contour polygons.
         """
 
-        # Improve efficiency by sharing same spatial tree of contouring points when finding points in polygons and finding points near polygons.
-        spatial_tree_of_contouring_points = points_spatial_tree.PointsSpatialTree(self.contouring_points)
-
         # Find the reconstructed continental polygon (if any) containing each point.
         continent_polygons_containing_points = points_in_polygons.find_polygons_using_points_spatial_tree(
                 self.contouring_points,
-                spatial_tree_of_contouring_points,
+                self.contouring_points_spatial_tree,
                 continent_polygons)
 
         # Find the reconstructed continental polygon (if any) near each point.
@@ -223,7 +361,7 @@ class ContinentFragmentation(object):
         # This ensures small gaps between continents are ignored during contouring.
         continent_polygons_near_points = proximity_query.find_closest_geometries_to_points_using_points_spatial_tree(
                 self.contouring_points,
-                spatial_tree_of_contouring_points,
+                self.contouring_points_spatial_tree,
                 continent_polygons,
                 distance_threshold_radians=self.continent_contouring_gap_threshold_radians)
 
