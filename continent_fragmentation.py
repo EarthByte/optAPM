@@ -213,12 +213,12 @@ class ContinentFragmentation(object):
         if self.debug:
             self.debug_contour_polygon_features = []
             self.debug_time_interval = age_range[1] - age_range[0]
-            self.debug_continent_inside_point_features = []
+            self.debug_contouring_inside_point_features = []
 
             # Easiest way to force contour polygons to be generated for all times is to get a *normalized* fragmentation index.
             self.get_fragmentation(age_range[0], normalize=True)
             pygplates.FeatureCollection(self.debug_contour_polygon_features).write('contour_polygons.gpmlz')
-            pygplates.FeatureCollection(self.debug_continent_inside_point_features).write('continent_inside_points.gpmlz')
+            pygplates.FeatureCollection(self.debug_contouring_inside_point_features).write('contour_inside_points.gpmlz')
     
     
     def get_fragmentation(
@@ -315,35 +315,31 @@ class ContinentFragmentation(object):
         Find the boundaries of the specified (potentially overlapping/abutting) continent polygons.
         """
 
-        contour_polygons = self._calculate_contour_polygons(continent_polygons)
+        contoured_continents = self._calculate_contoured_continents(continent_polygons)
         
-        # Contour polygons smaller than this will be excluded.
-        min_area = self.contouring_area_threshold_steradians
+        # If debugging contours then create a debug feature containing all points inside contours.
+        if self.debug:
+            contouring_inside_points = []
 
-        contour_polygons_above_area_threshold = []
-        for contour_polygon in contour_polygons:
-            # Exclude contour polygon if smaller than the threshold.
-            contour_polygon_area = contour_polygon.get_area()
-            if contour_polygon_area > min_area:
-                # It seems, with pygplates revisions prior to 31, that a sliver polygon along the dateline can return
-                # an area that's a multiple of 2*PI (instead of zero). So let's exclude exact multiples of 2*PI.
-                contour_polygon_area_fmod_2pi = math.fmod(contour_polygon_area, 2 * math.pi)
-                if contour_polygon_area_fmod_2pi > 1e-6 or contour_polygon_area_fmod_2pi < 2 * math.pi - 1e-6:
-                    contour_polygons_above_area_threshold.append(contour_polygon)
-
-        contoured_continents = []
-
-        for contour_polygon in contour_polygons_above_area_threshold:
-            contoured_continent = ContouredContinent()
-            contour_polygon_inside_is_continent = True
-            contoured_continent.add_polygon(contour_polygon, contour_polygon_inside_is_continent)
-
-            contoured_continents.append(contoured_continent)
+            # Find the contoured continent (if any) containing each contouring point.
+            for contoured_continent_index, contoured_continent in enumerate(contoured_continents):
+                # See if any contouring points are inside the current contoured continent.
+                contouring_points_inside_contoured_continent = contoured_continent.are_points_inside(self.contouring_points, self.contouring_points_spatial_tree)
+                # Record the contoured continent index for any contouring points that are inside it.
+                for contouring_point_index, contouring_point_inside in enumerate(contouring_points_inside_contoured_continent):
+                    if contouring_point_inside:
+                        contouring_inside_points.append(self.contouring_points[contouring_point_index])
+            
+            contouring_inside_points_feature = pygplates.Feature.create_reconstructable_feature(
+                                        pygplates.FeatureType.gpml_unclassified_feature,
+                                        pygplates.MultiPointOnSphere(contouring_inside_points),
+                                        valid_time=(self.debug_age + 0.5 * self.debug_time_interval, self.debug_age - 0.5 * self.debug_time_interval))
+            self.debug_contouring_inside_point_features.append(contouring_inside_points_feature)
         
         return contoured_continents
 
     
-    def _calculate_contour_polygons(
+    def _calculate_contoured_continents(
             self,
             continent_polygons):
         """
@@ -380,20 +376,6 @@ class ContinentFragmentation(object):
                 points_inside_contour.append(True)
             else:
                 points_inside_contour.append(False)
-        
-        # If contour debugging then create a debug feature containing all points inside contours.
-        if self.debug:
-            continent_inside_points = []
-
-            for contouring_point_index in range(len(self.contouring_points)):
-                if points_inside_contour[contouring_point_index]:
-                    continent_inside_points.append(self.contouring_points[contouring_point_index])
-
-            continent_inside_points_feature = pygplates.Feature.create_reconstructable_feature(
-                                        pygplates.FeatureType.gpml_unclassified_feature,
-                                        pygplates.MultiPointOnSphere(continent_inside_points),
-                                        valid_time=(self.debug_age + 0.5 * self.debug_time_interval, self.debug_age - 0.5 * self.debug_time_interval))
-            self.debug_continent_inside_point_features.append(continent_inside_points_feature)
         
         num_latitudes = self.contouring_grid_num_latitudes
         num_longitudes = self.contouring_grid_num_longitudes
@@ -530,152 +512,195 @@ class ContinentFragmentation(object):
         #
         # This is repeated to find all contour polygons until we have no more squares containing segments.
         #
-        contour_polygons = []
+        contoured_continents = []
         while marching_squares_containing_segments:
-            contour_points = []
-
             # Get any available square containing a segment.
             # This will contain the first segment of the current contour polygon.
             #
             # Note: Python 'set' has no get method (it has a pop() but that removes the element) so get first element from an iterator instead.
             latitude_index, longitude_index = next(iter(marching_squares_containing_segments))
-            first_latitude_index, first_longitude_index = latitude_index, longitude_index
 
-            #
-            # Starting at the first segment, follow the segments in a loop until they return to the first segment (thus forming a contour polygon).
-            #
-            prev_segment_end = None
-            while True:
-                # Get a segment from the current square.
-                square_index = latitude_index * num_longitude_intervals + longitude_index
-                segment1, segment2 = marching_squares[square_index]
-                # If a square has only one segment then it will be in 'segment1' (not 'segment2').
-                if segment1 is None:
-                    # Shouldn't be able to reach a square that doesn't have any segments (or previously had segments but now has none).
-                    raise AssertionError('Square has no segments')
-                
-                # Find a segment in the current square such that the segment start matches the
-                # end of the previous segment (in the previous square).
-                segment_start, segment_end = segment1
-                if prev_segment_end is None:  # first segment of current contour...
-                    # Mark the start of the contour so that later we know when we've completed the contour.
-                    first_segment_start = segment_start
+            contour_polygon = self._extract_contour_polygon(
+                latitude_index,
+                longitude_index,
+                num_latitude_intervals,
+                num_longitude_intervals,
+                interval_spacing,
+                marching_squares,
+                marching_squares_containing_segments)
+
+            # Exclude contour polygon if smaller than the threshold.
+            if contour_polygon.get_area() < self.contouring_area_threshold_steradians:
+                continue
+
+            # It seems, with pygplates revisions prior to 31, that a sliver polygon along the dateline can return
+            # an area that's a multiple of 2*PI (instead of zero). So let's exclude exact multiples of 2*PI.
+            contour_polygon_area_fmod_2pi = math.fmod(contour_polygon.get_area(), 2 * math.pi)
+            if contour_polygon_area_fmod_2pi < 1e-6 or contour_polygon_area_fmod_2pi > 2 * math.pi - 1e-6:
+                continue
+
+            contoured_continent = ContouredContinent()
+            contour_polygon_inside_is_continent = True
+            contoured_continent.add_polygon(contour_polygon, contour_polygon_inside_is_continent)
+
+            contoured_continents.append(contoured_continent)
+        
+        return contoured_continents
+
+
+    def _extract_contour_polygon(
+            self,
+            latitude_index,
+            longitude_index,
+            num_latitude_intervals,
+            num_longitude_intervals,
+            interval_spacing,
+            marching_squares,
+            marching_squares_containing_segments):
+        """
+        Follow the segment in marching square at specified lat/lon index around contour back to that first segment.
+
+        Note that a marching square can have two segments, in which case that square represents a thin connecting region between
+        two larger islands of the polygon (but still all just one polygon). That square will get traversed twice (once in one direction
+        through one segment and once in another the opposite direction through the second segment of that square).
+        """
+
+        contour_points = []
+
+        #
+        # Starting at the first segment, follow the segments in a loop until they return to the first segment (thus forming a contour polygon).
+        #
+        first_latitude_index, first_longitude_index = latitude_index, longitude_index
+        prev_segment_end = None
+        while True:
+
+            # Get a segment from the current square.
+            square_index = latitude_index * num_longitude_intervals + longitude_index
+            segment1, segment2 = marching_squares[square_index]
+            # If a square has only one segment then it will be in 'segment1' (not 'segment2').
+            if segment1 is None:
+                # Shouldn't be able to reach a square that doesn't have any segments (or previously had segments but now has none).
+                raise AssertionError('Square has no segments')
+            
+            # Find a segment in the current square such that the segment start matches the
+            # end of the previous segment (in the previous square).
+            segment_start, segment_end = segment1
+            if prev_segment_end is None:  # first segment of current contour...
+                # Mark the start of the contour so that later we know when we've completed the contour.
+                first_segment_start = segment_start
+            else:
+                # Continue from the side of the previous square that contains the end point of the previous segment to the side of
+                # the current square that should contain the start point of the current segment (that continues previous segment).
+                #
+                # The right side of previous square continues to left side of current square.
+                # The left side of previous square continues to right side of current square.
+                # The top side of previous square continues to bottom side of current square.
+                # The bottom side of previous square continues to top side of current square.
+                #
+                # The adjacency relation means 2->0, 0->2, 3->1 and 1->3...
+                #
+                #    ---2---
+                #   |       |
+                #   1       3
+                #   |       |
+                #    ---0---
+                #
+                # ...which is satisfied by 2^2->0, 0^2->2, 3^2->1 and 1^2->3 (where '^' is exclusive-or).
+                # 
+                curr_segment_start = prev_segment_end ^ 0b10
+
+                #
+                # Find the right segment (if there's two segments) and reverse the segment if necessary
+                # so that previous segment end matches current segment start.
+                #
+                if curr_segment_start == segment_start:
+                    # We're traversing segment in the correct direction.
+                    pass
+                elif curr_segment_start == segment_end:
+                    # Reverse segment direction (swap segment start and end points).
+                    segment_start, segment_end = segment_end, segment_start
                 else:
-                    # Continue from the side of the previous square that contains the end point of the previous segment to the side of
-                    # the current square that should contain the start point of the current segment (that continues previous segment).
-                    #
-                    # The right side of previous square continues to left side of current square.
-                    # The left side of previous square continues to right side of current square.
-                    # The top side of previous square continues to bottom side of current square.
-                    # The bottom side of previous square continues to top side of current square.
-                    #
-                    # The adjacency relation means 2->0, 0->2, 3->1 and 1->3...
-                    #
-                    #    ---2---
-                    #   |       |
-                    #   1       3
-                    #   |       |
-                    #    ---0---
-                    #
-                    # ...which is satisfied by 2^2->0, 0^2->2, 3^2->1 and 1^2->3 (where '^' is exclusive-or).
-                    # 
-                    curr_segment_start = prev_segment_end ^ 0b10
+                    if segment2:
+                        # Segment 1 didn't match so swap it with segment 2 (so it can be used later).
+                        segment1, segment2 = segment2, segment1
 
-                    #
-                    # Find the right segment (if there's two segments) and reverse the segment if necessary
-                    # so that previous segment end matches current segment start.
-                    #
-                    if curr_segment_start == segment_start:
-                        # We're traversing segment in the correct direction.
-                        pass
-                    elif curr_segment_start == segment_end:
-                        # Reverse segment direction (swap segment start and end points).
-                        segment_start, segment_end = segment_end, segment_start
-                    else:
-                        if segment2:
-                            # Segment 1 didn't match so swap it with segment 2 (so it can be used later).
-                            segment1, segment2 = segment2, segment1
-
-                            segment_start, segment_end = segment1
-                            if curr_segment_start == segment_start:
-                                # We're traversing segment in the correct direction.
-                                pass
-                            elif curr_segment_start == segment_end:
-                                # Reverse segment direction (swap segment start and end points).
-                                segment_start, segment_end = segment_end, segment_start
-                            else:
-                                raise AssertionError('Unable to find connecting segment')
+                        segment_start, segment_end = segment1
+                        if curr_segment_start == segment_start:
+                            # We're traversing segment in the correct direction.
+                            pass
+                        elif curr_segment_start == segment_end:
+                            # Reverse segment direction (swap segment start and end points).
+                            segment_start, segment_end = segment_end, segment_start
                         else:
                             raise AssertionError('Unable to find connecting segment')
-                
-                # The start position of 'segment'.
-                # It will be at the midpoint of a side of the square.
-                if segment_start == 0:
-                    segment_start_latitude = -90.0 + latitude_index * interval_spacing
-                    segment_start_longitude = -180.0 + (longitude_index + 0.5) * interval_spacing
-                elif segment_start == 1:
-                    segment_start_latitude = -90.0 + (latitude_index + 0.5) * interval_spacing
-                    segment_start_longitude = -180.0 + longitude_index * interval_spacing
-                elif segment_start == 2:
-                    segment_start_latitude = -90.0 + (latitude_index + 1) * interval_spacing
-                    segment_start_longitude = -180.0 + (longitude_index + 0.5) * interval_spacing
-                else:  # segment_start == 3
-                    segment_start_latitude = -90.0 + (latitude_index + 0.5) * interval_spacing
-                    segment_start_longitude = -180.0 + (longitude_index + 1) * interval_spacing
+                    else:
+                        raise AssertionError('Unable to find connecting segment')
+            
+            # The start position of 'segment'.
+            # It will be at the midpoint of a side of the square.
+            if segment_start == 0:
+                segment_start_latitude = -90.0 + latitude_index * interval_spacing
+                segment_start_longitude = -180.0 + (longitude_index + 0.5) * interval_spacing
+            elif segment_start == 1:
+                segment_start_latitude = -90.0 + (latitude_index + 0.5) * interval_spacing
+                segment_start_longitude = -180.0 + longitude_index * interval_spacing
+            elif segment_start == 2:
+                segment_start_latitude = -90.0 + (latitude_index + 1) * interval_spacing
+                segment_start_longitude = -180.0 + (longitude_index + 0.5) * interval_spacing
+            else:  # segment_start == 3
+                segment_start_latitude = -90.0 + (latitude_index + 0.5) * interval_spacing
+                segment_start_longitude = -180.0 + (longitude_index + 1) * interval_spacing
 
-                # Generate a contour point at the start of the current segment.
-                contour_point = pygplates.PointOnSphere(segment_start_latitude, segment_start_longitude)
-                contour_points.append(contour_point)
+            # Generate a contour point at the start of the current segment.
+            contour_point = pygplates.PointOnSphere(segment_start_latitude, segment_start_longitude)
+            contour_points.append(contour_point)
 
-                # We've just used 'segment1', so discard it by moving 'segment2' into its position to be used later.
-                # And if 'segment2' is None then there are no more segments in current square so discard the entire square.
-                marching_squares[square_index] = segment2, None
-                if segment2 is None:
-                    # There are no segments left in the current square, so we're finished with it.
-                    # Note: This will raise KeyError if not present in 'set'.
-                    marching_squares_containing_segments.remove((latitude_index, longitude_index))
+            # We've just used 'segment1', so discard it by moving 'segment2' into its position to be used later.
+            # And if 'segment2' is None then there are no more segments in current square so discard the entire square.
+            marching_squares[square_index] = segment2, None
+            if segment2 is None:
+                # There are no segments left in the current square, so we're finished with it.
+                # Note: This will raise KeyError if not present in 'set'.
+                marching_squares_containing_segments.remove((latitude_index, longitude_index))
 
-                # We're moving onto the next segment in the next square.
-                prev_segment_end = segment_end
+            # We're moving onto the next segment in the next square.
+            prev_segment_end = segment_end
 
-                # Move to the next square connected by the end of the current segment.
-                #
-                # As noted above, at each pole there is an entire row of lat/lon grid points that are all either inside or outside a contour.
-                # This means the Marching Squares algorithm cannot generate contour segments that penetrate the row. So we should not be able
-                # to move beyond the poles.
-                #
-                # Also as noted above, the both the leftmost and rightmost columns of the lat/lon grid of points will be on the dateline
-                # (ie, at both longitude -180 and 180). This means the Marching Squares algorithm will produce continuous contour segments across
-                # the dateline (as we move from a square on one side of the dateline to the adjacent square on the other side).
-                if prev_segment_end == 0:
-                    latitude_index -= 1
-                    if latitude_index < 0:
-                        raise AssertionError('Segment entered South Pole')
-                elif prev_segment_end == 1:
-                    longitude_index -= 1
-                    if longitude_index < 0:
-                        # Wrap around the dateline.
-                        longitude_index += num_longitude_intervals
-                elif prev_segment_end == 2:
-                    latitude_index += 1
-                    if latitude_index == num_latitude_intervals:
-                        raise AssertionError('Segment entered North Pole')
-                else:  # prev_segment_end == 3
-                    longitude_index += 1
-                    if longitude_index == num_longitude_intervals:
-                        # Wrap around the dateline.
-                        longitude_index -= num_longitude_intervals
-                
-                # See if we're returned to the first square (containing the first segment).
-                if (first_latitude_index, first_longitude_index) == (latitude_index, longitude_index):
-                    # And make sure the end of the previous segment matches the start of the first segment.
-                    # See comment above about adjacency relation for explanatation of exclusive-or.
-                    if first_segment_start == (prev_segment_end ^ 0b10):
-                        # Break out of current contour loop (we've completed the contour).
-                        break
+            # Move to the next square connected by the end of the current segment.
+            #
+            # As noted above, at each pole there is an entire row of lat/lon grid points that are all either inside or outside a contour.
+            # This means the Marching Squares algorithm cannot generate contour segments that penetrate the row. So we should not be able
+            # to move beyond the poles.
+            #
+            # Also as noted above, the both the leftmost and rightmost columns of the lat/lon grid of points will be on the dateline
+            # (ie, at both longitude -180 and 180). This means the Marching Squares algorithm will produce continuous contour segments across
+            # the dateline (as we move from a square on one side of the dateline to the adjacent square on the other side).
+            if prev_segment_end == 0:
+                latitude_index -= 1
+                if latitude_index < 0:
+                    raise AssertionError('Segment entered South Pole')
+            elif prev_segment_end == 1:
+                longitude_index -= 1
+                if longitude_index < 0:
+                    # Wrap around the dateline.
+                    longitude_index += num_longitude_intervals
+            elif prev_segment_end == 2:
+                latitude_index += 1
+                if latitude_index == num_latitude_intervals:
+                    raise AssertionError('Segment entered North Pole')
+            else:  # prev_segment_end == 3
+                longitude_index += 1
+                if longitude_index == num_longitude_intervals:
+                    # Wrap around the dateline.
+                    longitude_index -= num_longitude_intervals
+            
+            # See if we're returned to the first square (containing the first segment).
+            if (first_latitude_index, first_longitude_index) == (latitude_index, longitude_index):
+                # And make sure the end of the previous segment matches the start of the first segment.
+                # See comment above about adjacency relation for explanatation of exclusive-or.
+                if first_segment_start == (prev_segment_end ^ 0b10):
+                    # Break out of current contour loop (we've completed the contour).
+                    break
 
-            # Generate a contour polygon from the current loop of contour points.
-            contour_polygon = pygplates.PolygonOnSphere(contour_points)
-            contour_polygons.append(contour_polygon)
-
-        return contour_polygons
+        # Generate a contour polygon from the current loop of contour points.
+        return pygplates.PolygonOnSphere(contour_points)
