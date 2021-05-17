@@ -264,8 +264,31 @@ class ContinentFragmentation(object):
             self,
             age):
 
+        # Get the contoured continents representing the boundary(s) of the reconstructed continent polygons that overlap each other.
+        contoured_continents = self.get_contoured_continents(age)
+
         total_perimeter = 0.0
         total_area = 0.0
+        
+        # Update total perimeter and area.
+        for contoured_continent in contoured_continents:
+            total_perimeter += contoured_continent.get_perimeter()
+            total_area += contoured_continent.get_area()
+
+        # Avoid divide-by-zero.
+        if total_area == 0.0:
+            return 0.0
+        
+        #print('age:', age, 'frag_index (1/km):', total_perimeter / total_area / 6371.0); sys.stdout.flush()
+        return total_perimeter / total_area
+    
+    
+    def get_contoured_continents(
+            self,
+            age):
+        """
+        Reconstruct the continents and then find the boundaries of the specified (potentially overlapping/abutting) continent polygons.
+        """
         
         # Reconstruct static continental polygons.
         reconstructed_feature_geometries = []
@@ -278,47 +301,16 @@ class ContinentFragmentation(object):
         reconstructed_polygons = [pygplates.PolygonOnSphere(reconstructed_feature_geometry.get_reconstructed_geometry())
                 for reconstructed_feature_geometry in reconstructed_feature_geometries]
         
-        if self.debug:
-            # Age is needed by debugging inside contouring function.
-            self.debug_age = age
-        
         # Calculate contoured continents representing the boundary(s) of the reconstructed continent polygons that overlap each other.
-        contoured_continents = self.get_contoured_continents(reconstructed_polygons)
-
-        # Update total perimeter and area.
-        for contoured_continent in contoured_continents:
-            total_perimeter += contoured_continent.get_perimeter()
-            total_area += contoured_continent.get_area()
-
-        # Debug output contour polygons.
-        if self.debug:
-            for contoured_continent in contoured_continents:
-                self.debug_contour_polygon_features.extend(
-                        pygplates.Feature.create_reconstructable_feature(
-                                pygplates.FeatureType.gpml_unclassified_feature,
-                                polygon,
-                                valid_time=(age + 0.5 * self.debug_time_interval, age - 0.5 * self.debug_time_interval))
-                        for polygon in contoured_continent.get_polygons())
-
-        # Avoid divide-by-zero.
-        if total_area == 0.0:
-            return 0.0
+        contoured_continents = self.calculate_contoured_continents(reconstructed_polygons)
         
-        #print('age:', age, 'frag_index (1/km):', total_perimeter / total_area / 6371.0); sys.stdout.flush()
-        return total_perimeter / total_area
-    
-    
-    def get_contoured_continents(
-            self,
-            continent_polygons):
-        """
-        Find the boundaries of the specified (potentially overlapping/abutting) continent polygons.
-        """
-
-        contoured_continents = self._calculate_contoured_continents(continent_polygons)
-        
-        # If debugging contours then create a debug feature containing all points inside contours.
+        # Debugging output (if requested).
         if self.debug:
+
+            #
+            # Create a debug feature containing all points inside contours.
+            #
+
             contouring_inside_points = []
 
             # Find the contoured continent (if any) containing each contouring point.
@@ -333,21 +325,33 @@ class ContinentFragmentation(object):
             contouring_inside_points_feature = pygplates.Feature.create_reconstructable_feature(
                                         pygplates.FeatureType.gpml_unclassified_feature,
                                         pygplates.MultiPointOnSphere(contouring_inside_points),
-                                        valid_time=(self.debug_age + 0.5 * self.debug_time_interval, self.debug_age - 0.5 * self.debug_time_interval))
+                                        valid_time=(age + 0.5 * self.debug_time_interval, age - 0.5 * self.debug_time_interval))
             self.debug_contouring_inside_point_features.append(contouring_inside_points_feature)
 
-            for contoured_continent in contoured_continents:
-                print(
-                        'time:', self.debug_age,
-                        'area:', contoured_continent.get_area() * pygplates.Earth.equatorial_radius_in_kms * pygplates.Earth.equatorial_radius_in_kms, 'km',
-                        'perimeter:', contoured_continent.get_perimeter() * pygplates.Earth.equatorial_radius_in_kms, 'km',
-                        'perimeter/area:', contoured_continent.get_perimeter() / contoured_continent.get_area() / pygplates.Earth.equatorial_radius_in_kms, 'km-1')
+            #
+            # Output debug contour polygon features.
+            #
+
+            print('time:', age)
+
+            for contoured_continent_index, contoured_continent in enumerate(contoured_continents):
+                self.debug_contour_polygon_features.extend(
+                        pygplates.Feature.create_reconstructable_feature(
+                                pygplates.FeatureType.gpml_unclassified_feature,
+                                polygon,
+                                valid_time=(age + 0.5 * self.debug_time_interval, age - 0.5 * self.debug_time_interval))
+                        for polygon in contoured_continent.get_polygons())
+
+                print('  {} perimeter/area:'.format(contoured_continent_index), contoured_continent.get_perimeter() / contoured_continent.get_area() / pygplates.Earth.equatorial_radius_in_kms, 'km-1')
+                print('  {} area:'.format(contoured_continent_index), contoured_continent.get_area() * pygplates.Earth.equatorial_radius_in_kms * pygplates.Earth.equatorial_radius_in_kms, 'km')
+                print('  {} perimeter:'.format(contoured_continent_index), contoured_continent.get_perimeter() * pygplates.Earth.equatorial_radius_in_kms, 'km')
+            
             sys.stdout.flush()
         
         return contoured_continents
 
     
-    def _calculate_contoured_continents(
+    def calculate_contoured_continents(
             self,
             continent_polygons):
         """
