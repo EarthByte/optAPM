@@ -1,3 +1,4 @@
+from  collections import deque
 import math
 import os
 import os.path
@@ -280,7 +281,6 @@ class ContinentFragmentation(object):
         if self.debug:
             # Age is needed by debugging inside contouring function.
             self.debug_age = age
-            print(age); sys.stdout.flush()
         
         # Calculate contoured continents representing the boundary(s) of the reconstructed continent polygons that overlap each other.
         contoured_continents = self.get_contoured_continents(reconstructed_polygons)
@@ -335,6 +335,14 @@ class ContinentFragmentation(object):
                                         pygplates.MultiPointOnSphere(contouring_inside_points),
                                         valid_time=(self.debug_age + 0.5 * self.debug_time_interval, self.debug_age - 0.5 * self.debug_time_interval))
             self.debug_contouring_inside_point_features.append(contouring_inside_points_feature)
+
+            for contoured_continent in contoured_continents:
+                print(
+                        'time:', self.debug_age,
+                        'area:', contoured_continent.get_area() * pygplates.Earth.equatorial_radius_in_kms * pygplates.Earth.equatorial_radius_in_kms, 'km',
+                        'perimeter:', contoured_continent.get_perimeter() * pygplates.Earth.equatorial_radius_in_kms, 'km',
+                        'perimeter/area:', contoured_continent.get_perimeter() / contoured_continent.get_area() / pygplates.Earth.equatorial_radius_in_kms, 'km-1')
+            sys.stdout.flush()
         
         return contoured_continents
 
@@ -495,60 +503,192 @@ class ContinentFragmentation(object):
                     marching_squares_containing_segments.add((latitude_index, longitude_index))
 
                 marching_squares.append(segments_in_square)
-
-        interval_spacing = self.contouring_point_spacing_degrees
-
+        
+        # Mark those points *inside* any contour as requiring a visit.
+        # We also need to remove them once they've been visited.
+        points_inside_all_contoured_continents_to_visit = set()
+        for latitude_index in range(num_latitudes):
+            for longitude_index in range(num_longitudes):
+                if points_inside_contour[latitude_index * num_longitudes + longitude_index]:
+                    points_inside_all_contoured_continents_to_visit.add((latitude_index, longitude_index))
+        
         #
-        # Generate contour polygons.
+        # Generate contoured continents.
         #
-        # Each contour polygon is found by picking an arbitrary square that contains one (or two) segments to represent the start
-        # of that contour. We then pick one of that square's segments (in most cases it'll only have one segment) and generate the
-        # first contour point at the segment's start. We then find the adjacent square to the segment's end (since a segment ends
-        # in the middle of a side of the square we can find the adjacent square). We then find the segment in the adjacent
-        # square that starts (or ends) at the that point (the previous segment end). The adjacent square may contain two segments
-        # in which case we need to find the correct segment (that continues the previous segment). We generate the next contour point
-        # at the segment start and continue this process following the contour through segments of squares until we return to the
-        # first segment (thus closing the contour loop).
+        # Each contoured continent is found by picking an arbitrary point inside any contours and expanding around it until we've filled
+        # the entire contoured continent. As we expand we detect when we reach a contour that has not yet been generated and generate it
+        # for the current contoured continent. This expanding fill can detect more than one contour per contoured continent.
+        # If any contour has an area below the area threshold then we ignore that contour.
         #
-        # This is repeated to find all contour polygons until we have no more squares containing segments.
+        # This is repeated to find all contoured continents (at which time we will have no more points left to visit inside contours).
         #
         contoured_continents = []
-        while marching_squares_containing_segments:
-            # Get any available square containing a segment.
-            # This will contain the first segment of the current contour polygon.
-            #
-            # Note: Python 'set' has no get method (it has a pop() but that removes the element) so get first element from an iterator instead.
-            latitude_index, longitude_index = next(iter(marching_squares_containing_segments))
-
-            contour_polygon = self._extract_contour_polygon(
-                latitude_index,
-                longitude_index,
-                num_latitude_intervals,
-                num_longitude_intervals,
-                interval_spacing,
-                marching_squares,
-                marching_squares_containing_segments)
-
-            # Exclude contour polygon if smaller than the threshold.
-            if contour_polygon.get_area() < self.contouring_area_threshold_steradians:
-                continue
-
+        # Keep visting points *inside* any contour until there are no points left to visit.
+        while points_inside_all_contoured_continents_to_visit:
             contoured_continent = ContouredContinent()
-            contour_polygon_inside_is_continent = True
-            contoured_continent.add_polygon(contour_polygon, contour_polygon_inside_is_continent)
 
-            contoured_continents.append(contoured_continent)
+            # Keep a queue of points inside the current ContouredContinent that we will search for contours.
+            points_inside_contoured_continent = deque()
+
+            # Get any available point (inside any contoured continent).
+            # This will be the first point inside the current ContouredContinent.
+            points_inside_contoured_continent.append(
+                points_inside_all_contoured_continents_to_visit.pop())
+
+            # Find the remaining points inside the current ContouredContinent by recursively searching
+            # nearbouring points until we reach the contour boundary of the current ContouredContinent.
+            while points_inside_contoured_continent:
+                # Pop the current point to visit.
+                latitude_index, longitude_index = points_inside_contoured_continent.popleft()
+                point_index = latitude_index * num_longitudes + longitude_index
+
+                # Search the four squares, adjacent to the current point, for a contour.
+                #
+                # Note that, for an adjacent square containing a contour, we might already have generated
+                # the contour in which case all segments of that contour will have been removed from
+                # 'marching_squares_containing_segments' and hence we will be essentially searching for the
+                # next contour (if any) of the current contoured continent (eg, an interior hole contour).
+                #
+                #  +--+--+
+                #  |  |  |
+                #  +--o--+
+                #  |  |  |
+                #  +--+--+
+                #
+
+                if latitude_index > 0:
+                    if longitude_index > 0:
+                        neighbour_square_location = latitude_index - 1, longitude_index - 1
+                        if neighbour_square_location in marching_squares_containing_segments:
+                            self._add_contour_polygon_to_contoured_continent(
+                                contoured_continent, self.contouring_points[point_index],
+                                neighbour_square_location, marching_squares, marching_squares_containing_segments)
+                    
+                    if longitude_index < num_longitudes - 1:
+                        neighbour_square_location = latitude_index - 1, longitude_index
+                        if neighbour_square_location in marching_squares_containing_segments:
+                            self._add_contour_polygon_to_contoured_continent(
+                                contoured_continent, self.contouring_points[point_index],
+                                neighbour_square_location, marching_squares, marching_squares_containing_segments)
+
+                if latitude_index < num_latitude_intervals - 1:
+                    if longitude_index > 0:
+                        neighbour_square_location = latitude_index, longitude_index - 1
+                        if neighbour_square_location in marching_squares_containing_segments:
+                            self._add_contour_polygon_to_contoured_continent(
+                                contoured_continent, self.contouring_points[point_index],
+                                neighbour_square_location, marching_squares, marching_squares_containing_segments)
+                    
+                    if longitude_index < num_longitudes - 1:
+                        neighbour_square_location = latitude_index, longitude_index
+                        if neighbour_square_location in marching_squares_containing_segments:
+                            self._add_contour_polygon_to_contoured_continent(
+                                contoured_continent, self.contouring_points[point_index],
+                                neighbour_square_location, marching_squares, marching_squares_containing_segments)
+
+                #
+                # Propagate outwards from current point to progressively fill the inside of the current contoured continent.
+                #
+                # This requires visiting up to 8 neighbour points (the '+' in diagram below).
+                # Only visit those points that are inside (the contour) and that have not yet been visited.
+                #
+                #  +--+--+
+                #  |  |  |
+                #  +--o--+
+                #  |  |  |
+                #  +--+--+
+                #
+                # However we don't wrap around the dateline (longitude) and we don't traverse beyond the poles (latitude).
+                # We don't need to wrap around dateline because a point at longitude -180 will search the two squares on its right
+                # and a point at longitude +180 will search the two squares on its left.
+                #
+
+                if latitude_index > 0:
+                    neighbour_point_location = latitude_index - 1, longitude_index
+                    if neighbour_point_location in points_inside_all_contoured_continents_to_visit:
+                        points_inside_contoured_continent.append(neighbour_point_location)
+                        points_inside_all_contoured_continents_to_visit.remove(neighbour_point_location)
+
+                    if longitude_index > 0:
+                        neighbour_point_location = latitude_index - 1, longitude_index - 1
+                        if neighbour_point_location in points_inside_all_contoured_continents_to_visit:
+                            points_inside_contoured_continent.append(neighbour_point_location)
+                            points_inside_all_contoured_continents_to_visit.remove(neighbour_point_location)
+                    
+                    if longitude_index < num_longitudes - 1:
+                        neighbour_point_location = latitude_index - 1, longitude_index + 1
+                        if neighbour_point_location in points_inside_all_contoured_continents_to_visit:
+                            points_inside_contoured_continent.append(neighbour_point_location)
+                            points_inside_all_contoured_continents_to_visit.remove(neighbour_point_location)
+                
+                if latitude_index < num_latitudes - 1:
+                    neighbour_point_location = latitude_index + 1, longitude_index
+                    if neighbour_point_location in points_inside_all_contoured_continents_to_visit:
+                        points_inside_contoured_continent.append(neighbour_point_location)
+                        points_inside_all_contoured_continents_to_visit.remove(neighbour_point_location)
+
+                    if longitude_index > 0:
+                        neighbour_point_location = latitude_index + 1, longitude_index - 1
+                        if neighbour_point_location in points_inside_all_contoured_continents_to_visit:
+                            points_inside_contoured_continent.append(neighbour_point_location)
+                            points_inside_all_contoured_continents_to_visit.remove(neighbour_point_location)
+
+                    if longitude_index < num_longitudes - 1:
+                        neighbour_point_location = latitude_index + 1, longitude_index + 1
+                        if neighbour_point_location in points_inside_all_contoured_continents_to_visit:
+                            points_inside_contoured_continent.append(neighbour_point_location)
+                            points_inside_all_contoured_continents_to_visit.remove(neighbour_point_location)
+
+                if longitude_index > 0:
+                    neighbour_point_location = latitude_index, longitude_index - 1
+                    if neighbour_point_location in points_inside_all_contoured_continents_to_visit:
+                        points_inside_contoured_continent.append(neighbour_point_location)
+                        points_inside_all_contoured_continents_to_visit.remove(neighbour_point_location)
+
+                if longitude_index < num_longitudes - 1:
+                    neighbour_point_location = latitude_index, longitude_index + 1
+                    if neighbour_point_location in points_inside_all_contoured_continents_to_visit:
+                        points_inside_contoured_continent.append(neighbour_point_location)
+                        points_inside_all_contoured_continents_to_visit.remove(neighbour_point_location)
+
+            # If the contoured continent has one or more contour polygons then add it to the list.
+            # Otherwise all its contour polygons had areas below the area threshold.
+            if contoured_continent.get_polygons():
+                contoured_continents.append(contoured_continent)
         
         return contoured_continents
 
 
+    def _add_contour_polygon_to_contoured_continent(
+            self,
+            contoured_continent,
+            any_point_inside_contoured_continent,
+            first_contour_segment_lat_lon_indices,
+            marching_squares,
+            marching_squares_containing_segments):
+        """
+        Extract a contour polygon and add it to the contoured continent if its area is above the area threshold.
+        """
+
+        # First extract the contour polygon (starting at the first segment given to us).
+        contour_polygon = self._extract_contour_polygon(
+            first_contour_segment_lat_lon_indices,
+            marching_squares,
+            marching_squares_containing_segments)
+
+        # Exclude contour polygon if its area is smaller than the threshold.
+        if contour_polygon.get_area() < self.contouring_area_threshold_steradians:
+            return
+        
+        # A point inside the contoured continent might actually be outside the current contour polygon (eg, if it's an interior hole).
+        # So determine whether this is the case or not (since the contoured continent needs to know this when it's asked to do point-in-polygon tests).
+        contour_polygon_inside_is_continent = contour_polygon.is_point_in_polygon(any_point_inside_contoured_continent)
+        contoured_continent.add_polygon(contour_polygon, contour_polygon_inside_is_continent)
+
+
     def _extract_contour_polygon(
             self,
-            latitude_index,
-            longitude_index,
-            num_latitude_intervals,
-            num_longitude_intervals,
-            interval_spacing,
+            first_segment_lat_lon_indices,
             marching_squares,
             marching_squares_containing_segments):
         """
@@ -561,16 +701,30 @@ class ContinentFragmentation(object):
 
         contour_points = []
 
+        interval_spacing = self.contouring_point_spacing_degrees
+        num_latitude_intervals = self.contouring_grid_num_latitudes - 1
+        num_longitude_intervals = self.contouring_grid_num_longitudes - 1
+
+        #
+        # When a contour is first encountered (during the caller's expanding fill) a contour polygon is generated by starting at the first square
+        # found that contains one (or two) segments, which represents the start of that contour. We then pick one of that square's segments
+        # (in most cases it'll only have one segment) and generate the first contour point at the segment's start. We then find the
+        # adjacent square to the segment's end (since a segment ends in the middle of a side of the square we can find the adjacent square).
+        # We then find the segment in the adjacent square that starts (or ends) at the that point (the previous segment end). The adjacent
+        # square may contain two segments in which case we need to find the correct segment (that continues the previous segment).
+        # We generate the next contour point at the segment start and continue this process following the contour through segments of squares
+        # until we return to the first segment (thus closing the contour loop).
+        #
+
         #
         # Starting at the first segment, follow the segments in a loop until they return to the first segment (thus forming a contour polygon).
         #
-        first_latitude_index, first_longitude_index = latitude_index, longitude_index
+        latitude_index, longitude_index = first_segment_lat_lon_indices
         prev_segment_end = None
         while True:
 
             # Get a segment from the current square.
-            square_index = latitude_index * num_longitude_intervals + longitude_index
-            segment1, segment2 = marching_squares[square_index]
+            segment1, segment2 = marching_squares[latitude_index * num_longitude_intervals + longitude_index]
             # If a square has only one segment then it will be in 'segment1' (not 'segment2').
             if segment1 is None:
                 # Shouldn't be able to reach a square that doesn't have any segments (or previously had segments but now has none).
@@ -651,7 +805,7 @@ class ContinentFragmentation(object):
 
             # We've just used 'segment1', so discard it by moving 'segment2' into its position to be used later.
             # And if 'segment2' is None then there are no more segments in current square so discard the entire square.
-            marching_squares[square_index] = segment2, None
+            marching_squares[latitude_index * num_longitude_intervals + longitude_index] = segment2, None
             if segment2 is None:
                 # There are no segments left in the current square, so we're finished with it.
                 # Note: This will raise KeyError if not present in 'set'.
@@ -661,6 +815,12 @@ class ContinentFragmentation(object):
             prev_segment_end = segment_end
 
             # Move to the next square connected by the end of the current segment.
+            #
+            #    ---2---
+            #   |       |
+            #   1       3
+            #   |       |
+            #    ---0---
             #
             # As noted above, at each pole there is an entire row of lat/lon grid points that are all either inside or outside a contour.
             # This means the Marching Squares algorithm cannot generate contour segments that penetrate the row. So we should not be able
@@ -689,7 +849,7 @@ class ContinentFragmentation(object):
                     longitude_index -= num_longitude_intervals
             
             # See if we're returned to the first square (containing the first segment).
-            if (first_latitude_index, first_longitude_index) == (latitude_index, longitude_index):
+            if first_segment_lat_lon_indices == (latitude_index, longitude_index):
                 # And make sure the end of the previous segment matches the start of the first segment.
                 # See comment above about adjacency relation for explanatation of exclusive-or.
                 if first_segment_start == (prev_segment_end ^ 0b10):
