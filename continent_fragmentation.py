@@ -533,12 +533,6 @@ class ContinentFragmentation(object):
             if contour_polygon.get_area() < self.contouring_area_threshold_steradians:
                 continue
 
-            # It seems, with pygplates revisions prior to 31, that a sliver polygon along the dateline can return
-            # an area that's a multiple of 2*PI (instead of zero). So let's exclude exact multiples of 2*PI.
-            contour_polygon_area_fmod_2pi = math.fmod(contour_polygon.get_area(), 2 * math.pi)
-            if contour_polygon_area_fmod_2pi < 1e-6 or contour_polygon_area_fmod_2pi > 2 * math.pi - 1e-6:
-                continue
-
             contoured_continent = ContouredContinent()
             contour_polygon_inside_is_continent = True
             contoured_continent.add_polygon(contour_polygon, contour_polygon_inside_is_continent)
