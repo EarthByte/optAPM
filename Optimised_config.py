@@ -34,7 +34,7 @@ data_model = 'Global_1000-0_Model_2017'
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     model_name = "svn1618_run1"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "git_20200909_67baa20_run30"
+    model_name = "git_20210503_89d7a7e_run36"
 else:
     model_name = "run1"
 
@@ -432,7 +432,7 @@ def get_plate_velocity_params(age):
         if age <= 80:
             return True, 1.0, cost_function, pv_bounds  # Weight is always 1.0 for 0-80Ma
         else:
-            return True, 2.0, cost_function, pv_bounds  # 1.0 gives a *multiplicative* weight of 0.5
+            return True, 2.0, cost_function, pv_bounds  # 2.0 gives a *multiplicative* weight of 0.5
     else:
         return True, 1.0, cost_function, None
 

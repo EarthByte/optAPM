@@ -139,6 +139,11 @@ class ContouredContinent(object):
         return area
 
 
+    def get_perimeter_area_ratio(self):
+        """The perimeter divided by the area (in units of 1/radians)."""
+        return self.get_perimeter() / self.get_area()
+
+
 class ContinentFragmentation(object):
     """
     Class to calculate continental fragmentation (global perimeter-to-area ratio).
@@ -217,7 +222,11 @@ class ContinentFragmentation(object):
             self.debug_contouring_inside_point_features = []
 
             # Easiest way to force contour polygons to be generated for all times is to get a *normalized* fragmentation index.
-            self.get_fragmentation(age_range[0], normalize=True)
+    
+    
+    def __del__(self):
+        # Debug output contours to GPML.
+        if self.debug:
             pygplates.FeatureCollection(self.debug_contour_polygon_features).write('contour_polygons.gpmlz')
             pygplates.FeatureCollection(self.debug_contouring_inside_point_features).write('contour_inside_points.gpmlz')
     
@@ -278,6 +287,10 @@ class ContinentFragmentation(object):
         # Avoid divide-by-zero.
         if total_area == 0.0:
             return 0.0
+        
+        if self.debug:
+            print(' global perimeter/area:', total_perimeter / total_area / pygplates.Earth.equatorial_radius_in_kms, 'km-1')
+            sys.stdout.flush()
         
         #print('age:', age, 'frag_index (1/km):', total_perimeter / total_area / 6371.0); sys.stdout.flush()
         return total_perimeter / total_area
