@@ -156,10 +156,10 @@ class ContinentFragmentation(object):
             continent_features,
             # Point spacing used when creating continent contours...
             continent_contouring_point_spacing_degrees,
-            # Area threshold (in square radians) when creating continent contours...
-            continent_contouring_area_threshold_steradians,
-            # Distance threshold to ensure small gaps between continents are ignored during contouring...
-            continent_contouring_gap_threshold_radians,
+            # Function (accepting time in Ma) to return area threshold (in square radians) when creating continent contours...
+            continent_contouring_area_threshold_steradians_function,
+            # Function (accepting time in Ma) to return distance threshold to ensure small gaps between continents are ignored during contouring...
+            continent_contouring_gap_threshold_radians_function,
             age_range):
         """
         Load the continent features and use *original* rotation model to calculate fragment through all time to find normalisation factor.
@@ -169,8 +169,8 @@ class ContinentFragmentation(object):
         self.continent_features = continent_features
 
         # A point grid to calculate contour polygons representing the boundary of reconstructed static polygons that overlap each other.
-        self.contouring_area_threshold_steradians = continent_contouring_area_threshold_steradians
-        self.continent_contouring_gap_threshold_radians = continent_contouring_gap_threshold_radians
+        self.contouring_area_threshold_steradians_function = continent_contouring_area_threshold_steradians_function
+        self.continent_contouring_gap_threshold_radians_function = continent_contouring_gap_threshold_radians_function
 
         # The number of latitudes (including -90 and 90).
         self.contouring_grid_num_latitudes = int(math.ceil(180.0 / continent_contouring_point_spacing_degrees)) + 1
@@ -220,8 +220,6 @@ class ContinentFragmentation(object):
             self.debug_contour_polygon_features = []
             self.debug_time_interval = age_range[1] - age_range[0]
             self.debug_contouring_inside_point_features = []
-
-            # Easiest way to force contour polygons to be generated for all times is to get a *normalized* fragmentation index.
     
     
     def __del__(self):
@@ -315,7 +313,7 @@ class ContinentFragmentation(object):
                 for reconstructed_feature_geometry in reconstructed_feature_geometries]
         
         # Calculate contoured continents representing the boundary(s) of the reconstructed continent polygons that overlap each other.
-        contoured_continents = self.calculate_contoured_continents(reconstructed_polygons)
+        contoured_continents = self.calculate_contoured_continents(reconstructed_polygons, age)
         
         # Debugging output (if requested).
         if self.debug:
@@ -366,10 +364,17 @@ class ContinentFragmentation(object):
     
     def calculate_contoured_continents(
             self,
-            continent_polygons):
+            continent_polygons,
+            age):
         """
         Find the boundaries of the specified (potentially overlapping/abutting) continent polygons as contour polygons.
+
+        The 'age' is only used to look up the time-dependent contouring thresholds (using functions passed into constructor).
         """
+
+        # Get the time-dependent thresholds.
+        contouring_area_threshold_steradians = self.contouring_area_threshold_steradians_function(age)
+        continent_contouring_gap_threshold_radians = self.continent_contouring_gap_threshold_radians_function(age)
 
         # Find the reconstructed continental polygon (if any) containing each point.
         continent_polygons_containing_points = points_in_polygons.find_polygons_using_points_spatial_tree(
@@ -384,7 +389,7 @@ class ContinentFragmentation(object):
                 self.contouring_points,
                 self.contouring_points_spatial_tree,
                 continent_polygons,
-                distance_threshold_radians=self.continent_contouring_gap_threshold_radians)
+                distance_threshold_radians=continent_contouring_gap_threshold_radians)
 
         #
         # Determine which points are inside contours (and which are outside).
@@ -578,30 +583,30 @@ class ContinentFragmentation(object):
                         neighbour_square_location = latitude_index - 1, longitude_index - 1
                         if neighbour_square_location in marching_squares_containing_segments:
                             self._add_contour_polygon_to_contoured_continent(
-                                contoured_continent, self.contouring_points[point_index],
-                                neighbour_square_location, marching_squares, marching_squares_containing_segments)
+                                contoured_continent, self.contouring_points[point_index], neighbour_square_location,
+                                marching_squares, marching_squares_containing_segments, contouring_area_threshold_steradians)
                     
                     if longitude_index < num_longitudes - 1:
                         neighbour_square_location = latitude_index - 1, longitude_index
                         if neighbour_square_location in marching_squares_containing_segments:
                             self._add_contour_polygon_to_contoured_continent(
-                                contoured_continent, self.contouring_points[point_index],
-                                neighbour_square_location, marching_squares, marching_squares_containing_segments)
+                                contoured_continent, self.contouring_points[point_index], neighbour_square_location,
+                                marching_squares, marching_squares_containing_segments, contouring_area_threshold_steradians)
 
                 if latitude_index < num_latitude_intervals - 1:
                     if longitude_index > 0:
                         neighbour_square_location = latitude_index, longitude_index - 1
                         if neighbour_square_location in marching_squares_containing_segments:
                             self._add_contour_polygon_to_contoured_continent(
-                                contoured_continent, self.contouring_points[point_index],
-                                neighbour_square_location, marching_squares, marching_squares_containing_segments)
+                                contoured_continent, self.contouring_points[point_index], neighbour_square_location,
+                                marching_squares, marching_squares_containing_segments, contouring_area_threshold_steradians)
                     
                     if longitude_index < num_longitudes - 1:
                         neighbour_square_location = latitude_index, longitude_index
                         if neighbour_square_location in marching_squares_containing_segments:
                             self._add_contour_polygon_to_contoured_continent(
-                                contoured_continent, self.contouring_points[point_index],
-                                neighbour_square_location, marching_squares, marching_squares_containing_segments)
+                                contoured_continent, self.contouring_points[point_index], neighbour_square_location,
+                                marching_squares, marching_squares_containing_segments, contouring_area_threshold_steradians)
 
                 #
                 # Propagate outwards from current point to progressively fill the inside of the current contoured continent.
@@ -682,7 +687,8 @@ class ContinentFragmentation(object):
             any_point_inside_contoured_continent,
             first_contour_segment_lat_lon_indices,
             marching_squares,
-            marching_squares_containing_segments):
+            marching_squares_containing_segments,
+            contouring_area_threshold_steradians):
         """
         Extract a contour polygon and add it to the contoured continent if its area is above the area threshold.
         """
@@ -694,7 +700,7 @@ class ContinentFragmentation(object):
             marching_squares_containing_segments)
 
         # Exclude contour polygon if its area is smaller than the threshold.
-        if contour_polygon.get_area() < self.contouring_area_threshold_steradians:
+        if contour_polygon.get_area() < contouring_area_threshold_steradians:
             return
         
         # A point inside the contoured continent might actually be outside the current contour polygon (eg, if it's an interior hole).

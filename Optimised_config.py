@@ -154,7 +154,8 @@ plate_velocity_continental_fragmentation_point_spacing_degrees = 2.0
 #
 # NOTE: This only applies if both plate velocity is enabled (see 'get_plate_velocity_params' below) and
 #       'plate_velocity_continental_polygons_file' is specified (ie, not None).
-plate_velocity_continental_fragmentation_area_threshold_steradians = 0.0
+def plate_velocity_continental_fragmentation_area_threshold_steradians(time):
+    return 0.1
 
 # Gaps between continent polygons smaller than this will be excluded when contouring/aggregrating blocks of continental polygons.
 # Note: Units here are for normalised sphere (ie, radians).
@@ -162,7 +163,16 @@ plate_velocity_continental_fragmentation_area_threshold_steradians = 0.0
 #
 # NOTE: This only applies if both plate velocity is enabled (see 'get_plate_velocity_params' below) and
 #       'plate_velocity_continental_polygons_file' is specified (ie, not None).
-plate_velocity_continental_fragmentation_gap_threshold_radians = math.radians(4.0)  # 4 degrees is about 440 km
+def plate_velocity_continental_fragmentation_gap_threshold_radians(time):
+    if data_model == 'Global_1000-0_Model_2017':
+        if time < 200:
+            return math.radians(0.0)  # 1 degree is about 110 km
+        elif time < 400:
+            return math.radians(1.0)  # 1 degree is about 110 km
+        else:
+            return math.radians(2.0)  # 1 degree is about 110 km
+    else:
+        return math.radians(2.0)  # 1 degree is about 110 km
 
 
 # Temporary: Allow input of GPlates exported net rotation file.

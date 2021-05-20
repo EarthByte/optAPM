@@ -202,7 +202,7 @@ class PlateVelocityPartitioner(object):
             #
             # NOTE: We are NOT excluding contours based on perimeter/area ratio.
             #       That determination must be made by the final cost function that calculates the cost (penalty).
-            contoured_continents = self.continent_fragmentation.calculate_contoured_continents(reconstructed_continent_polygons)
+            contoured_continents = self.continent_fragmentation.calculate_contoured_continents(reconstructed_continent_polygons, ref_rotation_start_age)
             
             # Find the contoured continent (if any) containing each continent point.
             continent_point_contoured_continent_indices = [None] * len(continent_points)
