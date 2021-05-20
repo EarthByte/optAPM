@@ -212,7 +212,7 @@ class PlateVelocityPartitioner(object):
                 # See if any continent points are inside the current contoured continent.
                 continent_points_inside_contoured_continent = contoured_continent.are_points_inside(continent_points, continent_points_spatial_tree)
                 # Record the contoured continent index for any continent points that are inside it.
-                for continent_point_index, continent_point_inside in continent_points_inside_contoured_continent:
+                for continent_point_index, continent_point_inside in enumerate(continent_points_inside_contoured_continent):
                     if continent_point_inside:
                         continent_point_contoured_continent_indices[continent_point_index] = contoured_continent_index
             

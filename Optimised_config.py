@@ -406,8 +406,8 @@ def get_plate_velocity_params(age):
             
             # If there were no contours at all then just return zero cost.
             #
-            # This shouldn't happen because we should be getting all contours,
-            # none should be excluded based on area or perimeter/area ratio.
+            # This shouldn't happen because we should be getting all contours (except below min area threshold),
+            # because none should be excluded based on perimeter/area ratio.
             #
             # And note that returning zero cost is generally not a good idea because if the plate velocity cost happens
             # to be the only cost metric (eg, net rotation and trench migration weights are zero) then the optimizer cannot
