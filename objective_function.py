@@ -523,7 +523,7 @@ class ObjectiveFunction(object):
                 velocity_vectors_in_contours.append((contour_perimeter, contour_area, velocity_vectors_in_contour))
             
             # Delegate cost evaluation to cost function.
-            pv_eval = self.cost_func_array[4](plate_features_are_topologies, velocity_vectors_in_contours)
+            pv_eval = self.cost_func_array[4](plate_features_are_topologies, velocity_vectors_in_contours, self.ref_rotation_start_age)
             
             # Penalise out-of-bound cost values (if requested).
             if self.bounds_array[4]:

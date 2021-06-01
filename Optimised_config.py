@@ -34,7 +34,7 @@ data_model = 'Global_1000-0_Model_2017'
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     model_name = "svn1618_run1"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "git_20210503_89d7a7e_run36"
+    model_name = "git_20210503_89d7a7e_run44"
 else:
     model_name = "run1"
 
@@ -358,7 +358,7 @@ def get_hotspot_trail_params(age):
 
 def get_plate_velocity_params(age):
     # Cost function - see "objective_function.py" for definition of function arguments...
-    def cost_function(plate_features_are_topologies, velocity_vectors_in_contours):
+    def cost_function(plate_features_are_topologies, velocity_vectors_in_contours, ref_rotation_start_age):
         # NOTE: Import any modules used in this function here
         #       (since this function's code might be serialised over the network to remote nodes).
         import numpy as np
@@ -382,28 +382,6 @@ def get_plate_velocity_params(age):
             return np.median(velocity_magnitudes)
 
         else:  # continent contours...
-            contour_weighted_median_velocities = []
-
-            # Only include the larger contours that exceed an area/perimeter threshold.
-            # Note that 0.1427 corresponds to a perimeter/area of 7 radian^-1 or 0.0011 km^-1 (using a mean Earth radius of 6,371 km).
-            contour_weight_threshold = 0.1427
-
-            # Calculate a median velocity magnitude for each continent contour.
-            for contour_perimeter, contour_area, velocity_vectors_in_contour in velocity_vectors_in_contours:
-                median_velocity_in_contour = np.median([velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour])
-
-                # Continents with a larger area/perimeter ratio should be penalized more in terms of their speed.
-                # So weight their median velocity more heavily.
-                contour_weight = contour_area / contour_perimeter
-                if contour_weight > contour_weight_threshold:
-                    contour_weighted_median_velocity = contour_weight * median_velocity_in_contour
-                else:
-                    # We still penalize smaller area/perimeter contours, but much less.
-                    # For the reason we do this: see note below about returning zero cost.
-                    contour_weighted_median_velocity = 0.001 * median_velocity_in_contour
-                
-                contour_weighted_median_velocities.append(contour_weighted_median_velocity)
-            
             # If there were no contours at all then just return zero cost.
             #
             # This shouldn't happen because we should be getting all contours (except below min area threshold),
@@ -414,20 +392,45 @@ def get_plate_velocity_params(age):
             # find a minimum (since it's likely all model seeds could return zero). In this case the optimizer could just return
             # any solution. This was observed (when contours below a threshold were given zero weight, which we no longer do)
             # as very high speed absolute plate motions that zipped back and forth across the globe.
-            if not contour_weighted_median_velocities:
+            if not velocity_vectors_in_contours:
                 return 0.0
             
-            # Return the mean of the weighted median velocities of the contours.
-            #
-            # And scale it so that it roughly matches what we had previously, which was an un-weighted median velocity over all continents and so we want to
-            # undo the weighting which we'll take as the average area/perimeter ratio of all contours (so undoing that means multiplying by average perimeter/area).
-            # So here the scaling factor 7.0 corresponds to a perimeter/area of 7 radian^-1 or 0.0011 km^-1 (using a mean Earth radius of 6,371 km),
-            # which is about the averge perimeter/area of continent contours over time.
-            #
-            # We could instead include this scale factor in the 'scale_plate_velocity' internal scaling factor in the objective function, but it's easier to do it here
-            # (and explain the reason here). And that internal scale factor is usually based on doing a few optimization runs and adjusting the internal scale factors so
-            # that all costs (with equal weighting, eg, net rotation = trench migration = plate velocity = 1.0) come out roughly equal over all geological times.
-            return 7.0 * np.mean(contour_weighted_median_velocities)
+            # Return the median velocity across all contours, unless during Pangea or Rodinia in which case take the contour with the
+            # minimum perimeter/area ratio and use its median velocity (multiplied by 10 to penalize its velocity more heavily).
+
+            # Pangea.
+            if ref_rotation_start_age >= 200 and ref_rotation_start_age <= 320:
+                # Calculate a median velocity magnitude for each continent contour.
+                min_contour_perimeter_area_ratio = float('inf')
+                min_median_velocity = 0.0
+                for contour_perimeter, contour_area, velocity_vectors_in_contour in velocity_vectors_in_contours:
+                    contour_perimeter_area_ratio = contour_perimeter / contour_area
+                    if contour_perimeter_area_ratio < min_contour_perimeter_area_ratio:
+                        min_contour_perimeter_area_ratio = contour_perimeter_area_ratio
+                        min_median_velocity = np.median([velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour])
+                
+                return 10.0 * min_median_velocity
+            
+            # Rodinia.
+            if ref_rotation_start_age >= 800 and ref_rotation_start_age <= 950:
+                # Calculate a median velocity magnitude for each continent contour.
+                min_contour_perimeter_area_ratio = float('inf')
+                min_median_velocity = 0.0
+                for contour_perimeter, contour_area, velocity_vectors_in_contour in velocity_vectors_in_contours:
+                    contour_perimeter_area_ratio = contour_perimeter / contour_area
+                    if contour_perimeter_area_ratio < min_contour_perimeter_area_ratio:
+                        min_contour_perimeter_area_ratio = contour_perimeter_area_ratio
+                        min_median_velocity = np.median([velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour])
+                
+                return 10.0 * min_median_velocity
+
+            # Calculate median of all velocities (in all contours).
+            velocity_magnitudes = []
+            for _, _, velocity_vectors_in_contour in velocity_vectors_in_contours:
+                velocity_magnitudes.extend(velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour)
+            median_velocity = np.median(velocity_magnitudes)
+
+            return median_velocity
 
     # Note: Use units of mm/yr (same as km/Myr)...
     #pv_bounds = [0, 60]
