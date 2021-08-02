@@ -34,7 +34,7 @@ data_model = 'Global_1000-0_Model_2017'
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     model_name = "svn1618_run1"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "git_20210503_89d7a7e_run44"
+    model_name = "git_20210503_89d7a7e_run45"
 else:
     model_name = "run1"
 
@@ -155,7 +155,7 @@ plate_velocity_continental_fragmentation_point_spacing_degrees = 2.0
 # NOTE: This only applies if both plate velocity is enabled (see 'get_plate_velocity_params' below) and
 #       'plate_velocity_continental_polygons_file' is specified (ie, not None).
 def plate_velocity_continental_fragmentation_area_threshold_steradians(time):
-    return 0.1
+    return 0.0
 
 # Gaps between continent polygons smaller than this will be excluded when contouring/aggregrating blocks of continental polygons.
 # Note: Units here are for normalised sphere (ie, radians).
@@ -382,6 +382,7 @@ def get_plate_velocity_params(age):
             return np.median(velocity_magnitudes)
 
         else:  # continent contours...
+
             # If there were no contours at all then just return zero cost.
             #
             # This shouldn't happen because we should be getting all contours (except below min area threshold),
@@ -395,35 +396,6 @@ def get_plate_velocity_params(age):
             if not velocity_vectors_in_contours:
                 return 0.0
             
-            # Return the median velocity across all contours, unless during Pangea or Rodinia in which case take the contour with the
-            # minimum perimeter/area ratio and use its median velocity (multiplied by 10 to penalize its velocity more heavily).
-
-            # Pangea.
-            if ref_rotation_start_age >= 200 and ref_rotation_start_age <= 320:
-                # Calculate a median velocity magnitude for each continent contour.
-                min_contour_perimeter_area_ratio = float('inf')
-                min_median_velocity = 0.0
-                for contour_perimeter, contour_area, velocity_vectors_in_contour in velocity_vectors_in_contours:
-                    contour_perimeter_area_ratio = contour_perimeter / contour_area
-                    if contour_perimeter_area_ratio < min_contour_perimeter_area_ratio:
-                        min_contour_perimeter_area_ratio = contour_perimeter_area_ratio
-                        min_median_velocity = np.median([velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour])
-                
-                return 10.0 * min_median_velocity
-            
-            # Rodinia.
-            if ref_rotation_start_age >= 800 and ref_rotation_start_age <= 950:
-                # Calculate a median velocity magnitude for each continent contour.
-                min_contour_perimeter_area_ratio = float('inf')
-                min_median_velocity = 0.0
-                for contour_perimeter, contour_area, velocity_vectors_in_contour in velocity_vectors_in_contours:
-                    contour_perimeter_area_ratio = contour_perimeter / contour_area
-                    if contour_perimeter_area_ratio < min_contour_perimeter_area_ratio:
-                        min_contour_perimeter_area_ratio = contour_perimeter_area_ratio
-                        min_median_velocity = np.median([velocity_vector.get_magnitude() for velocity_vector in velocity_vectors_in_contour])
-                
-                return 10.0 * min_median_velocity
-
             # Calculate median of all velocities (in all contours).
             velocity_magnitudes = []
             for _, _, velocity_vectors_in_contour in velocity_vectors_in_contours:
