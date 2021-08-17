@@ -15,11 +15,10 @@ Note: The data references in this workflow have been changed to reference this *
 Since we're referencing a deforming model we currently require a version of pyGPlates that closes the gaps in resolved topologies in the *deforming* model (along deforming lines).
 PyGPlates revision 19 or above should suffice.
 
-Since we're using pyGPlates, this also means we need to use Python 2.7.x (since pyGPlates does not yet support Python 3).
-
-Other Python module prerequisites are:
+Python module prerequisites are:
 
 * PlateTectonicTools - https://github.com/EarthByte/PlateTectonicTools
+* pygplates
 * numpy
 * scipy
 * scikit-image
@@ -31,8 +30,59 @@ Other Python module prerequisites are:
 
 ## Configuration
 
-All settings are now in "Optimised_config.py", such as the model name, start/end times, number of models to use, etc.
-So the first step is to edit that to ensure it is configured how you like.
+All settings are now in "Optimised_config.py", such as the model name, start/end times, number of models to use, etc. So the first step is to edit that to ensure it is configured how you like.
+
+### Optimisation overview
+
+Essentially the workflow optimises the absolute plate motion by perturbing the absolute rotation (pole and angle) and then calculating penalties derived from that rotation (eg, net rotation (NR), trench migration (TM) and plate velocity (PV); and a hotspot (HS) penalty for 0-80Ma). Then these penalties are scaled by their weights (eg, NR=1, TM=0.5, PV=0.5) and also internal scaling to make sure each penalty is roughly the same when the weights are all 1.0 (but that’s an implementation detail). Then the penalties are added to give one number. The optimization workflow then perturbs the rotation further to try to reduce that number. It does this many times until it settles on a local minimum (called a seed), and does this for a bunch of seeds to find global minimum.
+
+### Plate velocity penalty
+
+For the 1Ga model, the plate velocity (PV) penalty currently involves multiplying the plate velocity weight by the median velocity across all continents on the globe:
+
+```
+plate_velocity_penalty = plate_velocity_weight * median_velocity_across_all_continents
+```
+
+Previously we performed experiments involving continent contouring where we also multiplied by the global fragmentation index (sum of continent areas divided sum of continent perimeters):
+
+```
+plate_velocity_penalty = plate_velocity_weight * median_velocity_across_all_continents *
+                         sum(area_continent) / sum(perimeter_continent)
+```
+
+Other experiments involved individually penalizing continents, such as:
+
+```
+plate_velocity_penalty = plate_velocity_weight *
+                         mean(median_velocity_in_continent * area_continent / perimeter_continent)
+```
+
+The general idea was to penalize the plate velocities of supercontinents more heavily in order to slow them down. However this tended to produce less than desirable results including conflicting with optimizing net rotation, and so was ultimately abandoned. However the code to perform contouring of continents remains and a brief overview is provided in the following section (since it may be useful in other projects).
+
+### Continent contouring
+
+The current contouring algorithm implements a landmass flood-fill to find all contours for a particular continuous landmass followed by the Marching Squares algorithm to create the contours for that landmass. This is done on the 3D globe and solves the following problems:
+
+*	A single very large landmass can have more than one contour (polygon).
+*	In some cases (particularly for 0-130Ma) the polygons are so large that the inside/outside region of each contour polygon becomes swapped.
+*	Clipping at the dateline (with a 2D approach) causes perimeters to be larger than they should be.
+
+The module "continent_fragmentation.py" performs this contouring of continents from reconstructed polygons. Ultimately it should be moved to [PlateTectonicTools](https://github.com/EarthByte/PlateTectonicTools) and reworked slightly (TODO), but in the meantime you can use it by copying it along with the following 3 modules (also in this repository): *points_in_polygons*, *points_spatial_tree* and *proximity_query*.
+
+Essentially you can create a `ContinentFragmentation` object using rotation files, the continent features (polygons), a contour resolution, a gap threshold, an area threshold and an age range. And then ask it to reconstruct the polygons to an `age` and contour them into continents:
+
+```
+continent_fragmentation = ContinentFragmentation(…)
+…
+contoured_continents = continent_fragmentation.get_contoured_continents(age)
+```
+
+Where the returned `contoured_continents` is a list of `ContouredContinent`. These are all the contoured continents on the globe at the specified age. Each of these can be used to query a continent perimeter, area and whether arbitrary points are contained inside it. If you want to query distance to the continent you can first retrieve its polygons and then query distance to those (each contoured continent is actually one or more pyGPlates polygons representing its boundary between land and ocean, eg, an exterior polygon with interior holes).
+
+*A note on the input parameters mentioned above*… The contour resolution determines how finely tessellated the contour outlines are. The gap threshold controls how close the reconstructed polygons can be to each other to be joined together – this helps remove narrow channels/gaps, however it also has the effect of expanding the continent outwards. The area threshold excludes any polygon boundary (of a contoured continent) with area below the threshold - remember that a contoured continent can contain more than one boundary - so for example if a hole inside a continent has an area below the threshold then the hole disappears.
+
+*Things that could be improved when moving to PlateTectonicTools*… The age range is an example of something that’s not really needed for contouring (and could be reworked) – it’s really only there to calculate the global fragmentation index (sum continent perimeters / sum continent areas) normalized over the age range (ie, max frag index at any time is 1.0) – the global fragmentation is another function you can call on the ContinentFragmentation class – better to move the age range onto that function.  Another reworking is removing the requirement to have rotation files relative to a specified data directory. Another improvement would be to replace the internal uniform lat/lon sampling with a sampling that’s uniform across the sphere (so that the contour resolution doesn’t favour contours near the North/South poles).
 
 ## Running the optimisation workflow
 
