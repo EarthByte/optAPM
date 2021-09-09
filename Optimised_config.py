@@ -34,7 +34,7 @@ data_model = 'Global_1000-0_Model_2017'
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     model_name = "svn1618_run1"
 elif data_model == 'Global_1000-0_Model_2017':
-    model_name = "git_20210503_89d7a7e_run45"
+    model_name = "git_20210802_ce53d67_run45"
 else:
     model_name = "run1"
 
