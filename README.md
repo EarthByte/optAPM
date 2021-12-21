@@ -2,18 +2,13 @@
 
 This code adapts Mike Tetley's code to work on a High Performance Computing (HPC) cluster such as Artemis at the University of Sydney.
 
-The initial commit in this repository is the following version of Simon William's code (that he adapted to work on his computer Eastwind):
-https://github.sydney.edu.au/GPlates/optAPM/tree/cfc6c26333f9d9e16433f1a5be727cb07af685bd
-
 ## Prerequisites
 
-The Earthbyte deforming model 2019_v2 (under the "Global_Model_WD_Internal_Release_2019_v2" directory in http://www.earthbyte.org/svn/EByteDeformingModels ).
-This data needs to be copied into the local "data/Global_Model_WD_Internal_Release_2019_v2/" directory.
+This workflow optimizes the absolute plate motion of an existing plate model. So the data of the plate model needs to be copied into a subdirectory of the `data` directory.
 
-Note: The data references in this workflow have been changed to reference this *deforming* model.
+For example, data for the Earthbyte deforming model can be obtained [here](https://www.earthbyte.org/webdav/ftp/Data_Collections/Muller_etal_2019_Tectonics/Muller_etal_2019_PlateMotionModel/).  
 
-Since we're referencing a deforming model we currently require a version of pyGPlates that closes the gaps in resolved topologies in the *deforming* model (along deforming lines).
-PyGPlates revision 19 or above should suffice.
+Also PyGPlates revision 28 (public release) or above should be used.
 
 Python module prerequisites are:
 
@@ -30,7 +25,7 @@ Python module prerequisites are:
 
 ## Configuration
 
-All settings are now in "Optimised_config.py", such as the model name, start/end times, number of models to use, etc. So the first step is to edit that to ensure it is configured how you like.
+All settings are now in "Optimised_config.py", such as the model name, start/end times, number of models to use, etc. So the first step is to edit that to ensure it is configured how you like. The most important parameter is `data_model` which refers to the plate model data (mentioned above).
 
 ### Optimisation overview
 
