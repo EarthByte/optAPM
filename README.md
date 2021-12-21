@@ -6,7 +6,8 @@ This code adapts Mike Tetley's code to work on a High Performance Computing (HPC
 
 This workflow optimizes the absolute plate motion of an existing plate model. So the data of the plate model needs to be copied into a subdirectory of the `data` directory.
 
-For example, data for the Earthbyte deforming model can be obtained [here](https://www.earthbyte.org/webdav/ftp/Data_Collections/Muller_etal_2019_Tectonics/Muller_etal_2019_PlateMotionModel/).  
+The data for the deforming model can be obtained [here](https://www.earthbyte.org/webdav/ftp/Data_Collections/Muller_etal_2019_Tectonics/Muller_etal_2019_PlateMotionModel/).  
+The data for the 1Ga model can be obtained [here](https://www.earthbyte.org/webdav/ftp/Data_Collections/Muller_etal_2022_SE/).  
 
 Also PyGPlates revision 28 (public release) or above should be used.
 
