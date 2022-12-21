@@ -23,6 +23,11 @@ Python module prerequisites are:
 * xlrd==1.2.0 (apparently required for Excel support; and using >= 2.0 results in an error since 2.0 removed some formats)
 * NLopt
 * mpi4py
+* future
+* cartopy
+* matplotlib
+* ipyparallel
+* openpyxl
 
 ## Configuration
 
