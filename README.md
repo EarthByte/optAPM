@@ -9,17 +9,19 @@ This workflow optimizes the absolute plate motion of an existing plate model. So
 The data for the deforming model can be obtained [here](https://www.earthbyte.org/webdav/ftp/Data_Collections/Muller_etal_2019_Tectonics/Muller_etal_2019_PlateMotionModel/).  
 The data for the 1Ga model can be obtained [here](https://www.earthbyte.org/webdav/ftp/Data_Collections/Muller_etal_2022_SE/).  
 
-Also PyGPlates revision 28 (public release) or above should be used.
+## Installation
 
-Python module prerequisites are:
+### Dependencies
 
-* PlateTectonicTools - https://github.com/EarthByte/PlateTectonicTools
+The following Python packages are required:
+
+* PlateTectonicTools
 
   Until version 0.5 of PlateTectonicTools is available you'll need to install it from Github:
 
   `pip install git+https://github.com/EarthByte/PlateTectonicTools`
 
-* pygplates
+* pygplates>=0.28  (version 0.28 or above should be used)
 * numpy
 * scipy
 * scikit-image
@@ -33,6 +35,34 @@ Python module prerequisites are:
 * matplotlib
 * ipyparallel
 * openpyxl
+
+### Install using conda and pip
+
+You can install the dependencies using `conda` and `pip`.
+
+First install dependencies that are available on `conda` (in the _conda-forge_ channel):
+
+```
+conda create -n <conda-environment> -c conda-forge \
+    pygplates numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
+    mpi4py future cartopy matplotlib ipyparallel openpyxl
+```
+
+...then activate the conda environment:
+
+```
+conda activate <conda-environment>
+```
+
+...then use `pip` to install the remaining packages (into the conda environment):
+
+```
+conda install git pip
+pip install pmagpy
+pip install git+https://github.com/EarthByte/PlateTectonicTools
+```
+
+...where `<conda-environment>` should be replaced with the name of your conda environment (eg, "optAPM").
 
 ## Configuration
 
