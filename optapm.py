@@ -433,7 +433,7 @@ class ModelSetup():
             # Create start seeds array
             for i in range(0, len(start_seeds_rotated)):
 
-                seed = [[start_seeds_rotated[i][0]], [start_seeds_rotated[i][1]], ref_rot_angle]
+                seed = [start_seeds_rotated[i][0], start_seeds_rotated[i][1], ref_rot_angle]
 
                 seed_lons.append(start_seeds_rotated[i][0])
                 seed_lats.append(start_seeds_rotated[i][1])
@@ -452,7 +452,7 @@ class ModelSetup():
             # For secondary minimisation, add inital min result to start seeds
             if auto_calc_ref_pole == False:
 
-                seed = [[ref_rot_longitude], [ref_rot_latitude], ref_rot_angle]
+                seed = [ref_rot_longitude, ref_rot_latitude, ref_rot_angle]
                 seed_lons.append(ref_rot_longitude)
                 seed_lats.append(ref_rot_latitude)
                 seed_angs.append(ref_rot_angle)
@@ -586,7 +586,7 @@ class ModelSetup():
             # Create start seeds array
             for i in range(0, len(start_seeds_rotated)):
 
-                seed = [[start_seeds_rotated[i][0]], [start_seeds_rotated[i][1]], ref_rot_angle]
+                seed = [start_seeds_rotated[i][0], start_seeds_rotated[i][1], ref_rot_angle]
 
                 seed_lons.append(start_seeds_rotated[i][0])
                 seed_lats.append(start_seeds_rotated[i][1])
@@ -605,7 +605,7 @@ class ModelSetup():
             # For secondary minimisation, add inital min result to start seeds
             if auto_calc_ref_pole == False:
 
-                seed = [[ref_rot_longitude], [ref_rot_latitude], ref_rot_angle]
+                seed = [ref_rot_longitude, ref_rot_latitude, ref_rot_angle]
                 seed_lons.append(ref_rot_longitude)
                 seed_lats.append(ref_rot_latitude)
                 seed_angs.append(ref_rot_angle)
@@ -690,11 +690,11 @@ class ModelSetup():
 
                 if search == "Secondary":
 
-                    seed = [[start_seeds_rotated[i][0]], [start_seeds_rotated[i][1]], ref_rot_angle]
+                    seed = [start_seeds_rotated[i][0], start_seeds_rotated[i][1], ref_rot_angle]
 
                 else:
 
-                    seed = [[start_seeds_rotated[i][0]], [start_seeds_rotated[i][1]], ang_gaussian_array[0][i]]
+                    seed = [start_seeds_rotated[i][0], start_seeds_rotated[i][1], ang_gaussian_array[0][i]]
 
                 seed_lons.append(start_seeds_rotated[i][0])
                 seed_lats.append(start_seeds_rotated[i][1])
@@ -708,7 +708,7 @@ class ModelSetup():
             # For secondary minimisation, add inital min result to start seeds
             if auto_calc_ref_pole == False:
 
-                seed = [[ref_rot_longitude], [ref_rot_latitude], ref_rot_angle]
+                seed = [ref_rot_longitude, ref_rot_latitude, ref_rot_angle]
                 seed_lons.append(ref_rot_longitude)
                 seed_lats.append(ref_rot_latitude)
                 seed_angs.append(ref_rot_angle)
