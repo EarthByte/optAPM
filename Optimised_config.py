@@ -26,13 +26,14 @@ datadir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data', '')
 
 # The data model to run the optimisation on.
 # This should be the name of the sub-directory in 'data/'.
-data_model = 'Global_1000-0_Model_2017'
+#data_model = 'Global_1000-0_Model_2017'
 #data_model = 'Global_Model_WD_Internal_Release_2019_v2'
+data_model = 'Global_Model_WD_Internal_Release-EarthBytePlateMotionModel-TRUNK'
 
 
 # The model name is suffixed to various output filenames.
 if data_model.startswith('Global_Model_WD_Internal_Release'):
-    model_name = "svn1618_run1"
+    model_name = "git_20230814_09f1e22_run1"
 elif data_model == 'Global_1000-0_Model_2017':
     model_name = "git_20210802_ce53d67_run45"
 else:
@@ -43,7 +44,7 @@ else:
 if data_model == 'Global_1000-0_Model_2017':
     start_age = 1000
 else:
-    start_age = 410
+    start_age = 1000
 
 # End age.
 #
@@ -56,7 +57,7 @@ end_age = 0
 
 # Time interval.
 if data_model.startswith('Global_Model_WD_Internal_Release'):
-    interval = 10
+    interval = 5
 elif data_model == 'Global_1000-0_Model_2017':
     # 5My works well with using a no-net-rotation reference frame (instead of PMAG), and is about as fast as 10My.
     interval = 5
@@ -91,8 +92,8 @@ original_rotation_filenames = [os.path.relpath(abs_path, datadir) for abs_path i
         glob.glob(os.path.join(datadir, data_model, '*.rot'))]
 # 2) Explicitly list all the input rotation files (must be relative to the 'data/' directory).
 #original_rotation_filenames = [
-#  'Global_Model_WD_Internal_Release_2019_v2/rotation_file1.rot',
-#  'Global_Model_WD_Internal_Release_2019_v2/rotation_file2.rot',
+#  data_model + '/rotation_file1.rot',
+#  data_model + '/rotation_file2.rot',
 #]
 
 # The topology files (relative to the 'data/' directory).
@@ -106,19 +107,19 @@ original_rotation_filenames = [os.path.relpath(abs_path, datadir) for abs_path i
 #        glob.glob(os.path.join(datadir, data_model, '*.gpml')) + glob.glob(os.path.join(datadir, data_model, '*.gpmlz'))]
 # 2) Explicitly list all the topology files (must be relative to the 'data/' directory).
 #topology_filenames = [
-#  'Global_Model_WD_Internal_Release_2019_v2/topology_file1.gpml',
-#  'Global_Model_WD_Internal_Release_2019_v2/topology_file2.gpml',
+#  data_model + '/topology_file1.gpml',
+#  data_model + '/topology_file2.gpml',
 #]
 if data_model == 'Global_1000-0_Model_2017':
     # Starting at SVN rev 1624 there are other GPML files that we don't need to include.
     topology_filenames = [   # svn 1683...
-        'Global_1000-0_Model_2017/250-0_plate_boundaries_Merdith_et_al.gpml',
-        'Global_1000-0_Model_2017/410-250_plate_boundaries_Merdith_et_al.gpml',
-        'Global_1000-0_Model_2017/1000-410-Convergence_Merdith_et_al.gpml',
-        'Global_1000-0_Model_2017/1000-410-Divergence_Merdith_et_al.gpml',
-        'Global_1000-0_Model_2017/1000-410-Topologies_Merdith_et_al.gpml',
-        'Global_1000-0_Model_2017/1000-410-Transforms_Merdith_et_al.gpml',
-        'Global_1000-0_Model_2017/TopologyBuildingBlocks_Merdith_et_al.gpml',
+        data_model + '/250-0_plate_boundaries_Merdith_et_al.gpml',
+        data_model + '/410-250_plate_boundaries_Merdith_et_al.gpml',
+        data_model + '/1000-410-Convergence_Merdith_et_al.gpml',
+        data_model + '/1000-410-Divergence_Merdith_et_al.gpml',
+        data_model + '/1000-410-Topologies_Merdith_et_al.gpml',
+        data_model + '/1000-410-Transforms_Merdith_et_al.gpml',
+        data_model + '/TopologyBuildingBlocks_Merdith_et_al.gpml',
     ]
 else:
     topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
@@ -126,8 +127,10 @@ else:
 
 # The continental polygons file (relative to the 'data/' directory) used for plate velocity calculations (when plate velocity is enabled).
 # NOTE: Set to None to use topologies instead (which includes continental and oceanic crust).
-if data_model == 'Global_1000-0_Model_2017':
-    plate_velocity_continental_polygons_file = 'Global_1000-0_Model_2017/shapes_continents_Merdith_et_al.gpml'
+if data_model.startswith('Global_Model_WD_Internal_Release'):
+    plate_velocity_continental_polygons_file = data_model + '/StaticGeometries/ContinentalPolygons/Global_EarthByte_GPlates_PresentDay_ContinentsOnly.shp'
+elif data_model == 'Global_1000-0_Model_2017':
+    plate_velocity_continental_polygons_file = data_model + '/shapes_continents_Merdith_et_al.gpml'
 else:
     plate_velocity_continental_polygons_file = None
 
@@ -164,7 +167,7 @@ def plate_velocity_continental_fragmentation_area_threshold_steradians(time):
 # NOTE: This only applies if both plate velocity is enabled (see 'get_plate_velocity_params' below) and
 #       'plate_velocity_continental_polygons_file' is specified (ie, not None).
 def plate_velocity_continental_fragmentation_gap_threshold_radians(time):
-    if data_model == 'Global_1000-0_Model_2017':
+    if data_model == 'Global_1000-0_Model_2017' or data_model.startswith('Global_Model_WD_Internal_Release'):
         if time < 200:
             return math.radians(0.0)  # 1 degree is about 110 km
         elif time < 400:
@@ -181,14 +184,17 @@ def plate_velocity_continental_fragmentation_gap_threshold_radians(time):
 #
 # Note: Set this to None for a non-deforming model.
 if data_model.startswith('Global_Model_WD_Internal_Release'):
-    gplates_net_rotation_filename = data_model + '/optimisation/total-net-rotations.csv'
+    #gplates_net_rotation_filename = data_model + '/optimisation/total-net-rotations.csv'
+
+    # Ignore deforming networks when calculating net rotation since we also ignore them for plate velocities.
+    gplates_net_rotation_filename = None
 else:
     gplates_net_rotation_filename = None
 
 if data_model.startswith('Global_Model_WD_Internal_Release'):
-    ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges_2019_v2.gpml'
-    isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons_2019_v2.gpml'
-    isocob_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB_2019_v2.gpml'
+    ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges.gpml'
+    isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons.gpml'
+    isocob_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB.gpml'
 elif data_model == 'Global_1000-0_Model_2017':
     #
     # For (data_model == 'Global_1000-0_Model_2017') or (data_model == 'Muller++_2015_AREPS_CORRECTED') ...
@@ -248,16 +254,7 @@ def get_net_rotation_params(age):
     # Note: Use units of degrees/Myr...
     #nr_bounds = (0.08, 0.20)
     
-    if data_model.startswith('Global_Model_WD_Internal_Release'):
-        if age <= 80:
-            return True, 1.0, cost_function, None  # Weight is always 1.0 for 0-80Ma
-        elif age <= 170:
-            # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-            return  True, 2.0, cost_function, None  # 2.0 gives a *multiplicative* weight of 0.5
-        else:
-            # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
-            return True, 5.0, cost_function, None  # 5.0 gives a *multiplicative* weight of 0.2
-    elif data_model == 'Global_1000-0_Model_2017':
+    if data_model == 'Global_1000-0_Model_2017' or data_model.startswith('Global_Model_WD_Internal_Release'):
         nr_bounds = (0.08, 0.20)
         if age <= 80:
             return  True, 1.0, cost_function, nr_bounds  # Weight is always 1.0 for 0-80Ma
@@ -321,12 +318,7 @@ def get_trench_migration_params(age):
     # Note: Use units of mm/yr (same as km/Myr)...
     #tm_bounds = [0, 30]
     
-    if data_model.startswith('Global_Model_WD_Internal_Release'):
-        if age <= 80:
-            return True, 1.0, cost_function, None  # Weight is always 1.0 for 0-80Ma
-        else:
-            return True, 1.0, cost_function, None
-    elif data_model == 'Global_1000-0_Model_2017':
+    if data_model == 'Global_1000-0_Model_2017' or data_model.startswith('Global_Model_WD_Internal_Release'):
         # # Override default cost function for 1Ga model - see "objective_function.py" for definition of function arguments...
         # def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
         #     # NOTE: Import any modules used in this function here
@@ -407,12 +399,7 @@ def get_plate_velocity_params(age):
     # Note: Use units of mm/yr (same as km/Myr)...
     #pv_bounds = [0, 60]
     
-    if data_model.startswith('Global_Model_WD_Internal_Release'):
-        if age <= 80:
-            return True, 1.0, cost_function, None  # Weight is always 1.0 for 0-80Ma
-        else:
-            return False, 1.0, cost_function, None
-    elif data_model == 'Global_1000-0_Model_2017':
+    if data_model == 'Global_1000-0_Model_2017' or data_model.startswith('Global_Model_WD_Internal_Release'):
         pv_bounds = [0, 60]
         if age <= 80:
             return True, 1.0, cost_function, pv_bounds  # Weight is always 1.0 for 0-80Ma
@@ -433,7 +420,7 @@ def get_reference_params(age):
     
     If reference rotation filename is None then it means the no-net-rotation model should be used.
     """
-    if data_model == 'Global_1000-0_Model_2017':
+    if data_model == 'Global_1000-0_Model_2017' or data_model.startswith('Global_Model_WD_Internal_Release'):
         # Choose NNR, Optimsed or Africa reference frame.
         reference_frame = USE_OPTIMISED_REFERENCE_FRAME
 
