@@ -36,7 +36,7 @@ The following Python packages are required:
 * ipyparallel
 * openpyxl
 
-### Install using conda and pip
+### Install on desktop
 
 You can install the dependencies using `conda` and `pip`.
 
@@ -45,24 +45,112 @@ First install dependencies that are available on `conda` (in the _conda-forge_ c
 ```
 conda create -n <conda-environment> -c conda-forge \
     pygplates numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
-    mpi4py future cartopy matplotlib ipyparallel openpyxl
+    future cartopy matplotlib ipyparallel openpyxl
 ```
 
-...then activate the conda environment:
+Then activate the conda environment:
 
 ```
 conda activate <conda-environment>
 ```
 
-...then use `pip` to install the remaining packages (into the conda environment):
+On desktop systems we can also use conda to install `mpi4py` (into the conda environment):
 
 ```
-conda install git pip
+conda install mpi4py
+```
+
+Then use `pip` to install the remaining packages (into the conda environment):
+
+```
+conda install pip
 pip install pmagpy
+
+conda install git
 pip install git+https://github.com/EarthByte/PlateTectonicTools
 ```
 
-...where `<conda-environment>` should be replaced with the name of your conda environment (eg, "optAPM").
+Where `<conda-environment>` should be replaced with the name of your conda environment (eg, `optAPM`).
+
+### Install on a HPC system
+
+Installation on a High Performance Computing (HPC) system can also be done with a local installation of `conda` (and `pip`). However the exception, compared with installing on desktop, is `mpi4py`. It will likely need to be installed differently to ensure that the MPI implementation of the HPC system is used (instead of conda's MPI).
+
+The example [job submission script](Optimised_APM.sh) works on [NCI's Gadi](https://nci.org.au/our-systems/hpc-systems) HPC. The script assumes that [Miniconda](https://docs.conda.io/en/main/miniconda.html) has been installed (in your $HOME directory by default).
+
+> Note: Miniconda currently requires an operating system based on CentOS 7 or above. For example, Gadi is based on CentOS 8 (so it's fine), however the University of Sydney's Artemis HPC is based on CentOS 6 (so it's not).
+
+> Note: Miniconda might consume a fair amount of your $HOME directory allocation. For example, on Gadi it consumes 4-5GB of my max 10GB allocation. So it may be worth trying to install to a shared project directory instead and also creating the `<conda-environment>` there (eg, using `conda create -p <shared-project-dir> ...`). This would require users in the project to add that shared path to their [conda config](https://conda.io/projects/conda/en/latest/user-guide/configuration/use-condarc.html#specify-environment-directories-envs-dirs). And it relies on users not accidentally modifying that conda environment.
+
+Similarly to installing on desktop, start by creating a conda environment:
+
+```
+conda create -n <conda-environment> -c conda-forge \
+    pygplates numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
+    future cartopy matplotlib ipyparallel openpyxl
+```
+
+Then activate the conda environment:
+
+```
+conda activate <conda-environment>
+```
+
+Then load the HPC system's MPI. For example:
+
+```
+module load openmpi
+```
+
+Then use `pip` to compile `mpi4py` using the system MPI with:
+
+```
+conda install pip
+pip install mpi4py
+```
+
+Then, similarly to installing on desktop, use `pip` to install the remaining packages:
+
+```
+pip install pmagpy
+conda install git
+pip install git+https://github.com/EarthByte/PlateTectonicTools
+```
+
+Where `<conda-environment>` should be replaced with the name of your conda environment (eg, `optAPM`).
+
+#### Job submission script
+
+In our example [job submission script](Optimised_APM.sh) (that runs on [NCI's Gadi](https://nci.org.au/our-systems/hpc-systems)) we have the following commands (after the various PBS directives) that:
+
+- Load the system's MPI,
+- configure the shell to use `conda activate`,
+- activate our previously created conda environnment named `optAPM`,
+- run our Python MPI program `Optimised_APM.py` across the CPUs specified in a previous PBS directive.
+
+```
+#!/bin/bash
+
+...
+
+# Use the system MPI implementation (not conda's MPI).
+module load openmpi
+
+# Initialise the shell for conda environments to avoid the error:
+#   "CommandNotFoundError: Your shell has not been properly configured to use 'conda activate'."
+source ~/.bashrc
+
+# Activate the "optAPM" conda environment in our home Miniconda installation.
+conda activate optAPM
+
+#
+# Run the job.
+#
+# Note: It seems "LD_PRELOAD=libmpi.so" is needed to prevent the error:
+#       "[LOG_CAT_ML] component basesmuma is not available but requested in hierarchy".
+#       See https://www.mail-archive.com/users@lists.open-mpi.org/msg35048.html
+mpirun -x LD_PRELOAD=libmpi.so -np $PBS_NCPUS python Optimised_APM.py
+```
 
 ## Configuration
 
@@ -142,19 +230,17 @@ If you are running on a personal computer that has an MPI runtime installed then
 
 ...where *cores* is the number of cores to use.
 
-If you are running on a HPC cluster (such as Artemis) then edit the "Optimise_APM.pbs" PBS script with
-the number of nodes/cores and walltime, etc, and then run:
+If you are running on a HPC cluster (such as NCI's Gadi) then edit the "Optimise_APM.sh" job submission script with the number of cpus, amount of memory and walltime, etc, and then run:
 
 ```
-  qsub Optimise_APM.pbs
+  qsub Optimise_APM.sh
 ```
 
 ...to submit to the job queue. When the job is finished you should have the final optimised rotation file mentioned above.
 
-*NOTE*: The "Optimise_APM.pbs" PBS scheduling script was used on the Artemis HPC at the University of Sydney and
-may require modifications for other HPC systems.
+> Note: The "Optimise_APM.sh" job submission script was used on NCI's Gadi HPC and may require modifications for other HPC systems.
 
-**NOTE**: Make sure to copy all directories over to the HPC (even empty directories like "model_output") otherwise an exception
+> Note: Make sure to copy all directories over to the HPC (even empty directories like "model_output") otherwise an exception
 will get raised during execution and mpirun (or mpiexec) will get terminated abruptly (possibly without an error message).
 
 ## Results
