@@ -29,7 +29,7 @@ datadir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data', '')
 #data_model = 'Global_1000-0_Model_2017'
 #data_model = 'Global_Model_WD_Internal_Release_2019_v2'
 #data_model = 'Global_Model_WD_Internal_Release-EarthBytePlateMotionModel-TRUNK'
-data_model = 'Zahirovic_etal_2022_GDJ'
+data_model = 'Cao1.8Ga'
 
 
 # The model name is suffixed to various output filenames.
@@ -39,6 +39,8 @@ elif data_model == 'Global_1000-0_Model_2017':
     model_name = "git_20210802_ce53d67_run45"
 elif data_model == 'Zahirovic_etal_2022_GDJ':
     model_name = "git_20230821_bb344f8_run2"
+elif data_model == 'Cao1.8Ga':
+    model_name = "git_20231016_run1"
 else:
     model_name = "run1"
 
@@ -46,6 +48,8 @@ else:
 # Start age.
 if data_model == 'Zahirovic_etal_2022_GDJ':
     start_age = 410
+elif data_model == 'Cao1.8Ga':
+    start_age = 1800
 else:
     start_age = 1000
 
@@ -124,6 +128,18 @@ if data_model == 'Global_1000-0_Model_2017':
         data_model + '/1000-410-Transforms_Merdith_et_al.gpml',
         data_model + '/TopologyBuildingBlocks_Merdith_et_al.gpml',
     ]
+elif data_model == 'Cao1.8Ga':
+    # There are other GPML files that we don't need to include.
+    topology_filenames = [
+        data_model + '/250-0_plate_boundaries_Merdith_et_al.gpml',
+        data_model + '/410-250_plate_boundaries_Merdith_et_al.gpml',
+        data_model + '/1000-410-Convergence_Merdith_et_al_Cao.gpml',
+        data_model + '/1000-410-Divergence_Merdith_et_al_Cao.gpml',
+        data_model + '/1000-410-Topologies_Merdith_et_al_Cao.gpml',
+        data_model + '/1000-410-Transforms_Merdith_et_al_Cao.gpml',
+        data_model + '/TopologyBuildingBlocks_Merdith_et_al.gpml',
+        data_model + '/1800-1000Ma-plate-boundary_new_valid_time_and_subduction_polarity.gpml',
+    ]
 else:
     topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
             glob.glob(os.path.join(datadir, data_model, '*.gpml')) + glob.glob(os.path.join(datadir, data_model, '*.gpmlz'))]
@@ -136,6 +152,8 @@ elif data_model == 'Global_1000-0_Model_2017':
     plate_velocity_continental_polygons_file = data_model + '/shapes_continents_Merdith_et_al.gpml'
 elif data_model == 'Zahirovic_etal_2022_GDJ':
     plate_velocity_continental_polygons_file = data_model + '/StaticGeometries/ContinentalPolygons/Global_EarthByte_GPlates_PresentDay_ContinentalPolygons.shp'
+elif data_model == 'Cao1.8Ga':
+    plate_velocity_continental_polygons_file = data_model + '/shapes_continents_Cao.gpmlz'
 else:
     plate_velocity_continental_polygons_file = None
 
@@ -174,7 +192,8 @@ def plate_velocity_continental_fragmentation_area_threshold_steradians(time):
 def plate_velocity_continental_fragmentation_gap_threshold_radians(time):
     if (data_model == 'Global_1000-0_Model_2017' or
         data_model.startswith('Global_Model_WD_Internal_Release') or
-        data_model == 'Zahirovic_etal_2022_GDJ'):
+        data_model == 'Zahirovic_etal_2022_GDJ' or
+        data_model == 'Cao1.8Ga'):
         if time < 200:
             return math.radians(0.0)  # 1 degree is about 110 km
         elif time < 400:
@@ -196,7 +215,8 @@ if data_model.startswith('Global_Model_WD_Internal_Release'):
     isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons.gpml'
     isocob_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB.gpml'
 elif (data_model == 'Global_1000-0_Model_2017' or
-    data_model == 'Zahirovic_etal_2022_GDJ'):
+    data_model == 'Zahirovic_etal_2022_GDJ' or
+    data_model == 'Cao1.8Ga'):
     #
     # For (data_model == 'Global_1000-0_Model_2017') or (data_model == 'Muller++_2015_AREPS_CORRECTED') ...
     #
@@ -257,7 +277,8 @@ def get_net_rotation_params(age):
     
     if (data_model == 'Global_1000-0_Model_2017' or
         data_model.startswith('Global_Model_WD_Internal_Release') or
-        data_model == 'Zahirovic_etal_2022_GDJ'):
+        data_model == 'Zahirovic_etal_2022_GDJ' or
+        data_model == 'Cao1.8Ga'):
         nr_bounds = (0.08, 0.20)
         if age <= 80:
             return  True, 1.0, cost_function, nr_bounds  # Weight is always 1.0 for 0-80Ma
@@ -323,7 +344,8 @@ def get_trench_migration_params(age):
     
     if (data_model == 'Global_1000-0_Model_2017' or
         data_model.startswith('Global_Model_WD_Internal_Release') or
-        data_model == 'Zahirovic_etal_2022_GDJ'):
+        data_model == 'Zahirovic_etal_2022_GDJ' or
+        data_model == 'Cao1.8Ga'):
         # # Override default cost function for 1Ga model - see "objective_function.py" for definition of function arguments...
         # def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
         #     # NOTE: Import any modules used in this function here
@@ -406,7 +428,8 @@ def get_plate_velocity_params(age):
     
     if (data_model == 'Global_1000-0_Model_2017' or
         data_model.startswith('Global_Model_WD_Internal_Release') or
-        data_model == 'Zahirovic_etal_2022_GDJ'):
+        data_model == 'Zahirovic_etal_2022_GDJ' or
+        data_model == 'Cao1.8Ga'):
         pv_bounds = [0, 60]
         if age <= 80:
             return True, 1.0, cost_function, pv_bounds  # Weight is always 1.0 for 0-80Ma
@@ -429,7 +452,8 @@ def get_reference_params(age):
     """
     if (data_model == 'Global_1000-0_Model_2017' or
         data_model.startswith('Global_Model_WD_Internal_Release') or
-        data_model == 'Zahirovic_etal_2022_GDJ'):
+        data_model == 'Zahirovic_etal_2022_GDJ' or
+        data_model == 'Cao1.8Ga'):
         # Choose NNR, Optimsed or Africa reference frame.
         reference_frame = USE_OPTIMISED_REFERENCE_FRAME
 
