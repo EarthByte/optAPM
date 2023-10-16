@@ -30,7 +30,7 @@ datadir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data', '')
 #data_model = 'Global_Model_WD_Internal_Release_2019_v2'
 #data_model = 'Global_Model_WD_Internal_Release-EarthBytePlateMotionModel-TRUNK'
 #data_model = 'SM2-Merdith_et_al_1_Ga_reconstruction_v1.1'
-data_model = '1.8Ga_model_GSF'
+data_model = 'Global_2000-540'
 
 
 # The model name is suffixed to various output filenames.
@@ -41,9 +41,11 @@ elif data_model == 'Global_1000-0_Model_2017':
 elif data_model == 'Zahirovic_etal_2022_GDJ':
     model_name = "git_20230821_bb344f8_run2"
 elif '1.8ga' in data_model.lower():
-    model_name = "zenodo_20240618_run1"
+    model_name = "20240725_run3"
 elif data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction'):
     model_name = "git_20231114_run1"
+elif data_model == "Global_2000-540":
+    model_name = "20250410_90W_run1"
 else:
     model_name = "run1"
 
@@ -53,11 +55,16 @@ if data_model == 'Zahirovic_etal_2022_GDJ':
     start_age = 410
 elif '1.8ga' in data_model.lower():
     start_age = 1800
+elif data_model == "Global_2000-540":
+    start_age = 2000
 else:
     start_age = 1000
 
 # End age.
-actual_end_age = 0
+if data_model == "Global_2000-540":
+    actual_end_age = 540
+else:
+    actual_end_age = 0
 #
 # Note: You can temporarily set the end age to an older value (than the actual end age) if you are continuing an interrupted run.
 #       In this case the workflow will attempt to re-use the existing partially optimised rotation file.
@@ -95,71 +102,78 @@ models = int(1e-4 + model_density * 0.5 * (1 - math.cos(math.radians(search_radi
 # The original rotation files (relative to the 'data/' directory).
 #
 # Can either:
-#   1) use glob to automatically find all the '.rot' files (you don't need to do anything), or
-#   2) explicitly list all the rotation files (you need to list the filenames).
+#   1) explicitly list all the rotation files (you need to list the filenames), or
+#   2) use glob to automatically find all the '.rot' files (you don't need to do anything).
 #
-# 1) Automatically gather all '.rot' files (and make filenames relative to the 'data/' directory).
-original_rotation_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
-        glob.glob(os.path.join(datadir, data_model, '*.rot'))]
-# 2) Explicitly list all the input rotation files (must be relative to the 'data/' directory).
-#original_rotation_filenames = [
-#  data_model + '/rotation_file1.rot',
-#  data_model + '/rotation_file2.rot',
-#]
+# 1) Explicitly list all the input rotation files (must be relative to the 'data/' directory).
+if data_model == "Global_2000-540":
+    # Arbitrarily using the 90W rotation file (instead of 90E).
+    # It shouldn't matter since they apparently just have different longitudinal shifts.
+    original_rotation_filenames = [os.path.join(data_model, rot_file) for rot_file in
+                                   (
+                                       'EDRG_90W_2000-540Ma.rot',
+                                   )]
+# 2) Automatically gather all '.rot' files (and make filenames relative to the 'data/' directory).
+else:
+    original_rotation_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
+                                   glob.glob(os.path.join(datadir, data_model, '*.rot'))]
 
 # The topology files (relative to the 'data/' directory).
 #
 # Can either:
-#   1) use glob to automatically find all the '.gpml' files (you don't need to do anything), or
-#   2) explicitly list all the topology files (you need to list the filenames).
+#   1) explicitly list all the topology files (you need to list the filenames), or
+#   2) use glob to automatically find all the '.gpml' files (you don't need to do anything).
 #
-# 1) Automatically gather all '.gpml' and '.gpmlz' files (and make filenames relative to the 'data/' directory).
-#topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
-#        glob.glob(os.path.join(datadir, data_model, '*.gpml')) + glob.glob(os.path.join(datadir, data_model, '*.gpmlz'))]
-# 2) Explicitly list all the topology files (must be relative to the 'data/' directory).
-#topology_filenames = [
-#  data_model + '/topology_file1.gpml',
-#  data_model + '/topology_file2.gpml',
-#]
+# 1) Explicitly list all the topology files (must be relative to the 'data/' directory).
 if (data_model == 'Global_1000-0_Model_2017' or
     data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction')):
-    # There are other GPML files that we don't need to include.
-    topology_filenames = [
-        data_model + '/250-0_plate_boundaries_Merdith_et_al.gpml',
-        data_model + '/410-250_plate_boundaries_Merdith_et_al.gpml',
-        data_model + '/1000-410-Convergence_Merdith_et_al.gpml',
-        data_model + '/1000-410-Divergence_Merdith_et_al.gpml',
-        data_model + '/1000-410-Topologies_Merdith_et_al.gpml',
-        data_model + '/1000-410-Transforms_Merdith_et_al.gpml',
-        data_model + '/TopologyBuildingBlocks_Merdith_et_al.gpml',
-    ]
+    topology_filenames = [os.path.join(data_model, rot_file) for rot_file in
+                          (
+                              '250-0_plate_boundaries_Merdith_et_al.gpml',
+                              '410-250_plate_boundaries_Merdith_et_al.gpml',
+                              '1000-410-Convergence_Merdith_et_al.gpml',
+                              '1000-410-Divergence_Merdith_et_al.gpml',
+                              '1000-410-Topologies_Merdith_et_al.gpml',
+                              '1000-410-Transforms_Merdith_et_al.gpml',
+                              'TopologyBuildingBlocks_Merdith_et_al.gpml',
+                          )]
 elif '1.8ga' in data_model.lower():
-    # There are other GPML files that we don't need to include.
-    topology_filenames = [
-        data_model + '/250-0_plate_boundaries.gpml',
-        data_model + '/410-250_plate_boundaries.gpml',
-        data_model + '/1000-410-Convergence.gpml',
-        data_model + '/1000-410-Divergence.gpml',
-        data_model + '/1000-410-Topologies.gpml',
-        data_model + '/1000-410-Transforms.gpml',
-        data_model + '/TopologyBuildingBlocks.gpml',
-        data_model + '/1800-1000_plate_boundaries.gpml',
-    ]
+    topology_filenames = [os.path.join(data_model, rot_file) for rot_file in
+                          (
+                              '250-0_plate_boundaries.gpml',
+                              '410-250_plate_boundaries.gpml',
+                              '1000-410-Convergence.gpml',
+                              '1000-410-Divergence.gpml',
+                              '1000-410-Topologies.gpml',
+                              '1000-410-Transforms.gpml',
+                              'TopologyBuildingBlocks.gpml',
+                              '1800-1000_plate_boundaries.gpml',
+                          )]
+elif data_model == "Global_2000-540":
+    topology_filenames = [os.path.join(data_model, rot_file) for rot_file in
+                          (
+                              'EDRG_topology_90W_2000-540Ma.gpml',
+                              'EDRG_boundary_90W_2000-540Ma.gpml',
+                          )]
+# 2) Automatically gather all '.gpml' and '.gpmlz' files (and make filenames relative to the 'data/' directory).
 else:
     topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
-            glob.glob(os.path.join(datadir, data_model, '*.gpml')) + glob.glob(os.path.join(datadir, data_model, '*.gpmlz'))]
+                          glob.glob(os.path.join(datadir, data_model, '*.gpml')) +
+                          glob.glob(os.path.join(datadir, data_model, '*.gpmlz'))]
 
 # The continental polygons file (relative to the 'data/' directory) used for plate velocity calculations (when plate velocity is enabled).
 # NOTE: Set to None to use topologies instead (which includes continental and oceanic crust).
 if data_model.startswith('Global_Model_WD_Internal_Release'):
-    plate_velocity_continental_polygons_file = data_model + '/StaticGeometries/ContinentalPolygons/Global_EarthByte_GPlates_PresentDay_ContinentsOnly.shp'
+    plate_velocity_continental_polygons_file = os.path.join(data_model, 'StaticGeometries', 'ContinentalPolygons', 'Global_EarthByte_GPlates_PresentDay_ContinentsOnly.shp')
 elif (data_model == 'Global_1000-0_Model_2017' or
       data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction')):
-    plate_velocity_continental_polygons_file = data_model + '/shapes_continents_Merdith_et_al.gpml'
+    plate_velocity_continental_polygons_file = os.path.join(data_model, 'shapes_continents_Merdith_et_al.gpml')
 elif data_model == 'Zahirovic_etal_2022_GDJ':
-    plate_velocity_continental_polygons_file = data_model + '/StaticGeometries/ContinentalPolygons/Global_EarthByte_GPlates_PresentDay_ContinentalPolygons.shp'
+    plate_velocity_continental_polygons_file = os.path.join(data_model, 'StaticGeometries', 'ContinentalPolygons', 'Global_EarthByte_GPlates_PresentDay_ContinentalPolygons.shp')
 elif '1.8ga' in data_model.lower():
-    plate_velocity_continental_polygons_file = data_model + '/shapes_continents.gpmlz'
+    plate_velocity_continental_polygons_file = os.path.join(data_model, 'shapes_continents.gpmlz')
+elif data_model == "Global_2000-540":
+    plate_velocity_continental_polygons_file = os.path.join(data_model, 'Continental_outlines.shp')
 else:
     plate_velocity_continental_polygons_file = None
 
@@ -200,7 +214,8 @@ def plate_velocity_continental_fragmentation_gap_threshold_radians(time):
         data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
         data_model.startswith('Global_Model_WD_Internal_Release') or
         data_model == 'Zahirovic_etal_2022_GDJ' or
-        '1.8ga' in data_model.lower()):
+        '1.8ga' in data_model.lower() or
+        data_model == "Global_2000-540"):
         if time < 200:
             return math.radians(0.0)  # 1 degree is about 110 km
         elif time < 400:
@@ -212,13 +227,14 @@ def plate_velocity_continental_fragmentation_gap_threshold_radians(time):
 
 
 if data_model.startswith('Global_Model_WD_Internal_Release'):
-    ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges.gpml'
-    isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons.gpml'
-    isocob_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_IsoCOB.gpml'
+    ridge_file = os.path.join(data_model, 'StaticGeometries', 'AgeGridInput', 'Global_EarthByte_GeeK07_Ridges.gpml')
+    isochron_file = os.path.join(data_model, 'StaticGeometries', 'AgeGridInput', 'Global_EarthByte_GeeK07_Isochrons.gpml')
+    isocob_file = os.path.join(data_model, 'StaticGeometries', 'AgeGridInput', 'Global_EarthByte_GeeK07_IsoCOB.gpml')
 elif (data_model == 'Global_1000-0_Model_2017' or
       data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
       data_model == 'Zahirovic_etal_2022_GDJ' or
-      '1.8ga' in data_model.lower()):
+      '1.8ga' in data_model.lower() or
+      data_model == "Global_2000-540"):
     #
     # For (data_model == 'Global_1000-0_Model_2017') or (data_model == 'Muller++_2015_AREPS_CORRECTED') ...
     #
@@ -281,7 +297,8 @@ def get_net_rotation_params(age):
         data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
         data_model.startswith('Global_Model_WD_Internal_Release') or
         data_model == 'Zahirovic_etal_2022_GDJ' or
-        '1.8ga' in data_model.lower()):
+        '1.8ga' in data_model.lower() or
+        data_model == "Global_2000-540"):
         nr_bounds = (0.08, 0.20)
         if age <= 80:
             return  True, 1.0, cost_function, nr_bounds  # Weight is always 1.0 for 0-80Ma
@@ -349,7 +366,8 @@ def get_trench_migration_params(age):
         data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
         data_model.startswith('Global_Model_WD_Internal_Release') or
         data_model == 'Zahirovic_etal_2022_GDJ' or
-        '1.8ga' in data_model.lower()):
+        '1.8ga' in data_model.lower() or
+        data_model == "Global_2000-540"):
         # # Override default cost function for 1Ga model - see "objective_function.py" for definition of function arguments...
         # def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
         #     # NOTE: Import any modules used in this function here
@@ -434,7 +452,8 @@ def get_plate_velocity_params(age):
         data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
         data_model.startswith('Global_Model_WD_Internal_Release') or
         data_model == 'Zahirovic_etal_2022_GDJ' or
-        '1.8ga' in data_model.lower()):
+        '1.8ga' in data_model.lower() or
+        data_model == "Global_2000-540"):
         pv_bounds = [0, 60]
         if age <= 80:
             return True, 1.0, cost_function, pv_bounds  # Weight is always 1.0 for 0-80Ma
@@ -459,7 +478,8 @@ def get_reference_params(age):
         data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
         data_model.startswith('Global_Model_WD_Internal_Release') or
         data_model == 'Zahirovic_etal_2022_GDJ' or
-        '1.8ga' in data_model.lower()):
+        '1.8ga' in data_model.lower() or
+        data_model == "Global_2000-540"):
         # Choose NNR, Optimsed or Africa reference frame.
         reference_frame = USE_OPTIMISED_REFERENCE_FRAME
 
