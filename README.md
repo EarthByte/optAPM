@@ -43,10 +43,12 @@ You can install the dependencies using `conda` and `pip`.
 First install dependencies that are available on `conda` (in the _conda-forge_ channel):
 
 ```
-conda create -n <conda-environment> -c conda-forge \
+conda create -n <conda-environment> -c conda-forge python=3.11 \
     pygplates numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
     future cartopy matplotlib ipyparallel openpyxl
 ```
+
+> Note: Use Python version 3.11 (or older) since Python 3.12 removed the `imp` module (in favour of `importlib`) which causes `pmagpy` to fail.
 
 Then activate the conda environment:
 
@@ -85,10 +87,12 @@ The example [job submission script](Optimised_APM.sh) works on [NCI's Gadi](http
 Similarly to installing on desktop, start by creating a conda environment:
 
 ```
-conda create -n <conda-environment> -c conda-forge \
+conda create -n <conda-environment> -c conda-forge python=3.11 \
     pygplates numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
     future cartopy matplotlib ipyparallel openpyxl
 ```
+
+> Note: Use Python version 3.11 (or older) since Python 3.12 removed the `imp` module (in favour of `importlib`) which causes `pmagpy` to fail.
 
 Then activate the conda environment:
 
