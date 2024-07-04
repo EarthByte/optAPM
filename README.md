@@ -1,6 +1,6 @@
 # optAPM - Absolute Plate Motion Optimisation
 
-This code adapts Mike Tetley's code to work on a High Performance Computing (HPC) cluster such as Artemis at the University of Sydney.
+This code adapts Mike Tetley's _optAPM_ code ([Tetley et al., 2019](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB017442)) to work on a High Performance Computing (HPC) cluster such as Artemis at the University of Sydney.
 
 ## Prerequisites
 
