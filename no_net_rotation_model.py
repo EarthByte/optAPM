@@ -27,6 +27,7 @@ class NoNetRotationModel(object):
             topology_features,
             start_age,
             end_age,
+            actual_end_age,  # 'end_age' is equal to this unless continuing an interrupted run
             data_model,
             model_name,
             # Temporary: Allow input of GPlates exported net rotation file.
@@ -106,25 +107,25 @@ class NoNetRotationModel(object):
         
         self.no_net_rotation_time_samples_005_rel_000 = []
         
-        # If we're not starting at 0Ma then attempt to re-use the existing partial no-net-rotation file.
+        # If we're not starting at 'actual_end_age' then attempt to re-use the existing partial no-net-rotation file.
         # This can save a lot of time if we need to re-start an interrupted optimisation run.
-        if end_age != 0:
+        if end_age != actual_end_age:
             try:
                 partial_no_net_rotation_features = pygplates.FeatureCollection(
                         os.path.join(self.data_dir, self.no_net_rotation_filename))
             except pygplates.OpenFileForReadingError:
                 warnings.warn('Attempted to re-use partial no-net-rotation file {0} starting at {1} '
-                    'but could not open for reading, so starting at 0Ma instead'.format(
-                        self.no_net_rotation_filename, end_age))
-                end_age = 0
+                    'but could not open for reading, so starting at {2} Ma instead'.format(
+                        self.no_net_rotation_filename, end_age, actual_end_age))
+                end_age = actual_end_age
         
         # Get the initial 005-000 samples.
-        # If we've started a new optimisation run then this will be the identity rotation at 0Ma.
+        # If we've started a new optimisation run then this will be the identity rotation at 'actual_end_age'.
         # If we are continuing a previous partial optimisation run then this will be all previous
         # 005-00 no-net-rotations computed so far.
-        if end_age != 0:
-            print('Re-using existing partial no-net-rotation file from 0Ma to {0}Ma: {1}'.format(
-                    end_age, self.no_net_rotation_filename))
+        if end_age != actual_end_age:
+            print('Re-using existing partial no-net-rotation file from {0}-{1} Ma: {2}'.format(
+                    actual_end_age, end_age, self.no_net_rotation_filename))
             sys.stdout.flush()
             
             # Look for existing 005-000 partial no-net-rotations in existing no-net-rotation file.
@@ -139,32 +140,36 @@ class NoNetRotationModel(object):
                                 self.no_net_rotation_time_samples_005_rel_000.append(finite_rotation_sample)
                         break
             if not self.no_net_rotation_time_samples_005_rel_000:
-                raise RuntimeError('Expected 005-000 in existing partial no-net-rotation file {0} from 0-{1}Ma'.format(
-                        self.no_net_rotation_filename, end_age))
+                raise RuntimeError('Expected 005-000 in existing partial no-net-rotation file {0} from {1}-{2} Ma'.format(
+                        self.no_net_rotation_filename, actual_end_age, end_age))
             
             # Get the no-net-rotation at time 'end_age'.
-            no_net_rotation_at_end_age = self.no_net_rotation_time_samples_005_rel_000[-1].get_value().get_finite_rotation()
+            no_net_rotation_at_end_age_for_continuing_an_interrupted_run = self.no_net_rotation_time_samples_005_rel_000[-1].get_value().get_finite_rotation()
             # The no-net-rotation was obtained from the inverse of the net rotation.
             # So to get the net rotation at time 'end_age' we take the inverse again (to undo the other inverse).
-            self.net_total_rotation = no_net_rotation_at_end_age.get_inverse()
+            self.net_total_rotation = no_net_rotation_at_end_age_for_continuing_an_interrupted_run.get_inverse()
             
             # Keep track of how update-to-date we are.
             self.last_update_time = end_age
             
         else:
-            # Start with identity rotation at time 0Ma.
+            # If 'actual_end_age' is not present day then also insert a present day 005-000 identity rotation.
+            if actual_end_age != 0:
+                self.no_net_rotation_time_samples_005_rel_000.append(
+                    pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'NNR'))
+            # Start with identity rotation at time 'actual_end_age'.
             self.no_net_rotation_time_samples_005_rel_000.append(
-                pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'NNR'))
+                pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), actual_end_age, 'NNR'))
             
-            # Start with identity net rotation at time 0Ma.
+            # Start with identity net rotation at time 'actual_end_age'.
             self.net_total_rotation = pygplates.FiniteRotation()
             
             # Keep track of how update-to-date we are.
-            self.last_update_time = 0
+            self.last_update_time = actual_end_age
         
         
         if self.CREATE_NO_NET_ROTATION_MODEL_AT_INIT:
-            print('Calculating no-net-rotation model for {0}-{1}Ma...'.format(end_age, start_age))
+            print('Calculating no-net-rotation model for {0}-{1} Ma...'.format(end_age, start_age))
             sys.stdout.flush()
             
             # Calculate no-net-rotation at 1My increments from 'end_age+1' Ma to 'start_age' Ma.
@@ -259,11 +264,11 @@ class NoNetRotationModel(object):
         # This can happen if we've already created the entire no-net-rotation model in '__init__()'.
         #
         # This can also happen if we read a partial no-net-rotation file in '__init__()'
-        # (because we're continuing a previously interrupted run, ie, 'end_age > 0').
+        # (because we're continuing a previously interrupted run, ie, 'end_age > actual_end_age').
         if ref_rotation_start_age <= self.last_update_time:
             return
         
-        print('Calculating no-net-rotation model for {0}-{1}Ma...'.format(self.last_update_time, ref_rotation_start_age))
+        print('Calculating no-net-rotation model for {0}-{1} Ma...'.format(self.last_update_time, ref_rotation_start_age))
         sys.stdout.flush()
         
         # Calculate no-net-rotation at 1My increments from where we left off until 'ref_rotation_start_age' Ma.

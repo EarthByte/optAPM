@@ -110,6 +110,9 @@ if __name__ == '__main__':
             print('{} does not exist, creating now... '.format(optimisation_sub_dir))
             os.mkdir(optimisation_sub_dir)
 
+        # The age range to optimise over.
+        #
+        # Note: 'end_age' will equal 'actual_end_age' unless we are continuing an interrupted run.
         age_range = range(end_age + interval, start_age + interval, interval)
 
         # When using mpi4py we only print and collect/process results in one process (the one with rank/ID 0).
@@ -127,12 +130,14 @@ if __name__ == '__main__':
             #   Creates a single optimised rotation file by combining all unoptimised (input) rotations.
             #   The 005-000 rotation feature is inserted (or replaced if already existing in input) and
             #   defined such that the rotation of reference plate (obtained for each time using 'get_reference_params')
-            #   relative to 000 is zero for each time from 'start_age' to 'end_age + interval' in 'interval' steps.
+            #   relative to 000 is zero for each time from 'start_age' to 'end_age + interval'
+            #   in 'interval' steps.
             optimised_rotation_updater = OptimisedRotationUpdater(
                     datadir,
                     original_rotation_filenames,
                     start_age,
                     end_age,
+                    actual_end_age,
                     interval,
                     get_reference_params,
                     data_model,
@@ -149,6 +154,7 @@ if __name__ == '__main__':
                     topology_features,
                     start_age,
                     end_age,
+                    actual_end_age,
                     data_model,
                     model_name,
                     gplates_net_rotation_filename)
