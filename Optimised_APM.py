@@ -104,6 +104,11 @@ if __name__ == '__main__':
         
         # else serial
 
+        # Create 'optimisation' sub-directory of data model directory (if it doesn't already exist).
+        optimisation_sub_dir = os.path.join(datadir, data_model, 'optimisation')
+        if not os.path.exists(optimisation_sub_dir):
+            print('{} does not exist, creating now... '.format(optimisation_sub_dir))
+            os.mkdir(optimisation_sub_dir)
 
         age_range = range(end_age + interval, start_age + interval, interval)
 
