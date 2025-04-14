@@ -15,13 +15,13 @@ The data for the 1Ga model can be obtained [here](https://www.earthbyte.org/webd
 
 The following Python packages are required:
 
-* PlateTectonicTools
+* PlateTectonicTools>=0.5
 
-  Until version 0.5 of PlateTectonicTools is available you'll need to install it from Github:
+  > __Note:__ Until version 0.5 of PlateTectonicTools is available (on conda and pip) you'll need to install the latest version from Github:
+  >
+  > `pip install git+https://github.com/EarthByte/PlateTectonicTools`
 
-  `pip install git+https://github.com/EarthByte/PlateTectonicTools`
-
-* pygplates>=0.28  (version 0.28 or above should be used)
+* pygplates>=1.0
 * numpy
 * scipy
 * scikit-image
@@ -44,7 +44,7 @@ First install dependencies that are available on `conda` (in the _conda-forge_ c
 
 ```
 conda create -n <conda-environment> -c conda-forge python=3.11 \
-    pygplates numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
+    pygplates numpy scipy platetectonictools scikit-image pandas xlrd==1.2.0 NLopt \
     future cartopy matplotlib ipyparallel openpyxl
 ```
 
@@ -56,23 +56,27 @@ Then activate the conda environment:
 conda activate <conda-environment>
 ```
 
+...where `<conda-environment>` should be replaced with the name of your conda environment (eg, `optAPM`).
+
 On desktop systems we can also use conda to install `mpi4py` (into the conda environment):
 
 ```
 conda install mpi4py
 ```
 
-Then use `pip` to install the remaining packages (into the conda environment):
+Then use `pip` to install `pmagpy` (into the conda environment):
 
 ```
 conda install pip
 pip install pmagpy
-
-conda install git
-pip install git+https://github.com/EarthByte/PlateTectonicTools
 ```
 
-Where `<conda-environment>` should be replaced with the name of your conda environment (eg, `optAPM`).
+> Note: Until version 0.5 of PlateTectonicTools is available (on conda) you'll need to upgrade it from Github:
+>
+> ```
+> conda install git
+> pip install --upgrade git+https://github.com/EarthByte/PlateTectonicTools
+> ```
 
 ### Install on a HPC system
 
@@ -88,7 +92,7 @@ Similarly to installing on desktop, start by creating a conda environment:
 
 ```
 conda create -n <conda-environment> -c conda-forge python=3.11 \
-    pygplates numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
+    pygplates numpy scipy platetectonictools scikit-image pandas xlrd==1.2.0 NLopt \
     future cartopy matplotlib ipyparallel openpyxl
 ```
 
@@ -99,6 +103,8 @@ Then activate the conda environment:
 ```
 conda activate <conda-environment>
 ```
+
+...where `<conda-environment>` should be replaced with the name of your conda environment (eg, `optAPM`).
 
 Then load the HPC system's MPI. For example:
 
@@ -113,15 +119,18 @@ conda install pip
 pip install mpi4py
 ```
 
-Then, similarly to installing on desktop, use `pip` to install the remaining packages:
+Then, similarly to installing on desktop, use `pip` to install `pmagpy` (into the conda environment):
 
 ```
 pip install pmagpy
-conda install git
-pip install git+https://github.com/EarthByte/PlateTectonicTools
 ```
 
-Where `<conda-environment>` should be replaced with the name of your conda environment (eg, `optAPM`).
+> Note: Until version 0.5 of PlateTectonicTools is available (on conda) you'll need to upgrade it from Github:
+>
+> ```
+> conda install git
+> pip install --upgrade git+https://github.com/EarthByte/PlateTectonicTools
+> ```
 
 #### Job submission script
 
