@@ -211,12 +211,6 @@ def plate_velocity_continental_fragmentation_gap_threshold_radians(time):
         return math.radians(2.0)  # 1 degree is about 110 km
 
 
-# Temporary: Allow input of GPlates exported net rotation file.
-# TODO: Remove when we can calculate net rotation in pygplates for a deforming model (like GPlates can).
-#       Currently we ignore deforming networks when calculating net rotation since we also ignore them for plate velocities.
-#gplates_net_rotation_filename = data_model + '/optimisation/total-net-rotations.csv'
-gplates_net_rotation_filename = None
-
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges.gpml'
     isochron_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Isochrons.gpml'

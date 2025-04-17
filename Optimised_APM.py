@@ -156,8 +156,7 @@ if __name__ == '__main__':
                     end_age,
                     actual_end_age,
                     data_model,
-                    model_name,
-                    gplates_net_rotation_filename)
+                    model_name)
             
             # The filename of single rotation file (containing entire rotation model) with
             # no net rotation.

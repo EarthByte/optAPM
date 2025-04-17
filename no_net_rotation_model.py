@@ -1,6 +1,3 @@
-import math
-import net_rotation
-import numpy as np
 import os.path
 import pygplates
 import sys
@@ -29,30 +26,16 @@ class NoNetRotationModel(object):
             end_age,
             actual_end_age,  # 'end_age' is equal to this unless continuing an interrupted run
             data_model,
-            model_name,
-            # Temporary: Allow input of GPlates exported net rotation file.
-            # TODO: Remove when we can calculate net rotation in pygplates for a deforming model.
-            #       This class currently only calculates net rotation for non-deforming models.
-            gplates_net_rotation_filename=None):  # Relative to the 'data/' directory
+            model_name):
         """
         Create a single no-net-rotation file by combining all original (input) rotations and
         removing net rotation to produce a no-net-rotation model.
         """
-        self.topology_features = topology_features
         self.data_dir = data_dir
         
         # The single combined no-net-rotation filename (relative to the 'data/' directory).
         self.no_net_rotation_filename = os.path.join(
                 data_model, 'optimisation', 'no_net_rotation_model_' + model_name + '.rot')
-        
-        # Temporary: Allow input of GPlates exported net rotation file.
-        # TODO: Remove when we can calculate net rotation in pygplates for a deforming model.
-        #       This class currently only calculates net rotation for non-deforming models.
-        if gplates_net_rotation_filename:
-            self.gplates_net_rotations = self._read_gplates_net_rotations(
-                    os.path.join(self.data_dir, gplates_net_rotation_filename))
-        else:
-            self.gplates_net_rotations = None
         
         #
         # Combine the original (input) rotation files into a single no-net-rotation file.
@@ -100,6 +83,13 @@ class NoNetRotationModel(object):
         # Once we've calculated net rotation we'll remove net rotation (which will make 005-000 non-zero).
         rotation_model_zero_005_rel_000 = pygplates.RotationModel(
                 [rotation_features_except_005_rel_000, rotation_feature_zero_005_rel_000])
+        # Topological model for zero 005-000.
+        topological_model_zero_005_rel_000 = pygplates.TopologicalModel(topology_features, rotation_model_zero_005_rel_000)
+        # Net rotation model for zero 005-000.
+        net_rotation_model_zero_005_rel_000 = pygplates.NetRotationModel(
+                topological_model_zero_005_rel_000,
+                velocity_delta_time = 1.0,
+                velocity_delta_time_type = pygplates.VelocityDeltaTimeType.t_to_t_minus_delta_t)
         
         #
         # Create a new 005-000 rotation feature such that the total net rotation is zero.
@@ -179,19 +169,9 @@ class NoNetRotationModel(object):
                 #print time
                 #sys.stdout.flush()
                 
-                if self.gplates_net_rotations:
-                    net_stage_lat, net_stage_lon, net_stage_angle_per_my = self.gplates_net_rotations[time]
-                    net_stage_rotation = pygplates.FiniteRotation(
-                            pygplates.PointOnSphere(net_stage_lat, net_stage_lon),
-                            math.radians(net_stage_angle_per_my))
-                else:
-                    # Calculate net stage rotation from 'time' to 'time-1'.
-                    net_stage_rotation = net_rotation.calculate_net_rotation_internal_gplates(
-                            rotation_model_zero_005_rel_000,
-                            topology_features,
-                            time,
-                            velocity_method = net_rotation.VelocityMethod.T_TO_T_MINUS_DT,
-                            velocity_delta_time = 1.0)
+                # Calculate net stage rotation from 'time' to 'time-1'.
+                net_stage_rotation = net_rotation_model_zero_005_rel_000.net_rotation_snapshot(
+                        time).get_total_net_rotation().get_finite_rotation()
                 
                 # Accumulate net stage rotations going backward in time (hence the inverse stage rotation)
                 # since finite rotations go backward in time in the rotation file.
@@ -233,7 +213,7 @@ class NoNetRotationModel(object):
         
         # Extra data to keep track of for use in later update
         # (if haven't created entire no-net-rotation file already above).
-        self.rotation_model_zero_005_rel_000 = rotation_model_zero_005_rel_000
+        self.net_rotation_model_zero_005_rel_000 = net_rotation_model_zero_005_rel_000
         self.no_net_rotation_features_except_005_rel_000 = rotation_features_except_005_rel_000
     
     
@@ -268,9 +248,6 @@ class NoNetRotationModel(object):
         if ref_rotation_start_age <= self.last_update_time:
             return
         
-        print('Calculating no-net-rotation model for {0}-{1} Ma...'.format(self.last_update_time, ref_rotation_start_age))
-        sys.stdout.flush()
-        
         # Calculate no-net-rotation at 1My increments from where we left off until 'ref_rotation_start_age' Ma.
         #
         # We shouldn't need to sample older than 'ref_rotation_start_age' because at each iteration the
@@ -282,19 +259,9 @@ class NoNetRotationModel(object):
             #print time
             #sys.stdout.flush()
             
-            if self.gplates_net_rotations:
-                net_stage_lat, net_stage_lon, net_stage_angle_per_my = self.gplates_net_rotations[time]
-                net_stage_rotation = pygplates.FiniteRotation(
-                        pygplates.PointOnSphere(net_stage_lat, net_stage_lon),
-                        math.radians(net_stage_angle_per_my))
-            else:
-                # Calculate net stage rotation from 'time' to 'time-1'.
-                net_stage_rotation = net_rotation.calculate_net_rotation_internal_gplates(
-                        self.rotation_model_zero_005_rel_000,
-                        self.topology_features,
-                        time,
-                        velocity_method = net_rotation.VelocityMethod.T_TO_T_MINUS_DT,
-                        velocity_delta_time = 1.0)
+            # Calculate net stage rotation from 'time' to 'time-1'.
+            net_stage_rotation = self.net_rotation_model_zero_005_rel_000.net_rotation_snapshot(
+                    time).get_total_net_rotation().get_finite_rotation()
             
             # Accumulate net stage rotations going backward in time (hence the inverse stage rotation)
             # since finite rotations go backward in time in the rotation file.
@@ -329,9 +296,6 @@ class NoNetRotationModel(object):
         # Write the no-net-rotation file.
         pygplates.FeatureCollection(all_no_net_rotation_features).write(
                 os.path.join(self.data_dir, self.no_net_rotation_filename))
-        
-        print('...finished calculating no-net-rotation model.')
-        sys.stdout.flush()
     
     
     def _read_gplates_net_rotations(
