@@ -104,12 +104,6 @@ if __name__ == '__main__':
         
         # else serial
 
-        # Create 'optimisation' sub-directory of data model directory (if it doesn't already exist).
-        optimisation_sub_dir = os.path.join(datadir, data_model, 'optimisation')
-        if not os.path.exists(optimisation_sub_dir):
-            print('{} does not exist, creating now... '.format(optimisation_sub_dir))
-            os.mkdir(optimisation_sub_dir)
-
         # The age range to optimise over.
         #
         # Note: 'end_age' will equal 'actual_end_age' unless we are continuing an interrupted run.
@@ -117,6 +111,12 @@ if __name__ == '__main__':
 
         # When using mpi4py we only print and collect/process results in one process (the one with rank/ID 0).
         if use_parallel != MPI4PY or mpi_rank == 0:
+
+            # Create 'optimisation' sub-directory of data model directory (if it doesn't already exist).
+            optimisation_sub_dir = os.path.join(datadir, data_model, 'optimisation')
+            if not os.path.exists(optimisation_sub_dir):
+                print('{} does not exist, creating now... '.format(optimisation_sub_dir))
+                os.mkdir(optimisation_sub_dir)
 
             # Load the topology features. They can take a long time to load (especially for a deforming model) so we
             # do it once instead of three times (once each for no-net-rotation, trench resolving and plate velocities).
