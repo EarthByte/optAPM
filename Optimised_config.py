@@ -57,13 +57,14 @@ else:
     start_age = 1000
 
 # End age.
+actual_end_age = 0
 #
-# Note: You can set 'end_age' to a non-zero value if you are continuing an interrupted run.
+# Note: You can temporarily set the end age to an older value (than the actual end age) if you are continuing an interrupted run.
 #       In this case the workflow will attempt to re-use the existing partially optimised rotation file.
 #       This can save a lot of time by skipping the optimisations already done by the interrupted optimisation run.
-#       But be sure to set 'end_age' back to zero when finished.
+#       But be sure to reset this back to 'actual_end_age' when finished.
 #       Also this currently only works properly if 'interval' is the same for the interrupted and continued runs (as it should be).
-end_age = 0
+end_age = actual_end_age
 
 # Time interval.
 if data_model.startswith('Global_Model_WD_Internal_Release'):
@@ -209,12 +210,6 @@ def plate_velocity_continental_fragmentation_gap_threshold_radians(time):
     else:
         return math.radians(2.0)  # 1 degree is about 110 km
 
-
-# Temporary: Allow input of GPlates exported net rotation file.
-# TODO: Remove when we can calculate net rotation in pygplates for a deforming model (like GPlates can).
-#       Currently we ignore deforming networks when calculating net rotation since we also ignore them for plate velocities.
-#gplates_net_rotation_filename = data_model + '/optimisation/total-net-rotations.csv'
-gplates_net_rotation_filename = None
 
 if data_model.startswith('Global_Model_WD_Internal_Release'):
     ridge_file = data_model + '/StaticGeometries/AgeGridInput/Global_EarthByte_GeeK07_Ridges.gpml'

@@ -1,6 +1,3 @@
-import math
-import net_rotation
-import numpy as np
 import os.path
 import pygplates
 import sys
@@ -27,31 +24,18 @@ class NoNetRotationModel(object):
             topology_features,
             start_age,
             end_age,
+            actual_end_age,  # 'end_age' is equal to this unless continuing an interrupted run
             data_model,
-            model_name,
-            # Temporary: Allow input of GPlates exported net rotation file.
-            # TODO: Remove when we can calculate net rotation in pygplates for a deforming model.
-            #       This class currently only calculates net rotation for non-deforming models.
-            gplates_net_rotation_filename=None):  # Relative to the 'data/' directory
+            model_name):
         """
         Create a single no-net-rotation file by combining all original (input) rotations and
         removing net rotation to produce a no-net-rotation model.
         """
-        self.topology_features = topology_features
         self.data_dir = data_dir
         
         # The single combined no-net-rotation filename (relative to the 'data/' directory).
         self.no_net_rotation_filename = os.path.join(
                 data_model, 'optimisation', 'no_net_rotation_model_' + model_name + '.rot')
-        
-        # Temporary: Allow input of GPlates exported net rotation file.
-        # TODO: Remove when we can calculate net rotation in pygplates for a deforming model.
-        #       This class currently only calculates net rotation for non-deforming models.
-        if gplates_net_rotation_filename:
-            self.gplates_net_rotations = self._read_gplates_net_rotations(
-                    os.path.join(self.data_dir, gplates_net_rotation_filename))
-        else:
-            self.gplates_net_rotations = None
         
         #
         # Combine the original (input) rotation files into a single no-net-rotation file.
@@ -99,6 +83,13 @@ class NoNetRotationModel(object):
         # Once we've calculated net rotation we'll remove net rotation (which will make 005-000 non-zero).
         rotation_model_zero_005_rel_000 = pygplates.RotationModel(
                 [rotation_features_except_005_rel_000, rotation_feature_zero_005_rel_000])
+        # Topological model for zero 005-000.
+        topological_model_zero_005_rel_000 = pygplates.TopologicalModel(topology_features, rotation_model_zero_005_rel_000)
+        # Net rotation model for zero 005-000.
+        net_rotation_model_zero_005_rel_000 = pygplates.NetRotationModel(
+                topological_model_zero_005_rel_000,
+                velocity_delta_time = 1.0,
+                velocity_delta_time_type = pygplates.VelocityDeltaTimeType.t_to_t_minus_delta_t)
         
         #
         # Create a new 005-000 rotation feature such that the total net rotation is zero.
@@ -106,25 +97,25 @@ class NoNetRotationModel(object):
         
         self.no_net_rotation_time_samples_005_rel_000 = []
         
-        # If we're not starting at 0Ma then attempt to re-use the existing partial no-net-rotation file.
+        # If we're not starting at 'actual_end_age' then attempt to re-use the existing partial no-net-rotation file.
         # This can save a lot of time if we need to re-start an interrupted optimisation run.
-        if end_age != 0:
+        if end_age != actual_end_age:
             try:
                 partial_no_net_rotation_features = pygplates.FeatureCollection(
                         os.path.join(self.data_dir, self.no_net_rotation_filename))
             except pygplates.OpenFileForReadingError:
                 warnings.warn('Attempted to re-use partial no-net-rotation file {0} starting at {1} '
-                    'but could not open for reading, so starting at 0Ma instead'.format(
-                        self.no_net_rotation_filename, end_age))
-                end_age = 0
+                    'but could not open for reading, so starting at {2} Ma instead'.format(
+                        self.no_net_rotation_filename, end_age, actual_end_age))
+                end_age = actual_end_age
         
         # Get the initial 005-000 samples.
-        # If we've started a new optimisation run then this will be the identity rotation at 0Ma.
+        # If we've started a new optimisation run then this will be the identity rotation at 'actual_end_age'.
         # If we are continuing a previous partial optimisation run then this will be all previous
         # 005-00 no-net-rotations computed so far.
-        if end_age != 0:
-            print('Re-using existing partial no-net-rotation file from 0Ma to {0}Ma: {1}'.format(
-                    end_age, self.no_net_rotation_filename))
+        if end_age != actual_end_age:
+            print('Re-using existing partial no-net-rotation file from {0}-{1} Ma: {2}'.format(
+                    actual_end_age, end_age, self.no_net_rotation_filename))
             sys.stdout.flush()
             
             # Look for existing 005-000 partial no-net-rotations in existing no-net-rotation file.
@@ -139,32 +130,36 @@ class NoNetRotationModel(object):
                                 self.no_net_rotation_time_samples_005_rel_000.append(finite_rotation_sample)
                         break
             if not self.no_net_rotation_time_samples_005_rel_000:
-                raise RuntimeError('Expected 005-000 in existing partial no-net-rotation file {0} from 0-{1}Ma'.format(
-                        self.no_net_rotation_filename, end_age))
+                raise RuntimeError('Expected 005-000 in existing partial no-net-rotation file {0} from {1}-{2} Ma'.format(
+                        self.no_net_rotation_filename, actual_end_age, end_age))
             
             # Get the no-net-rotation at time 'end_age'.
-            no_net_rotation_at_end_age = self.no_net_rotation_time_samples_005_rel_000[-1].get_value().get_finite_rotation()
+            no_net_rotation_at_end_age_for_continuing_an_interrupted_run = self.no_net_rotation_time_samples_005_rel_000[-1].get_value().get_finite_rotation()
             # The no-net-rotation was obtained from the inverse of the net rotation.
             # So to get the net rotation at time 'end_age' we take the inverse again (to undo the other inverse).
-            self.net_total_rotation = no_net_rotation_at_end_age.get_inverse()
+            self.net_total_rotation = no_net_rotation_at_end_age_for_continuing_an_interrupted_run.get_inverse()
             
             # Keep track of how update-to-date we are.
             self.last_update_time = end_age
             
         else:
-            # Start with identity rotation at time 0Ma.
+            # If 'actual_end_age' is not present day then also insert a present day 005-000 identity rotation.
+            if actual_end_age != 0:
+                self.no_net_rotation_time_samples_005_rel_000.append(
+                    pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'NNR'))
+            # Start with identity rotation at time 'actual_end_age'.
             self.no_net_rotation_time_samples_005_rel_000.append(
-                pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'NNR'))
+                pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), actual_end_age, 'NNR'))
             
-            # Start with identity net rotation at time 0Ma.
+            # Start with identity net rotation at time 'actual_end_age'.
             self.net_total_rotation = pygplates.FiniteRotation()
             
             # Keep track of how update-to-date we are.
-            self.last_update_time = 0
+            self.last_update_time = actual_end_age
         
         
         if self.CREATE_NO_NET_ROTATION_MODEL_AT_INIT:
-            print('Calculating no-net-rotation model for {0}-{1}Ma...'.format(end_age, start_age))
+            print('Calculating no-net-rotation model for {0}-{1} Ma...'.format(end_age, start_age))
             sys.stdout.flush()
             
             # Calculate no-net-rotation at 1My increments from 'end_age+1' Ma to 'start_age' Ma.
@@ -174,19 +169,9 @@ class NoNetRotationModel(object):
                 #print time
                 #sys.stdout.flush()
                 
-                if self.gplates_net_rotations:
-                    net_stage_lat, net_stage_lon, net_stage_angle_per_my = self.gplates_net_rotations[time]
-                    net_stage_rotation = pygplates.FiniteRotation(
-                            pygplates.PointOnSphere(net_stage_lat, net_stage_lon),
-                            math.radians(net_stage_angle_per_my))
-                else:
-                    # Calculate net stage rotation from 'time' to 'time-1'.
-                    net_stage_rotation = net_rotation.calculate_net_rotation_internal_gplates(
-                            rotation_model_zero_005_rel_000,
-                            topology_features,
-                            time,
-                            velocity_method = net_rotation.VelocityMethod.T_TO_T_MINUS_DT,
-                            velocity_delta_time = 1.0)
+                # Calculate net stage rotation from 'time' to 'time-1'.
+                net_stage_rotation = net_rotation_model_zero_005_rel_000.net_rotation_snapshot(
+                        time).get_total_net_rotation().get_finite_rotation()
                 
                 # Accumulate net stage rotations going backward in time (hence the inverse stage rotation)
                 # since finite rotations go backward in time in the rotation file.
@@ -228,7 +213,7 @@ class NoNetRotationModel(object):
         
         # Extra data to keep track of for use in later update
         # (if haven't created entire no-net-rotation file already above).
-        self.rotation_model_zero_005_rel_000 = rotation_model_zero_005_rel_000
+        self.net_rotation_model_zero_005_rel_000 = net_rotation_model_zero_005_rel_000
         self.no_net_rotation_features_except_005_rel_000 = rotation_features_except_005_rel_000
     
     
@@ -259,12 +244,9 @@ class NoNetRotationModel(object):
         # This can happen if we've already created the entire no-net-rotation model in '__init__()'.
         #
         # This can also happen if we read a partial no-net-rotation file in '__init__()'
-        # (because we're continuing a previously interrupted run, ie, 'end_age > 0').
+        # (because we're continuing a previously interrupted run, ie, 'end_age > actual_end_age').
         if ref_rotation_start_age <= self.last_update_time:
             return
-        
-        print('Calculating no-net-rotation model for {0}-{1}Ma...'.format(self.last_update_time, ref_rotation_start_age))
-        sys.stdout.flush()
         
         # Calculate no-net-rotation at 1My increments from where we left off until 'ref_rotation_start_age' Ma.
         #
@@ -277,19 +259,9 @@ class NoNetRotationModel(object):
             #print time
             #sys.stdout.flush()
             
-            if self.gplates_net_rotations:
-                net_stage_lat, net_stage_lon, net_stage_angle_per_my = self.gplates_net_rotations[time]
-                net_stage_rotation = pygplates.FiniteRotation(
-                        pygplates.PointOnSphere(net_stage_lat, net_stage_lon),
-                        math.radians(net_stage_angle_per_my))
-            else:
-                # Calculate net stage rotation from 'time' to 'time-1'.
-                net_stage_rotation = net_rotation.calculate_net_rotation_internal_gplates(
-                        self.rotation_model_zero_005_rel_000,
-                        self.topology_features,
-                        time,
-                        velocity_method = net_rotation.VelocityMethod.T_TO_T_MINUS_DT,
-                        velocity_delta_time = 1.0)
+            # Calculate net stage rotation from 'time' to 'time-1'.
+            net_stage_rotation = self.net_rotation_model_zero_005_rel_000.net_rotation_snapshot(
+                    time).get_total_net_rotation().get_finite_rotation()
             
             # Accumulate net stage rotations going backward in time (hence the inverse stage rotation)
             # since finite rotations go backward in time in the rotation file.
@@ -324,9 +296,6 @@ class NoNetRotationModel(object):
         # Write the no-net-rotation file.
         pygplates.FeatureCollection(all_no_net_rotation_features).write(
                 os.path.join(self.data_dir, self.no_net_rotation_filename))
-        
-        print('...finished calculating no-net-rotation model.')
-        sys.stdout.flush()
     
     
     def _read_gplates_net_rotations(

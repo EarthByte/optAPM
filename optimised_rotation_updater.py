@@ -30,6 +30,7 @@ class OptimisedRotationUpdater(object):
             original_rotation_filenames,  # Relative to the 'data/' directory.
             start_age,
             end_age,
+            actual_end_age,  # 'end_age' is equal to this unless continuing an interrupted run
             interval,
             reference_params_function,
             data_model,
@@ -100,35 +101,36 @@ class OptimisedRotationUpdater(object):
                 
                 rotation_feature_index += 1
         
-        # Rotation model with root plate 005.
+        # Rotation model with root plate 005 (we'll still need to specify 'anchor_plate_id=5' though).
         #
         # Excludes 005-000 rotation features (if any) and root plate is now 005 (instead of 000).
         original_rotation_model_anchor_005 = pygplates.RotationModel(self.rotation_feature_collections)
         
         #
-        # Create a new 005-000 rotation feature such that 'ref_rotation_plate_id' rel 000 is zero (from 'start_age' to 'end_age').
+        # Create a new 005-000 rotation feature such that 'ref_rotation_plate_id' rel 000 is zero (from 'start_age' to 'actual_end_age').
         #
         
         rotation_time_samples_005_rel_000 = []
         
-        # If we're not starting at 0Ma then attempt to re-use the existing partially optimised rotation file.
+        # If we're not starting at 'actual_end_age' then attempt to re-use the existing partially optimised rotation file.
         # This can save a lot of time if we need to re-start an interrupted optimisation run.
-        if end_age != 0:
+        if end_age != actual_end_age:
             try:
                 partially_optimised_rotation_features = pygplates.FeatureCollection(
                         os.path.join(self.data_dir, self.optimised_rotation_filename))
             except pygplates.OpenFileForReadingError:
-                warnings.warn('Attempted to re-use partially optimised rotation file {0} starting at {1} '
-                    'but could not open for reading, so starting at 0Ma instead'.format(
-                        self.optimised_rotation_filename, end_age))
-                end_age = 0
+                warnings.warn('Attempted to re-use partially optimised rotation file {0} starting at {1} Ma '
+                    'but could not open for reading, so starting at {2} Ma instead'.format(
+                        self.optimised_rotation_filename, end_age, actual_end_age))
+                end_age = actual_end_age
         
         # Get the initial 005-000 samples.
-        # If we've started a new optimisation run then this will only be the identity rotation at 0Ma.
+        # If we've started a new optimisation run then this will only be the identity rotation at 'actual_end_age'.
         # If we are continuing a previous partial optimisation run then this will be all previous
         # 005-00 rotations computed so far.
-        if end_age != 0:
-            print('Re-using existing partially optimised rotation file from 0Ma to {0}Ma'.format(end_age))
+        if end_age != actual_end_age:
+            print('Re-using existing partially optimised rotation file from {0}-{1} Ma'.format(
+                actual_end_age, end_age))
             sys.stdout.flush()
             
             # Look for existing 005-000 partially optimised rotation in existing optimised rotation file.
@@ -143,12 +145,16 @@ class OptimisedRotationUpdater(object):
                                 rotation_time_samples_005_rel_000.append(finite_rotation_sample)
                         break
             if not rotation_time_samples_005_rel_000:
-                raise RuntimeError('Expected 005-000 in existing partially optimised file {0} from 0-{1}Ma'.format(
-                        self.optimised_rotation_filename, end_age))
+                raise RuntimeError('Expected 005-000 in existing partially optimised file {0} from {1}-{2} Ma'.format(
+                        self.optimised_rotation_filename, actual_end_age, end_age))
         else:
-            # Start with identity rotation at time 0Ma.
+            # If 'actual_end_age' is not present day then also insert a present day 005-000 identity rotation.
+            if actual_end_age != 0:
+                rotation_time_samples_005_rel_000.append(
+                    pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'optAPM @absage'))
+            # Start with identity rotation at time 'actual_end_age'.
             rotation_time_samples_005_rel_000.append(
-                pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), 0.0, 'optAPM @absage'))
+                pygplates.GpmlTimeSample(pygplates.GpmlFiniteRotation(pygplates.FiniteRotation()), actual_end_age, 'optAPM @absage'))
         
         # Add a rotation at each age in 'end_age + interval' to 'start_age' (inclusive) at 'interval' steps.
         for ref_rotation_start_age in range(end_age + interval, start_age + interval, interval):

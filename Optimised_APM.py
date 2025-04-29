@@ -24,13 +24,12 @@ from Optimised_config import *
 
 # Check the required pygplates version.
 #
-# PyGPlates version 19 can close the gaps in resolved topologies in the *deforming* model (along deforming lines).
-# PyGPlates version 22 can handle topological lines (can get their sub-sub-segment plate IDs).
-# PyGPlates version 25 greatly improved the speed of pygplates.RotationModel.
+# PyGPlates version 0.19 can close the gaps in resolved topologies in the *deforming* model (along deforming lines).
+# PyGPlates version 0.22 can handle topological lines (can get their sub-sub-segment plate IDs).
+# PyGPlates version 0.25 greatly improved the speed of pygplates.RotationModel (workflow time reduced by about a factor of 8).
+# PyGPlates version 1.0 supports calculating net rotation, and pickling (eg, can pickle a pygplates.RotationModel).
 #
-# We really do need the speed afforded by pyGPlates version 25, so we'll make that a requirement,
-# otherwise it can take about 8 times longer (eg, 16 hours instead of 2 hours).
-PYGPLATES_VERSION_REQUIRED = pgp.Version(25)
+PYGPLATES_VERSION_REQUIRED = pgp.Version(1, 0)
 # Check the imported pygplates version.
 if not hasattr(pgp, 'Version') or pgp.Version.get_imported_version() < PYGPLATES_VERSION_REQUIRED:
     raise RuntimeError('{0}: Error - imported pygplates version {1} but version {2} or greater is required'.format(
@@ -105,11 +104,19 @@ if __name__ == '__main__':
         
         # else serial
 
-
+        # The age range to optimise over.
+        #
+        # Note: 'end_age' will equal 'actual_end_age' unless we are continuing an interrupted run.
         age_range = range(end_age + interval, start_age + interval, interval)
 
         # When using mpi4py we only print and collect/process results in one process (the one with rank/ID 0).
         if use_parallel != MPI4PY or mpi_rank == 0:
+
+            # Create 'optimisation' sub-directory of data model directory (if it doesn't already exist).
+            optimisation_sub_dir = os.path.join(datadir, data_model, 'optimisation')
+            if not os.path.exists(optimisation_sub_dir):
+                print('{} does not exist, creating now... '.format(optimisation_sub_dir))
+                os.mkdir(optimisation_sub_dir)
 
             # Load the topology features. They can take a long time to load (especially for a deforming model) so we
             # do it once instead of three times (once each for no-net-rotation, trench resolving and plate velocities).
@@ -123,12 +130,14 @@ if __name__ == '__main__':
             #   Creates a single optimised rotation file by combining all unoptimised (input) rotations.
             #   The 005-000 rotation feature is inserted (or replaced if already existing in input) and
             #   defined such that the rotation of reference plate (obtained for each time using 'get_reference_params')
-            #   relative to 000 is zero for each time from 'start_age' to 'end_age + interval' in 'interval' steps.
+            #   relative to 000 is zero for each time from 'start_age' to 'end_age + interval'
+            #   in 'interval' steps.
             optimised_rotation_updater = OptimisedRotationUpdater(
                     datadir,
                     original_rotation_filenames,
                     start_age,
                     end_age,
+                    actual_end_age,
                     interval,
                     get_reference_params,
                     data_model,
@@ -145,9 +154,9 @@ if __name__ == '__main__':
                     topology_features,
                     start_age,
                     end_age,
+                    actual_end_age,
                     data_model,
-                    model_name,
-                    gplates_net_rotation_filename)
+                    model_name)
             
             # The filename of single rotation file (containing entire rotation model) with
             # no net rotation.
