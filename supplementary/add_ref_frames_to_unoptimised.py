@@ -89,9 +89,6 @@ for filename in input_rotation_filenames:
     output_filename = os.path.join('optimisation', output_filename)
     output_rotation_filenames.append(output_filename)
 
-# The output rotation filename to store the optimised, NNR and true polar wander reference frames.
-output_reference_frames_filename = 'optimisation/reference_frames{}.rot'.format(output_rotation_filenames_suffix)
-
 ##########################
 
 
@@ -421,15 +418,28 @@ true_polar_wander_rotation_feature = pygplates.Feature.create_total_reconstructi
     total_reconstruction_pole=pygplates.GpmlIrregularSampling(
         invert_rotation_sequence(rotation_time_samples_true_polar_wander)))
 
-# Add reference frames to a feature collection.
+# Add the reference frame features to a feature collection.
 output_reference_frames_feature_collection = pygplates.FeatureCollection()
 output_reference_frames_feature_collection.add(pmag_rotation_feature)
 output_reference_frames_feature_collection.add(optimised_rotation_feature)
 output_reference_frames_feature_collection.add(no_net_rotation_feature)
 output_reference_frames_feature_collection.add(true_polar_wander_rotation_feature)
 
-# Write the reference frames to their associated output rotation file.
-output_reference_frames_feature_collection.write(output_reference_frames_filename)
+# Store the reference frames in one of the output feature collections/files (we arbitrarily choose the first).
+#
+# Previously we added to a separate file called 'reference_frames<suffix>.rot'.
+# But that can be confusing for novice users who might think they can exclude that file if
+# they don't want any of the reference frames (and hence just rely on the default 000 plate ID).
+# But that would have been erroneous because 000 only existed in 'reference_frames<suffix>.rot'.
+# So now the reference frames are included within the normal output rotation files (associated with the input files).
+#
+# Note: We could split the rotation sequences of the reference frames across the output rotation files
+#       (instead of dumping them all in just one of the files). For example, 0-1000 Ma into '1000_0_rotfile<suffix>.rot'
+#       and 1000-1800 Ma into '1800_1000_rotfile<suffix>.rot'. But we only have the filename to determine the time range
+#       of each rotation file. And that information isn't always in the filename.
+#       Besides, the original rotation sequences aren't always split up exactly according to the filename anyway.
+output_reference_frames_feature_collection.add(output_rotation_feature_collections[0])
+output_rotation_feature_collections[0] = output_reference_frames_feature_collection
 
 # Write the output rotation filenames associated with the input rotation files.
 for file_index in range(len(output_rotation_feature_collections)):
