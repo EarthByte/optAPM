@@ -308,35 +308,35 @@ if default_reference_frame_plate_id == pmag_ref_frame_plate_id:
     # 015->000 is the existing optimised rotation (000->005).
     rotation_time_samples_optimised = clone_rotation_sequence(
         optimised_rotation_sequence,
-        f' Reference frames: paleomag (000) and optimised mantle ({optimised_ref_frame_plate_id:03d})')
+        f' Reference frames: optimised mantle ({optimised_ref_frame_plate_id:03d}) and paleomag (000)')
     # 016->000 is the existing no-net rotation (000->005).
     rotation_time_samples_no_net_rotation = clone_rotation_sequence(
         no_net_rotation_sequence,
-        f' Reference frames: paleomag (000) and no-net rotation ({no_net_rotation_ref_frame_plate_id:03d})')
+        f' Reference frames: no-net rotation ({no_net_rotation_ref_frame_plate_id:03d}) and paleomag (000)')
     # 017->000 is the calculated TPW rotation sequence.
     rotation_time_samples_true_polar_wander = calculate_true_polar_wander_rotation_sequence(
         optimised_rotation_sequence,
-        f' Reference frames: paleomag (000) and approx true polar wander ({true_polar_wander_ref_frame_plate_id:03d})')
+        f' Reference frames: approx true polar wander ({true_polar_wander_ref_frame_plate_id:03d}) and paleomag (000)')
 elif default_reference_frame_plate_id == optimised_ref_frame_plate_id:
     # 000 is optimised (and 014 is PMAG).
     #
     # 015->000 is zero (identity).
     rotation_time_samples_optimised = create_identity_rotation_sequence(
-        f' Reference frames: optimised mantle (000 and {optimised_ref_frame_plate_id:03d})',
+        f' Reference frames: optimised mantle ({optimised_ref_frame_plate_id:03d} and 000)',
         max_time_of_sequences_with_fixed_000)
     # 016->014 is the existing no-net rotation (000->005).
     # 016->014 = 016->000 * 000->014
     # 016->000 = 016->014 * inverse[000->014]
     rotation_time_samples_no_net_rotation = remove_pmag_from_rotation_sequence(
         no_net_rotation_sequence,
-        f' Reference frames: optimised mantle (000) and no-net rotation ({no_net_rotation_ref_frame_plate_id:03d})')
+        f' Reference frames: no-net rotation ({no_net_rotation_ref_frame_plate_id:03d}) and optimised mantle (000)')
     # 017->014 is the calculated TPW rotation sequence.
     # 017->014 = 017->000 * 000->014
     # 017->000 = 017->014 * inverse[000->014]
     rotation_time_samples_true_polar_wander = calculate_true_polar_wander_rotation_sequence(optimised_rotation_sequence, '')
     rotation_time_samples_true_polar_wander = remove_pmag_from_rotation_sequence(
         rotation_time_samples_true_polar_wander,
-        f' Reference frames: optimised mantle (000) and approx true polar wander ({true_polar_wander_ref_frame_plate_id:03d})')
+        f' Reference frames: approx true polar wander ({true_polar_wander_ref_frame_plate_id:03d}) and optimised mantle (000)')
 elif default_reference_frame_plate_id == no_net_rotation_ref_frame_plate_id:
     # 000 is no-net rotation (and 014 is PMAG).
     #
@@ -345,10 +345,10 @@ elif default_reference_frame_plate_id == no_net_rotation_ref_frame_plate_id:
     # 015->000 = 015->014 * inverse[000->014]
     rotation_time_samples_optimised = remove_pmag_from_rotation_sequence(
         optimised_rotation_sequence,
-        f' Reference frames: no-net rotation (000) and optimised mantle ({optimised_ref_frame_plate_id:03d})')
+        f' Reference frames: optimised mantle ({optimised_ref_frame_plate_id:03d}) and no-net rotation (000)')
     # 016->000 is zero (identity).
     rotation_time_samples_no_net_rotation = create_identity_rotation_sequence(
-        f' Reference frames: no-net rotation (000 and {no_net_rotation_ref_frame_plate_id:03d})',
+        f' Reference frames: no-net rotation ({no_net_rotation_ref_frame_plate_id:03d} and 000)',
         max_time_of_sequences_with_fixed_000)
     # 017->014 is the calculated TPW rotation sequence.
     # 017->014 = 017->000 * 000->014
@@ -356,7 +356,7 @@ elif default_reference_frame_plate_id == no_net_rotation_ref_frame_plate_id:
     rotation_time_samples_true_polar_wander = calculate_true_polar_wander_rotation_sequence(optimised_rotation_sequence, '')
     rotation_time_samples_true_polar_wander = remove_pmag_from_rotation_sequence(
         rotation_time_samples_true_polar_wander,
-        f' Reference frames: no-net rotation (000) and approx true polar wander ({true_polar_wander_ref_frame_plate_id:03d})')
+        f' Reference frames: approx true polar wander ({true_polar_wander_ref_frame_plate_id:03d}) and no-net rotation (000)')
 elif default_reference_frame_plate_id == true_polar_wander_ref_frame_plate_id:
     # 000 is TPW (and 014 is PMAG).
     #
@@ -365,37 +365,61 @@ elif default_reference_frame_plate_id == true_polar_wander_ref_frame_plate_id:
     # 015->000 = 015->014 * inverse[000->014]
     rotation_time_samples_optimised = remove_pmag_from_rotation_sequence(
         optimised_rotation_sequence,
-        f' Reference frames: approx true polar wander (000) and optimised mantle ({optimised_ref_frame_plate_id:03d})')
+        f' Reference frames: optimised mantle ({optimised_ref_frame_plate_id:03d}) and approx true polar wander (000)')
     # 016->014 is the existing no-net rotation (000->005).
     # 016->014 = 016->000 * 000->014
     # 016->000 = 016->014 * inverse[000->014]
     rotation_time_samples_no_net_rotation = remove_pmag_from_rotation_sequence(
         no_net_rotation_sequence,
-        f' Reference frames: approx true polar wander (000) and no-net rotation ({no_net_rotation_ref_frame_plate_id:03d})')
+        f' Reference frames: no-net rotation ({no_net_rotation_ref_frame_plate_id:03d}) and approx true polar wander (000)')
     # 017->000 is zero (identity).
     rotation_time_samples_true_polar_wander = create_identity_rotation_sequence(
-        f' Reference frames: approx true polar wander (000 and {true_polar_wander_ref_frame_plate_id:03d})',
+        f' Reference frames: approx true polar wander ({true_polar_wander_ref_frame_plate_id:03d} and 000)',
         max_time_of_sequences_with_fixed_000)
 else:
     raise ValueError('Default reference frame plate ID is not one of the reference frame plate IDs')
 
+
+def invert_rotation_sequence(rotation_sequence):
+    rotation_time_samples = []
+    for rotation_sample in rotation_sequence:
+        rotation_time_samples.append(
+            pygplates.GpmlTimeSample(
+                    pygplates.GpmlFiniteRotation(rotation_sample.get_value().get_finite_rotation().get_inverse()),
+                    rotation_sample.get_time(),
+                    rotation_sample.get_description(),
+                    rotation_sample.is_enabled()))
+    return rotation_time_samples
+
 # Create a new optimised rotation sequence R(015->000).
+#
+# But we write it out as R(000->015), which is inverse of R(015->000), otherwise 000 is the moving plate ID and it
+# will overlap in time with other sequences where 000 is also the moving plate ID (when loading into GPlates/pyGPlates).
 optimised_rotation_feature = pygplates.Feature.create_total_reconstruction_sequence(
-    fixed_plate_id=optimised_ref_frame_plate_id,
-    moving_plate_id=0,
-    total_reconstruction_pole=pygplates.GpmlIrregularSampling(rotation_time_samples_optimised))
+    fixed_plate_id=0,
+    moving_plate_id=optimised_ref_frame_plate_id,
+    total_reconstruction_pole=pygplates.GpmlIrregularSampling(
+        invert_rotation_sequence(rotation_time_samples_optimised)))
 
 # Create a new no-net rotation sequence R(016->000).
+#
+# But we write it out as R(000->016), which is inverse of R(016->000), otherwise 000 is the moving plate ID and it
+# will overlap in time with other sequences where 000 is also the moving plate ID (when loading into GPlates/pyGPlates).
 no_net_rotation_feature = pygplates.Feature.create_total_reconstruction_sequence(
-    fixed_plate_id=no_net_rotation_ref_frame_plate_id,
-    moving_plate_id=0,
-    total_reconstruction_pole=pygplates.GpmlIrregularSampling(rotation_time_samples_no_net_rotation))
+    fixed_plate_id=0,
+    moving_plate_id=no_net_rotation_ref_frame_plate_id,
+    total_reconstruction_pole=pygplates.GpmlIrregularSampling(
+        invert_rotation_sequence(rotation_time_samples_no_net_rotation)))
 
 # Create a new true polar wander rotation sequence R(017->000).
+#
+# But we write it out as R(000->016), which is inverse of R(016->000), otherwise 000 is the moving plate ID and it
+# will overlap in time with other sequences where 000 is also the moving plate ID (when loading into GPlates/pyGPlates).
 true_polar_wander_rotation_feature = pygplates.Feature.create_total_reconstruction_sequence(
-    fixed_plate_id=true_polar_wander_ref_frame_plate_id,
-    moving_plate_id=0,
-    total_reconstruction_pole=pygplates.GpmlIrregularSampling(rotation_time_samples_true_polar_wander))
+    fixed_plate_id=0,
+    moving_plate_id=true_polar_wander_ref_frame_plate_id,
+    total_reconstruction_pole=pygplates.GpmlIrregularSampling(
+        invert_rotation_sequence(rotation_time_samples_true_polar_wander)))
 
 # Add reference frames to a feature collection.
 output_reference_frames_feature_collection = pygplates.FeatureCollection()
