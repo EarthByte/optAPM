@@ -32,12 +32,12 @@ input_no_net_rotation_file = 'optimisation/no_net_rotation_model_20240725.rot'
 # The suffix to append to the basenames of the input rotation filenames to get the output rotation filenames.
 #
 # Note: The output rotation files also end up in the 'optimisation/' sub-directory.
-output_rotation_filenames_suffix = '_20240725_2'
+output_rotation_filenames_suffix = '_20240725'
 
 # Plate IDs of reference frames.
 # 
 # These are PMAG, optimised, no-net rotation and true polar wander (which is optimised with PMAG removed).
-pmag_reference_frame_plate_id = 14
+pmag_ref_frame_plate_id = 14
 optimised_ref_frame_plate_id = 15
 no_net_rotation_ref_frame_plate_id = 16
 true_polar_wander_ref_frame_plate_id = 17
@@ -75,12 +75,6 @@ default_reference_frame_plate_id = optimised_ref_frame_plate_id
 ##########################
 
 
-# Description for the comments of the reference frame rotations.
-rotation_description_pmag = ' {:03d} is paleomag reference frame'.format(pmag_reference_frame_plate_id)
-rotation_description_optimised = ' {:03d} is optimised mantle reference frame @absage'.format(optimised_ref_frame_plate_id)
-rotation_description_no_net_rotation = ' {:03d} is no-net rotation reference frame'.format(no_net_rotation_ref_frame_plate_id)
-rotation_description_true_polar_wander = ' {:03d} is true polar wander reference frame (approx)'.format(true_polar_wander_ref_frame_plate_id)
-
 # Each input rotation file will get a corresponding output rotation file.
 output_rotation_feature_collections = [pygplates.FeatureCollection(filename)
                                        for filename in input_rotation_filenames]
@@ -101,7 +95,7 @@ output_reference_frames_filename = 'optimisation/reference_frames{}.rot'.format(
 ##########################
 
 
-# Change fixed plate 000 to <pmag_reference_frame_plate_id>
+# Change fixed plate 000 to <pmag_ref_frame_plate_id>
 # (and remove any existing leftover 005-000 rotation features).
 max_time_of_sequences_with_fixed_000 = 0.0
 for rotation_feature_collection in output_rotation_feature_collections:
@@ -115,18 +109,18 @@ for rotation_feature_collection in output_rotation_feature_collections:
         return False
     rotation_feature_collection.remove(is_feature_005_000)
     
-    # Change fixed plate 000 to <pmag_reference_frame_plate_id>.
+    # Change fixed plate 000 to <pmag_ref_frame_plate_id>.
     for rotation_feature in rotation_feature_collection:
         total_reconstruction_pole = rotation_feature.get_total_reconstruction_pole()
         if total_reconstruction_pole:
             fixed_plate_id, moving_plate_id, rotation_sequence = total_reconstruction_pole
             
-            # Change fixed plate ID 000 to <pmag_reference_frame_plate_id>.
-            # We want everything that references 000 to now reference <pmag_reference_frame_plate_id>.
+            # Change fixed plate ID 000 to <pmag_ref_frame_plate_id>.
+            # We want everything that references 000 to now reference <pmag_ref_frame_plate_id>.
             if fixed_plate_id == 0:
-                # Change the fixed plate ID from 000 to <pmag_reference_frame_plate_id>.
+                # Change the fixed plate ID from 000 to <pmag_ref_frame_plate_id>.
                 rotation_feature.set_total_reconstruction_pole(
-                    pmag_reference_frame_plate_id, moving_plate_id, rotation_sequence)
+                    pmag_ref_frame_plate_id, moving_plate_id, rotation_sequence)
                 # The oldest time in this sequence.
                 max_time = max(time_sample.get_time() for time_sample in rotation_sequence.get_time_samples())
                 # The oldest time in all sequences (with fixed plate 000).
@@ -139,7 +133,7 @@ for rotation_feature_collection in output_rotation_feature_collections:
 # Note: It has no 000 plate ID. Instead it's anchor plate is the PMAG reference frame plate ID.
 original_rotation_model_anchored_014 = pygplates.RotationModel(
     output_rotation_feature_collections,
-    default_anchor_plate_id=pmag_reference_frame_plate_id)
+    default_anchor_plate_id=pmag_ref_frame_plate_id)
 
 
 def find_005_000_rotation_sequence(rotation_filename):
@@ -181,65 +175,106 @@ def create_identity_rotation_sequence(rotation_description, begin_time, end_time
 
 def clone_rotation_sequence(rotation_sequence, rotation_description):
     rotation_time_samples = []
-    for rotation_sample in rotation_sequence.get_enabled_time_samples():
+    for rotation_sample in rotation_sequence:
         rotation_time_samples.append(
             pygplates.GpmlTimeSample(
                     pygplates.GpmlFiniteRotation(rotation_sample.get_value().get_finite_rotation()),
                     rotation_sample.get_time(),
-                    rotation_description))
+                    rotation_description,
+                    rotation_sample.is_enabled()))
     return rotation_time_samples
 
 def calculate_true_polar_wander_rotation_sequence(optimised_rotation_sequence, rotation_description):
     rotation_time_samples = []
-    for optimised_rotation_sample in optimised_rotation_sequence.get_enabled_time_samples():
+    for optimised_rotation_sample in optimised_rotation_sequence:
         time = optimised_rotation_sample.get_time()
         # R(000->005).
         optimised_finite_rotation = optimised_rotation_sample.get_value().get_finite_rotation()
         # R(014->701).
         finite_rotation_701_014 = original_rotation_model_anchored_014.get_rotation(time, 701)
-        # We want TPW->701 to be equivalent to the optimised reference frame 000->005:
         #
-        #  R(TPW->701)               = R(000->005)
-        #  R(TPW->014) * R(014->701) = R(000->005)
-        #  R(TPW->014)               = R(000->005) * inverse[R(014->701)]
-        finite_rotation_true_polar_wander = optimised_finite_rotation * finite_rotation_701_014.get_inverse()
+        # PMAG contain a mantle reference frame and true polar wander (TPW).
+        # Whereas OPT only contains a mantle reference frame.
+        #
+        #   TPW + OPT = PMAG
+        #   TPW       = PMAG - OPT
+        #
+        # So looking at Africa this becomes...
+        #
+        #   R(PMAG->701) - R(OPT->701) = R(PMAG->701) * R(701->OPT)
+        #                              = R(PMAG->OPT)
+        #
+        # ...and, using the old optimised rotation R(000->005) (where 000 was OPT and 005 was PMAG)...
+        #
+        #   R(PMAG->OPT) = R(005->000)
+        #                = inverse[R(000->005)]
+        #
+        # ...therefore...
+        #
+        #   R(PMAG->701) - R(OPT->701) = R(PMAG->OPT)
+        #                              = inverse[R(000->005)]
+        #
+        # So we want 017->701 to be equivalent to the *inverse* of the optimised rotation 000->005:
+        #
+        #   TPW         = PMAG - OPT
+        #
+        #   R(017->701) = R(PMAG->701) - R(OPT->701)
+        #               = R(PMAG->OPT)
+        #               = inverse[R(000->005)]
+        #
+        # And expressing this relative to 014 becomes...
+        #
+        #   R(017->701)               = inverse[R(000->005)]
+        #   R(017->014) * R(014->701) = inverse[R(000->005)]
+        #   R(017->014)               = inverse[R(000->005)] * inverse[R(014->701)]
+        #
+        finite_rotation_true_polar_wander = optimised_finite_rotation.get_inverse() * finite_rotation_701_014.get_inverse()
         rotation_time_samples.append(
             pygplates.GpmlTimeSample(
                     pygplates.GpmlFiniteRotation(finite_rotation_true_polar_wander),
                     time,
-                    rotation_description))
+                    rotation_description,
+                    optimised_rotation_sample.is_enabled()))
     return rotation_time_samples
 
 # Generate the rotation sequence for the PMAG reference frame.
 #
 # This depends on which reference frame 000 is assigned to.
-if default_reference_frame_plate_id == pmag_reference_frame_plate_id:
+if default_reference_frame_plate_id == pmag_ref_frame_plate_id:
     # Both 000 and 014 are PMAG.
     #
     # So 000->014 is zero (identity).
-    rotation_time_samples_pmag = create_identity_rotation_sequence(rotation_description_pmag, max_time_of_sequences_with_fixed_000)
+    rotation_time_samples_pmag = create_identity_rotation_sequence(
+        f' Reference frames: paleomag ({pmag_ref_frame_plate_id:03d} and 000)',
+        max_time_of_sequences_with_fixed_000)
 elif default_reference_frame_plate_id == optimised_ref_frame_plate_id:
     # 000 is optimised (and 014 is PMAG).
     #
     # So 000->014 is the existing optimised rotation (000->005).
-    rotation_time_samples_pmag = clone_rotation_sequence(optimised_rotation_sequence, rotation_description_pmag)
+    rotation_time_samples_pmag = clone_rotation_sequence(
+        optimised_rotation_sequence,
+        f' Reference frames: paleomag ({pmag_ref_frame_plate_id:03d}) and optimised mantle (000)')
 elif default_reference_frame_plate_id == no_net_rotation_ref_frame_plate_id:
     # 000 is no-net rotation (and 014 is PMAG).
     #
     # So 000->014 is the existing no-net rotation (000->005).
-    rotation_time_samples_pmag = clone_rotation_sequence(no_net_rotation_sequence, rotation_description_pmag)
+    rotation_time_samples_pmag = clone_rotation_sequence(
+        no_net_rotation_sequence,
+        f' Reference frames: paleomag ({pmag_ref_frame_plate_id:03d}) and no-net rotation (000)')
 elif default_reference_frame_plate_id == true_polar_wander_ref_frame_plate_id:
     # 000 is TPW (and 014 is PMAG).
     #
     # So 000->014 is the calculated TPW rotation sequence.
-    rotation_time_samples_pmag = calculate_true_polar_wander_rotation_sequence(optimised_rotation_sequence, rotation_description_pmag)
+    rotation_time_samples_pmag = calculate_true_polar_wander_rotation_sequence(
+        optimised_rotation_sequence,
+        f' Reference frames: paleomag ({pmag_ref_frame_plate_id:03d}) and approx true polar wander (000)')
 else:
     raise ValueError('Default reference frame plate ID is not one of the reference frame plate IDs')
 
 # Create a new PMAG rotation sequence R(000->014).
 pmag_rotation_feature = pygplates.Feature.create_total_reconstruction_sequence(
     fixed_plate_id=0,
-    moving_plate_id=pmag_reference_frame_plate_id,
+    moving_plate_id=pmag_ref_frame_plate_id,
     total_reconstruction_pole=pygplates.GpmlIrregularSampling(rotation_time_samples_pmag))
 
 # Default rotation model (anchor plate 000).
@@ -252,7 +287,7 @@ def remove_pmag_from_rotation_sequence(rotation_sequence, rotation_description):
         time = rotation_sample.get_time()
         finite_rotation = rotation_sample.get_value().get_finite_rotation()
         # R(000->014).
-        finite_rotation_014_000 = default_rotation_model.get_rotation(time, pmag_reference_frame_plate_id)
+        finite_rotation_014_000 = default_rotation_model.get_rotation(time, pmag_ref_frame_plate_id)
         # pid->014 = pid->000 * 000->014
         # pid->000 = pid->014 * inverse[000->014]
         finite_rotation = finite_rotation * finite_rotation_014_000.get_inverse()
@@ -267,56 +302,80 @@ def remove_pmag_from_rotation_sequence(rotation_sequence, rotation_description):
 # Generate the rotation sequences for the remaining reference frames (opt, NNR, TPW).
 #
 # This depends on which reference frame 000 is assigned to.
-if default_reference_frame_plate_id == pmag_reference_frame_plate_id:
+if default_reference_frame_plate_id == pmag_ref_frame_plate_id:
     # Both 000 and 014 are PMAG.
     #
     # 015->000 is the existing optimised rotation (000->005).
-    rotation_time_samples_optimised = clone_rotation_sequence(optimised_rotation_sequence, rotation_description_optimised)
+    rotation_time_samples_optimised = clone_rotation_sequence(
+        optimised_rotation_sequence,
+        f' Reference frames: paleomag (000) and optimised mantle ({optimised_ref_frame_plate_id:03d})')
     # 016->000 is the existing no-net rotation (000->005).
-    rotation_time_samples_no_net_rotation = clone_rotation_sequence(no_net_rotation_sequence, rotation_description_no_net_rotation)
+    rotation_time_samples_no_net_rotation = clone_rotation_sequence(
+        no_net_rotation_sequence,
+        f' Reference frames: paleomag (000) and no-net rotation ({no_net_rotation_ref_frame_plate_id:03d})')
     # 017->000 is the calculated TPW rotation sequence.
-    rotation_time_samples_true_polar_wander = calculate_true_polar_wander_rotation_sequence(optimised_rotation_sequence, rotation_description_true_polar_wander)
+    rotation_time_samples_true_polar_wander = calculate_true_polar_wander_rotation_sequence(
+        optimised_rotation_sequence,
+        f' Reference frames: paleomag (000) and approx true polar wander ({true_polar_wander_ref_frame_plate_id:03d})')
 elif default_reference_frame_plate_id == optimised_ref_frame_plate_id:
     # 000 is optimised (and 014 is PMAG).
     #
     # 015->000 is zero (identity).
-    rotation_time_samples_optimised = create_identity_rotation_sequence(rotation_description_optimised, max_time_of_sequences_with_fixed_000)
+    rotation_time_samples_optimised = create_identity_rotation_sequence(
+        f' Reference frames: optimised mantle (000 and {optimised_ref_frame_plate_id:03d})',
+        max_time_of_sequences_with_fixed_000)
     # 016->014 is the existing no-net rotation (000->005).
     # 016->014 = 016->000 * 000->014
     # 016->000 = 016->014 * inverse[000->014]
-    rotation_time_samples_no_net_rotation = remove_pmag_from_rotation_sequence(no_net_rotation_sequence, rotation_description_no_net_rotation)
+    rotation_time_samples_no_net_rotation = remove_pmag_from_rotation_sequence(
+        no_net_rotation_sequence,
+        f' Reference frames: optimised mantle (000) and no-net rotation ({no_net_rotation_ref_frame_plate_id:03d})')
     # 017->014 is the calculated TPW rotation sequence.
     # 017->014 = 017->000 * 000->014
     # 017->000 = 017->014 * inverse[000->014]
-    rotation_time_samples_true_polar_wander = calculate_true_polar_wander_rotation_sequence(optimised_rotation_sequence, rotation_description_true_polar_wander)
-    rotation_time_samples_true_polar_wander = remove_pmag_from_rotation_sequence(rotation_time_samples_true_polar_wander, rotation_description_true_polar_wander)
+    rotation_time_samples_true_polar_wander = calculate_true_polar_wander_rotation_sequence(optimised_rotation_sequence, '')
+    rotation_time_samples_true_polar_wander = remove_pmag_from_rotation_sequence(
+        rotation_time_samples_true_polar_wander,
+        f' Reference frames: optimised mantle (000) and approx true polar wander ({true_polar_wander_ref_frame_plate_id:03d})')
 elif default_reference_frame_plate_id == no_net_rotation_ref_frame_plate_id:
     # 000 is no-net rotation (and 014 is PMAG).
     #
     # 015->014 is the existing optimised rotation (000->005).
     # 015->014 = 015->000 * 000->014
     # 015->000 = 015->014 * inverse[000->014]
-    rotation_time_samples_optimised = remove_pmag_from_rotation_sequence(optimised_rotation_sequence, rotation_description_optimised)
+    rotation_time_samples_optimised = remove_pmag_from_rotation_sequence(
+        optimised_rotation_sequence,
+        f' Reference frames: no-net rotation (000) and optimised mantle ({optimised_ref_frame_plate_id:03d})')
     # 016->000 is zero (identity).
-    rotation_time_samples_no_net_rotation = create_identity_rotation_sequence(rotation_description_no_net_rotation, max_time_of_sequences_with_fixed_000)
+    rotation_time_samples_no_net_rotation = create_identity_rotation_sequence(
+        f' Reference frames: no-net rotation (000 and {no_net_rotation_ref_frame_plate_id:03d})',
+        max_time_of_sequences_with_fixed_000)
     # 017->014 is the calculated TPW rotation sequence.
     # 017->014 = 017->000 * 000->014
     # 017->000 = 017->014 * inverse[000->014]
-    rotation_time_samples_true_polar_wander = calculate_true_polar_wander_rotation_sequence(optimised_rotation_sequence, rotation_description_true_polar_wander)
-    rotation_time_samples_true_polar_wander = remove_pmag_from_rotation_sequence(rotation_time_samples_true_polar_wander, rotation_description_true_polar_wander)
+    rotation_time_samples_true_polar_wander = calculate_true_polar_wander_rotation_sequence(optimised_rotation_sequence, '')
+    rotation_time_samples_true_polar_wander = remove_pmag_from_rotation_sequence(
+        rotation_time_samples_true_polar_wander,
+        f' Reference frames: no-net rotation (000) and approx true polar wander ({true_polar_wander_ref_frame_plate_id:03d})')
 elif default_reference_frame_plate_id == true_polar_wander_ref_frame_plate_id:
     # 000 is TPW (and 014 is PMAG).
     #
     # 015->014 is the existing optimised rotation (000->005).
     # 015->014 = 015->000 * 000->014
     # 015->000 = 015->014 * inverse[000->014]
-    rotation_time_samples_optimised = remove_pmag_from_rotation_sequence(optimised_rotation_sequence, rotation_description_optimised)
+    rotation_time_samples_optimised = remove_pmag_from_rotation_sequence(
+        optimised_rotation_sequence,
+        f' Reference frames: approx true polar wander (000) and optimised mantle ({optimised_ref_frame_plate_id:03d})')
     # 016->014 is the existing no-net rotation (000->005).
     # 016->014 = 016->000 * 000->014
     # 016->000 = 016->014 * inverse[000->014]
-    rotation_time_samples_no_net_rotation = remove_pmag_from_rotation_sequence(no_net_rotation_sequence, rotation_description_no_net_rotation)
+    rotation_time_samples_no_net_rotation = remove_pmag_from_rotation_sequence(
+        no_net_rotation_sequence,
+        f' Reference frames: approx true polar wander (000) and no-net rotation ({no_net_rotation_ref_frame_plate_id:03d})')
     # 017->000 is zero (identity).
-    rotation_time_samples_true_polar_wander = create_identity_rotation_sequence(rotation_description_true_polar_wander, max_time_of_sequences_with_fixed_000)
+    rotation_time_samples_true_polar_wander = create_identity_rotation_sequence(
+        f' Reference frames: approx true polar wander (000 and {true_polar_wander_ref_frame_plate_id:03d})',
+        max_time_of_sequences_with_fixed_000)
 else:
     raise ValueError('Default reference frame plate ID is not one of the reference frame plate IDs')
 
