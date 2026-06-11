@@ -15,11 +15,9 @@ The data for the 1Ga model can be obtained [here](https://www.earthbyte.org/webd
 
 The following Python packages are required:
 
-* PlateTectonicTools>=0.5
+* gplately>=1.3
 
-  > __Note:__ Until version 0.5 of PlateTectonicTools is available (on conda and pip) you'll need to install the latest version from Github:
-  >
-  > `pip install git+https://github.com/EarthByte/PlateTectonicTools`
+  > __Note:__ PlateTectonicTools is no longer required - its functionality is now fully integrated into [GPlately](https://github.com/GPlates/gplately) (as the `gplately.ptt` module).
 
 * pygplates>=1.0
 * numpy
@@ -44,7 +42,7 @@ First install dependencies that are available on `conda` (in the _conda-forge_ c
 
 ```
 conda create -n <conda-environment> -c conda-forge \
-    "pygplates>=1.0" numpy scipy platetectonictools scikit-image pandas xlrd==1.2.0 NLopt \
+    "pygplates>=1.0" "gplately>=1.3" numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
     future cartopy matplotlib ipyparallel openpyxl
 ```
 
@@ -69,13 +67,6 @@ conda install pip
 pip install pmagpy
 ```
 
-> Note: Until version 0.5 of PlateTectonicTools is available (on conda) you'll need to upgrade it from Github:
->
-> ```
-> conda install git
-> pip install --upgrade git+https://github.com/EarthByte/PlateTectonicTools
-> ```
-
 ### Install on a HPC system
 
 Installation on a High Performance Computing (HPC) system can also be done with a local installation of `conda` (and `pip`). However the exception, compared with installing on desktop, is `mpi4py`. It will likely need to be installed differently to ensure that the MPI implementation of the HPC system is used (instead of conda's MPI).
@@ -90,7 +81,7 @@ Similarly to installing on desktop, start by creating a conda environment:
 
 ```
 conda create -n <conda-environment> -c conda-forge \
-    "pygplates>=1.0" numpy scipy platetectonictools scikit-image pandas xlrd==1.2.0 NLopt \
+    "pygplates>=1.0" "gplately>=1.3" numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
     future cartopy matplotlib ipyparallel openpyxl
 ```
 
@@ -120,13 +111,6 @@ Then, similarly to installing on desktop, use `pip` to install `pmagpy` (into th
 ```
 pip install pmagpy
 ```
-
-> Note: Until version 0.5 of PlateTectonicTools is available (on conda) you'll need to upgrade it from Github:
->
-> ```
-> conda install git
-> pip install --upgrade git+https://github.com/EarthByte/PlateTectonicTools
-> ```
 
 #### Job submission script
 
@@ -168,6 +152,35 @@ All settings are now in "Optimised_config.py", such as the model name, start/end
 ### Optimisation overview
 
 Essentially the workflow optimises the absolute plate motion by perturbing the absolute rotation (pole and angle) and then calculating penalties derived from that rotation (eg, net rotation (NR), trench migration (TM) and plate velocity (PV); and a hotspot (HS) penalty for 0-80Ma). Then these penalties are scaled by their weights (eg, NR=1, TM=0.5, PV=0.5) and also internal scaling to make sure each penalty is roughly the same when the weights are all 1.0 (but that’s an implementation detail). Then the penalties are added to give one number. The optimization workflow then perturbs the rotation further to try to reduce that number. It does this many times until it settles on a local minimum (called a seed), and does this for a bunch of seeds to find global minimum.
+
+### Seed screening ("screen then polish")
+
+By default the workflow now *screens* all seeds before optimising. The objective function is evaluated once at every seed (cheap - roughly the cost of fully optimising just one or two seeds, since a full NLopt optimisation typically uses ~80-200 objective evaluations), and then only the most promising seeds are fully optimised: the `seed_screen_top_n` best-screened seeds plus `seed_screen_uniform_n` seeds spread uniformly across the search space (insurance in case screening misses a basin). Both parameters are in "Optimised_config.py".
+
+An empirical convergence study on a 1Ga global plate model found that screening 400 seeds and fully optimising the best 16 (plus 16 uniform) reproduces the full 400-seed multistart minimum to within ~0.5% cost, while reducing the per-timestep optimisation cost by roughly a factor of 10. The study also found that the optimised pole is only loosely constrained near the minimum (several near-degenerate minima can differ by 10-20 degrees in pole position while differing by less than 0.5% in cost), so the residual error introduced by screening is well below the intrinsic uncertainty of the objective function itself.
+
+To reproduce or extend the study (eg, for a different plate model or different seed counts), use the standalone, resumable harness "seed_study.py":
+
+```
+  python seed_study.py prep --age 100      # prepare data for one timestep (re-run until 'PREP DONE')
+  python seed_study.py probe --age 100     # time a single objective evaluation / full optimisation
+  python seed_study.py run --age 100       # run the study (resumable; re-run until 'ALL TASKS DONE')
+  python seed_study.py report --age 100    # summarise results (writes a CSV)
+```
+
+To disable screening (and fully optimise every seed, as in the original workflow), set `seed_screen_top_n = None`.
+
+The workflow also caps each NLopt (COBYLA) optimisation at `nlopt_max_eval_safety` objective evaluations (default 1000). COBYLA occasionally fails to converge and can otherwise cycle for thousands of evaluations, stalling an entire MPI rank (and hence the whole timestep, since all ranks must finish before the next timestep begins).
+
+### Quick test runs
+
+The age range, seed count, screening parameters and parallelisation can be temporarily overridden via environment variables without editing "Optimised_config.py" - useful for quick smoke tests:
+
+```
+  OPTAPM_START_AGE=5 OPTAPM_END_AGE=0 OPTAPM_MODELS=49 OPTAPM_SERIAL=1 python Optimised_APM.py
+```
+
+(`OPTAPM_SCREEN_TOP_N` and `OPTAPM_SCREEN_UNIFORM_N` override the screening parameters; a negative `OPTAPM_SCREEN_TOP_N` disables screening.)
 
 ### Plate velocity penalty
 
@@ -263,15 +276,15 @@ All these rotation files also comprise the entire optimised rotation model.
 Note that only those rotations that referenced 000 as their fixed plate will be modified (to include the optimised absolute plate motion).
 
 You can also optionally remove plates in the plate hierarchy to make it simpler (eg, plates below 701 are typically removed so that 701 directly references 000).
-This can be done using the 'remove_plate_rotations' module in Plate Tectonic Tools ( https://github.com/EarthByte/PlateTectonicTools ) For example:
+This can be done using the 'remove_plate_rotations' module in GPlately ( https://github.com/GPlates/gplately ) For example:
 
 ```
-  python -m ptt.remove_plate_rotations -u -a 0.1 5 -p 70 4 3 2 1 -o removed_70_4_3_2_1_ -- ...
+  python -m gplately.ptt.remove_plate_rotations -u -a 0.1 5 -p 70 4 3 2 1 -o removed_70_4_3_2_1_ -- ...
 ```
 
 ...where you replace `...` with all the rotation files in the optimised rotation model.
 
 ## Plotting results
 
-After running the workflow and post-processing (although you don't need to run `ptt.remove_plate_rotations` for this), you can plot the
+After running the workflow and post-processing (although you don't need to run `gplately.ptt.remove_plate_rotations` for this), you can plot the
 trench migration stats and net rotation curves for the non-optimised and any optimised models using the Jupyter notebooks in the `figures/` directory.

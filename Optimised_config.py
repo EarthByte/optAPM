@@ -506,6 +506,31 @@ def get_reference_params(age):
     return ref_rotation_plate_id, ref_rotation_file
 
 
+#
+# Seed screening ("screen then polish").
+#
+# The objective function is first evaluated once at every seed (cheap screening), and then
+# only the most promising seeds are fully optimised with NLopt. A full NLopt optimisation
+# typically uses ~80-200 objective evaluations, so screening all seeds costs roughly the
+# same as fully optimising just one or two seeds - while identifying where the low-cost
+# basins are. An empirical convergence study (see 'seed_study.py') found that fully
+# optimising the best ~16 screened seeds plus a small uniformly-distributed backstop
+# reproduces the full 400-seed multistart minimum to within ~0.5% cost at ~10-25x less CPU.
+#
+# Set 'seed_screen_top_n' to None to disable screening (original behaviour: fully optimise every seed).
+seed_screen_top_n = 16      # Fully optimise the N best-screened seeds.
+seed_screen_uniform_n = 16  # Also fully optimise this many seeds spread uniformly across the
+                            # search space (insurance in case screening misses a basin -
+                            # eg, when a poor seed would have converged to the global minimum).
+
+# Safety cap on NLopt objective evaluations per seed (only used when model_stop_condition == 'threshold').
+# COBYLA occasionally fails to converge (it can cycle for thousands of evaluations, stalling
+# an entire MPI rank and hence the whole timestep). The vast majority of optimisations
+# converge in well under 200 evaluations, so this generous cap only affects pathological cases.
+# Set to None to disable the cap.
+nlopt_max_eval_safety = 1000
+
+
 search = "Initial"
 # If True then temporarily expand search radius to 180 whenever the reference plate changes.
 # Normally the reference plate stays constant at Africa (701), but does switch to 101 for the 1Ga model.
@@ -569,6 +594,29 @@ interpolated_hotspots = 'interpolated_hotspot_chains_5Myr.xlsx'
 # Don't plot in this workflow.
 # This is so it can be run on an HPC cluster with no visualisation node.
 plot = False
+
+
+#
+# Environment variable overrides (useful for quick test runs without editing this file).
+#
+# OPTAPM_START_AGE / OPTAPM_END_AGE : Override the age range (eg, to run a single timestep).
+# OPTAPM_MODELS                     : Override the number of seed models.
+# OPTAPM_SERIAL=1                   : Disable parallelisation (eg, to run/debug on a desktop without MPI).
+#
+if 'OPTAPM_START_AGE' in os.environ:
+    start_age = int(os.environ['OPTAPM_START_AGE'])
+if 'OPTAPM_END_AGE' in os.environ:
+    end_age = actual_end_age = int(os.environ['OPTAPM_END_AGE'])
+if 'OPTAPM_MODELS' in os.environ:
+    models = int(os.environ['OPTAPM_MODELS'])
+if 'OPTAPM_SCREEN_TOP_N' in os.environ:
+    seed_screen_top_n = int(os.environ['OPTAPM_SCREEN_TOP_N'])
+    if seed_screen_top_n < 0:  # negative disables screening
+        seed_screen_top_n = None
+if 'OPTAPM_SCREEN_UNIFORM_N' in os.environ:
+    seed_screen_uniform_n = int(os.environ['OPTAPM_SCREEN_UNIFORM_N'])
+if os.environ.get('OPTAPM_SERIAL') == '1':
+    use_parallel = None
 
 
 #
