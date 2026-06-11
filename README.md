@@ -172,6 +172,23 @@ To disable screening (and fully optimise every seed, as in the original workflow
 
 The workflow also caps each NLopt (COBYLA) optimisation at `nlopt_max_eval_safety` objective evaluations (default 1000). COBYLA occasionally fails to converge and can otherwise cycle for thousands of evaluations, stalling an entire MPI rank (and hence the whole timestep, since all ranks must finish before the next timestep begins).
 
+### Uncertainty quantification (run variants)
+
+The optimisation is dominated by the net rotation (NR) minimisation: subduction zone migration largely depends on the net rotation optimisation (it is not an independent parameter), and the same holds for limiting the speed of continents (see [Muller et al. 2022, Solid Earth](https://doi.org/10.5194/se-13-1127-2022)). Perturbing the component weights only slightly changes the outcome, so a defensible uncertainty envelope for the optimised reference frame instead consists of end-members in the net rotation bounds:
+
+1. **No-net-rotation (NNR) end-member** - zero net rotation. This rotation file is already produced by every run as "no_net_rotation_model_<model_name>.rot".
+2. **Best run** (`run_variant = 'best'`, the default) - NR bounded to (0.08, 0.20) deg/Myr: non-zero (as suggested by mantle flow models, eg, Becker 2006) but below the preferred geodynamic upper limit (Conrad & Behn 2010).
+3. **Maximum-NR end-member** (`run_variant = 'nr_max'`) - the NR upper bound relaxed to 0.30 deg/Myr, the top of the range permitted by asthenospheric shear / seismic anisotropy constraints (Conrad & Behn 2010 derive NR < 0.26 deg/Myr for an asthenosphere 10x less viscous than the upper mantle; anisotropy proxies allow 0.2-0.3 deg/Myr). Larger values approach the Pacific hotspot (HS3) frame rates (0.33-0.44 deg/Myr), which are widely considered geodynamically implausible.
+
+To produce the envelope, run the workflow twice (the `nr_max` variant appends its name to the model name, so the two runs write separate output files):
+
+```
+  mpirun -np <cores> python Optimised_APM.py
+  OPTAPM_VARIANT=nr_max mpirun -np <cores> python Optimised_APM.py
+```
+
+The variant NR bounds are defined in `run_variant_nr_bounds` in "Optimised_config.py" (where further variants can be added).
+
 ### Quick test runs
 
 The age range, seed count, screening parameters and parallelisation can be temporarily overridden via environment variables without editing "Optimised_config.py" - useful for quick smoke tests:

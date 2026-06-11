@@ -50,6 +50,45 @@ else:
     model_name = "run1"
 
 
+#
+# Run variant (for uncertainty quantification).
+#
+# The optimisation is dominated by the net rotation (NR) minimisation: subduction zone
+# migration largely depends on the net rotation optimisation (it is not really an
+# independent parameter), and the same holds for limiting the speed of continents
+# (see Muller et al. 2022, Solid Earth, doi:10.5194/se-13-1127-2022).
+# So a defensible uncertainty envelope for the optimised reference frame consists of
+# end-members in the net rotation bounds rather than perturbations of the weights:
+#
+#   1. A no-net-rotation (NNR) reference frame - the zero-NR end-member. This is already
+#      produced by every run as "no_net_rotation_model_<model_name>.rot".
+#   2. The 'best' run - the default NR bounds of (0.08, 0.20) deg/Myr, ie, non-zero
+#      (as suggested by mantle flow models, eg, Becker 2006) but below the preferred
+#      geodynamic upper limit (Conrad & Behn 2010).
+#   3. The 'nr_max' run - the maximum-NR end-member, with the NR upper bound relaxed to
+#      0.30 deg/Myr: the top of the range permitted by asthenospheric shear / seismic
+#      anisotropy constraints (Conrad & Behn 2010 derive NR < 0.26 deg/Myr for an
+#      asthenosphere 10x less viscous than the upper mantle; anisotropy proxies allow
+#      0.2-0.3 deg/Myr). Beyond this, net rotations approach the Pacific hotspot (HS3)
+#      frame (0.33-0.44 deg/Myr), which is widely considered geodynamically implausible.
+#
+# Select the variant here (or via the OPTAPM_VARIANT environment variable, eg,
+# "OPTAPM_VARIANT=nr_max mpirun -np 16 python Optimised_APM.py").
+# The variant name (other than 'best') is appended to the model name, so each variant
+# writes its own set of output files.
+#
+run_variant_nr_bounds = {
+    'best':   (0.08, 0.20),  # deg/Myr
+    'nr_max': (0.08, 0.30),  # deg/Myr
+}
+run_variant = os.environ.get('OPTAPM_VARIANT', 'best')
+if run_variant not in run_variant_nr_bounds:
+    raise RuntimeError('Unknown run variant {0!r} - choose one of {1}'.format(
+            run_variant, sorted(run_variant_nr_bounds.keys())))
+if run_variant != 'best':
+    model_name = model_name + '_' + run_variant
+
+
 # Start age.
 if data_model == 'Zahirovic_etal_2022_GDJ':
     start_age = 410
@@ -299,7 +338,8 @@ def get_net_rotation_params(age):
         data_model == 'Zahirovic_etal_2022_GDJ' or
         '1.8ga' in data_model.lower() or
         data_model == "Global_2000-540"):
-        nr_bounds = (0.08, 0.20)
+        # Net rotation bounds depend on the run variant (see 'run_variant' above).
+        nr_bounds = run_variant_nr_bounds[run_variant]
         if age <= 80:
             return  True, 1.0, cost_function, nr_bounds  # Weight is always 1.0 for 0-80Ma
         else:
