@@ -172,6 +172,12 @@ To disable screening (and fully optimise every seed, as in the original workflow
 
 The workflow also caps each NLopt (COBYLA) optimisation at `nlopt_max_eval_safety` objective evaluations (default 1000). COBYLA occasionally fails to converge and can otherwise cycle for thousands of evaluations, stalling an entire MPI rank (and hence the whole timestep, since all ranks must finish before the next timestep begins).
 
+### Trench migration scheme
+
+The original trench migration component drives trench-normal migration velocities toward zero. However, since zero net rotation also implies near-zero trench migration, that constraint is largely redundant with the net rotation minimisation. It is also at odds with observations: most trenches roll back toward the ocean basin behind them rather than advancing toward the overriding plate - across reference frames, 62-78% of trench segments retreat, with mean trench-normal velocities of +1.3-1.5 cm/yr and medians of +0.9-1.3 cm/yr (Schellart et al. 2008, Earth-Science Reviews; see also Williams et al. 2015, EPSL).
+
+The default scheme is therefore now `trench_migration_scheme = 'rollback'` (in "Optimised_config.py"): per-trench orthogonal velocities are driven toward a target of +10 mm/yr retreat, and the bounds on the *mean* orthogonal velocity are tightened to (0, 20) mm/yr - the global mean must be retreating, but at less than 2 cm/yr. Individual trenches can still advance; only the mean is required to retreat. This makes trench kinematics an independent constraint that competes with the net rotation minimisation (instead of duplicating it). Set `trench_migration_scheme = 'minimise'` (or `OPTAPM_TM_SCHEME=minimise`) to restore the original behaviour.
+
 ### Uncertainty quantification (run variants)
 
 The optimisation is dominated by the net rotation (NR) minimisation: subduction zone migration largely depends on the net rotation optimisation (it is not an independent parameter), and the same holds for limiting the speed of continents (see [Muller et al. 2022, Solid Earth](https://doi.org/10.5194/se-13-1127-2022)). Perturbing the component weights only slightly changes the outcome, so a defensible uncertainty envelope for the optimised reference frame instead consists of end-members in the net rotation bounds:

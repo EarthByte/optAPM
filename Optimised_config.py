@@ -347,7 +347,68 @@ def get_net_rotation_params(age):
     else:
         return True, 1.0, cost_function, None
 
+#
+# Trench migration scheme.
+#
+# 'minimise' - the original behaviour: drive trench-normal migration velocities toward zero
+#              (mean absolute orthogonal velocity + standard deviation), with loose bounds
+#              of (-30, 30) mm/yr on the mean orthogonal velocity.
+#
+# 'rollback' - prefer slow trench *retreat* (rollback). Observations show that most trenches
+#              roll back toward the ocean basin behind them rather than advancing toward the
+#              overriding plate: across reference frames, 62-78% of trench segments retreat,
+#              with mean trench-normal velocities of +1.3-1.5 cm/yr and medians of
+#              +0.9-1.3 cm/yr (Schellart et al. 2008, Earth-Science Reviews,
+#              doi:10.1016/j.earscirev.2008.01.005; see also Williams et al. 2015, EPSL,
+#              doi:10.1016/j.epsl.2015.02.026). This scheme drives the per-trench orthogonal
+#              velocities toward a target of +10 mm/yr (positive = retreat; the target value
+#              is hardcoded inside the cost function below because cost functions are
+#              serialised by code object only and cannot capture config variables), and
+#              tightens the bounds on the *mean* orthogonal velocity to (0, 20) mm/yr,
+#              ie, the global mean must be retreating but at less than 2 cm/yr.
+#              Individual trenches can still advance (eg, Izu-Bonin-Mariana-style segments);
+#              only the global mean is required to be retreating.
+#
+#              Because zero net rotation also implies near-zero trench migration, the original
+#              'minimise' scheme is largely redundant with net rotation minimisation. The
+#              'rollback' scheme makes trench kinematics an independent constraint that
+#              competes with the net rotation minimisation.
+#
+trench_migration_scheme = 'rollback'
+
 def get_trench_migration_params(age):
+    if trench_migration_scheme == 'rollback':
+        # Cost function - see "objective_function.py" for definition of function arguments...
+        def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
+            # NOTE: Import any modules used in this function here
+            #       (since this function's code might be serialised over the network to remote nodes).
+            #
+            # NOTE: Any constants must be hardcoded here (not read from the config) since only
+            #       this function's *code* is serialised (closures/globals are not preserved).
+            import numpy as np
+
+            # Target trench-normal migration velocity in mm/yr (positive = retreat/rollback).
+            # The median trench-normal retreat is +0.9-1.3 cm/yr across reference frames
+            # (Schellart et al. 2008), so we target +10 mm/yr (= +1.0 cm/yr).
+            tm_target = 10.0
+
+            # Mean absolute deviation of per-trench orthogonal velocities from the rollback
+            # target, plus the standard deviation (to penalise large spread), with the same
+            # overall scaling as the 'minimise' scheme so the component weights are comparable.
+            return (np.mean(np.abs(tm_vel_orth - tm_target)) + np.std(tm_vel_orth)) * 3
+
+        # Bounds on the *mean* orthogonal velocity (mm/yr): must be retreating, but slower
+        # than 2 cm/yr. (Note: Use units of mm/yr - same as km/Myr.)
+        tm_bounds = [0, 20]
+
+        if age <= 80:
+            return True, 1.0, cost_function, tm_bounds  # Weight is always 1.0 for 0-80Ma
+        else:
+            # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
+            return True, 2.0, cost_function, tm_bounds  # 2.0 gives a *multiplicative* weight of 0.5
+
+    # trench_migration_scheme == 'minimise' (the original scheme) ...
+
     # Cost function - see "objective_function.py" for definition of function arguments...
     def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
         # NOTE: Import any modules used in this function here
@@ -655,6 +716,10 @@ if 'OPTAPM_SCREEN_TOP_N' in os.environ:
         seed_screen_top_n = None
 if 'OPTAPM_SCREEN_UNIFORM_N' in os.environ:
     seed_screen_uniform_n = int(os.environ['OPTAPM_SCREEN_UNIFORM_N'])
+if 'OPTAPM_TM_SCHEME' in os.environ:
+    trench_migration_scheme = os.environ['OPTAPM_TM_SCHEME']
+    if trench_migration_scheme not in ('minimise', 'rollback'):
+        raise RuntimeError("OPTAPM_TM_SCHEME must be 'minimise' or 'rollback'")
 if os.environ.get('OPTAPM_SERIAL') == '1':
     use_parallel = None
 
