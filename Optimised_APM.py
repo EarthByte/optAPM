@@ -808,7 +808,21 @@ if __name__ == '__main__':
             
             # Save the final optimised model back to the original rotation files (or copies of them).
             optimised_rotation_updater.save_to_rotation_files()
-            
+
+            # Generate post-run diagnostics: net rotation (median +/- MAD) and trench-normal
+            # migration (mean +/- MAD) through time, written as CSV and plots to 'model_output/'.
+            if generate_diagnostics:
+                from model_diagnostics import generate_model_diagnostics
+                generate_model_diagnostics(
+                        datadir,
+                        rotfile,
+                        no_net_rotation_model.get_no_net_rotation_filename(),
+                        trench_resolver,
+                        age_range,
+                        interval,
+                        get_reference_params,
+                        model_name)
+
             main_end_time = round(time.time() - main_start, 10)
             main_sec = timedelta(seconds = float(main_end_time))
             main_dt = datetime(1,1,1) + main_sec
