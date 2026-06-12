@@ -72,6 +72,17 @@ else:
 #      0.2-0.3 deg/Myr). Beyond this, net rotations approach the Pacific hotspot (HS3)
 #      frame (0.33-0.44 deg/Myr), which is widely considered geodynamically implausible.
 #
+#      The 'nr_max' variant also *halves the net rotation weight* (inverse weight 2.0).
+#      Relaxing the bounds alone is not sufficient to produce a directional end-member:
+#      the bounds are hard penalty walls that only affect timesteps where the optimum
+#      presses against the 0.20 deg/Myr ceiling (mostly in deep time), whereas inside the
+#      walls the solution is set by the smooth trade-off between the net rotation cost and
+#      the other components. Halving the NR weight shifts that trade-off at *every*
+#      timestep, letting the trench rollback and plate velocity constraints pull harder
+#      against the net rotation minimisation (single-timestep tests confirm this produces
+#      a systematically stronger-rollback / higher-NR solution, whereas relaxing the
+#      bounds alone merely selects a different near-degenerate minimum).
+#
 # Select the variant here (or via the OPTAPM_VARIANT environment variable, eg,
 # "OPTAPM_VARIANT=nr_max mpirun -np 16 python Optimised_APM.py").
 # The variant name (other than 'best') is appended to the model name, so each variant
@@ -80,6 +91,11 @@ else:
 run_variant_nr_bounds = {
     'best':   (0.08, 0.20),  # deg/Myr
     'nr_max': (0.08, 0.30),  # deg/Myr
+}
+# Inverse weights (the NR cost is *multiplied* by "1.0 / weight").
+run_variant_nr_weight = {
+    'best':   1.0,  # full NR weight
+    'nr_max': 2.0,  # half NR weight
 }
 run_variant = os.environ.get('OPTAPM_VARIANT', 'best')
 if run_variant not in run_variant_nr_bounds:
@@ -338,12 +354,13 @@ def get_net_rotation_params(age):
         data_model == 'Zahirovic_etal_2022_GDJ' or
         '1.8ga' in data_model.lower() or
         data_model == "Global_2000-540"):
-        # Net rotation bounds depend on the run variant (see 'run_variant' above).
+        # Net rotation bounds and weight depend on the run variant (see 'run_variant' above).
         nr_bounds = run_variant_nr_bounds[run_variant]
+        nr_weight = run_variant_nr_weight[run_variant]
         if age <= 80:
-            return  True, 1.0, cost_function, nr_bounds  # Weight is always 1.0 for 0-80Ma
+            return  True, nr_weight, cost_function, nr_bounds
         else:
-            return  True, 1.0, cost_function, nr_bounds  # 1.0 gives a *multiplicative* weight of 1.0
+            return  True, nr_weight, cost_function, nr_bounds  # NOTE: Inverse weight (cost is multiplied by "1.0 / weight").
     else:
         return True, 1.0, cost_function, None
 
@@ -630,6 +647,13 @@ seed_screen_uniform_n = 16  # Also fully optimise this many seeds spread uniform
 # converge in well under 200 evaluations, so this generous cap only affects pathological cases.
 # Set to None to disable the cap.
 nlopt_max_eval_safety = 1000
+
+
+# Whether to generate post-run diagnostics at the end of the optimisation run:
+# per-timestep net rotation (median +/- MAD) and trench-normal migration (mean +/- MAD)
+# statistics (CSV) and plots (PNG) written to 'model_output/' - see "model_diagnostics.py".
+# The diagnostics can also be (re)generated standalone: "python model_diagnostics.py".
+generate_diagnostics = True
 
 
 search = "Initial"
