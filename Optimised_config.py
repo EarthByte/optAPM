@@ -30,7 +30,14 @@ datadir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data', '')
 #data_model = 'Global_Model_WD_Internal_Release_2019_v2'
 #data_model = 'Global_Model_WD_Internal_Release-EarthBytePlateMotionModel-TRUNK'
 #data_model = 'SM2-Merdith_et_al_1_Ga_reconstruction_v1.1'
-data_model = 'Global_2000-540'
+#data_model = 'Global_2000-540'
+#data_model = 'Merdith_etal_plate_model_1Ga-present_rev6-2'
+# Zahirovic et al. (2022) GDJ model (0-410 Ma), downloaded via the GPlately Plate Model Manager
+# (PMM model name "Zahirovic2022") into 'data/Zahirovic_etal_2022_GDJ/'. The reference plate is
+# Africa (701); each interval's search is seeded from the model's paleomagnetic ("pmag") pole, which
+# the model stores as plate 701701 (GAPWAP; readme.txt: "Set the anchor plate ID to 701701 to use
+# PMAG reference frame"). See get_reference_params() below.
+data_model = 'Zahirovic_etal_2022_GDJ'
 
 
 # The model name is suffixed to various output filenames.
@@ -44,6 +51,8 @@ elif '1.8ga' in data_model.lower():
     model_name = "20240725_run3"
 elif data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction'):
     model_name = "git_20231114_run1"
+elif data_model == 'Merdith_etal_plate_model_1Ga-present_rev6-2':
+    model_name = "rev6-2_run2"
 elif data_model == "Global_2000-540":
     model_name = "20250410_90W_run1"
 else:
@@ -168,6 +177,23 @@ if data_model == "Global_2000-540":
                                    (
                                        'EDRG_90W_2000-540Ma.rot',
                                    )]
+elif data_model == 'Merdith_etal_plate_model_1Ga-present_rev6-2':
+    # Explicitly use the main rotation file (the directory also contains a 'SH2017' variant
+    # which must not be loaded at the same time).
+    original_rotation_filenames = [os.path.join(data_model, rot_file) for rot_file in
+                                   (
+                                       '1000_0_rotfile_MER21.rot',
+                                   )]
+elif data_model == 'Zahirovic_etal_2022_GDJ':
+    # Single combined rotation file from the PMM download. It lives in a 'Rotations/' sub-directory
+    # (so it must be listed explicitly rather than globbed from the data model's top level).
+    # This one file contains both reference frames: plate 701 (rel 000) is the Muller++ 2019
+    # optimised mantle frame, and plate 701701 (rel 701) carries the GAPWAP paleomagnetic
+    # correction (Merdith et al. 2021) - anchoring 701701 gives the "pmag" reference frame.
+    original_rotation_filenames = [os.path.join(data_model, rot_file) for rot_file in
+                                   (
+                                       os.path.join('Rotations', 'CombinedRotations.rot'),
+                                   )]
 # 2) Automatically gather all '.rot' files (and make filenames relative to the 'data/' directory).
 else:
     original_rotation_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
@@ -210,6 +236,29 @@ elif data_model == "Global_2000-540":
                               'EDRG_topology_90W_2000-540Ma.gpml',
                               'EDRG_boundary_90W_2000-540Ma.gpml',
                           )]
+elif data_model == 'Merdith_etal_plate_model_1Ga-present_rev6-2':
+    topology_filenames = [os.path.join(data_model, rot_file) for rot_file in
+                          (
+                              '250-0_plate_boundaries_MER21.gpml',
+                              '410-250_plate_boundaries_MER21.gpml',
+                              '1000-410-Convergence_MER21.gpml',
+                              '1000-410-Divergence_MER21.gpml',
+                              '1000-410-Topologies_MER21.gpml',
+                              '1000-410-Transforms_MER21.gpml',
+                              'TopologyBuildingBlocks_MER21.gpml',
+                          )]
+elif data_model == 'Zahirovic_etal_2022_GDJ':
+    # Topology files from the PMM download (in a 'Topologies/' sub-directory). 'Feature_Geometries'
+    # holds the line geometries referenced by the topological boundaries/networks, so it must be
+    # loaded alongside them. Only time-appropriate features resolve at each reconstruction time, so
+    # including the inactive deforming networks is harmless.
+    topology_filenames = [os.path.join(data_model, 'Topologies', gpml_file) for gpml_file in
+                          (
+                              'Plate_Boundaries.gpml',
+                              'Deforming_Networks_Active.gpml',
+                              'Deforming_Networks_Inactive.gpml',
+                              'Feature_Geometries.gpml',
+                          )]
 # 2) Automatically gather all '.gpml' and '.gpmlz' files (and make filenames relative to the 'data/' directory).
 else:
     topology_filenames = [os.path.relpath(abs_path, datadir) for abs_path in
@@ -224,11 +273,14 @@ elif (data_model == 'Global_1000-0_Model_2017' or
       data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction')):
     plate_velocity_continental_polygons_file = os.path.join(data_model, 'shapes_continents_Merdith_et_al.gpml')
 elif data_model == 'Zahirovic_etal_2022_GDJ':
-    plate_velocity_continental_polygons_file = os.path.join(data_model, 'StaticGeometries', 'ContinentalPolygons', 'Global_EarthByte_GPlates_PresentDay_ContinentalPolygons.shp')
+    # Continental polygons from the PMM download (in a 'ContinentalPolygons/' sub-directory).
+    plate_velocity_continental_polygons_file = os.path.join(data_model, 'ContinentalPolygons', 'Global_EarthByte_GPlates_PresentDay_ContinentalPolygons.shp')
 elif '1.8ga' in data_model.lower():
     plate_velocity_continental_polygons_file = os.path.join(data_model, 'shapes_continents.gpmlz')
 elif data_model == "Global_2000-540":
     plate_velocity_continental_polygons_file = os.path.join(data_model, 'Continental_outlines.shp')
+elif data_model == 'Merdith_etal_plate_model_1Ga-present_rev6-2':
+    plate_velocity_continental_polygons_file = os.path.join(data_model, 'COB_MER21_land_mask.shp')
 else:
     plate_velocity_continental_polygons_file = None
 
@@ -267,6 +319,7 @@ def plate_velocity_continental_fragmentation_area_threshold_steradians(time):
 def plate_velocity_continental_fragmentation_gap_threshold_radians(time):
     if (data_model == 'Global_1000-0_Model_2017' or
         data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
+        data_model.startswith('Merdith_etal_plate_model') or
         data_model.startswith('Global_Model_WD_Internal_Release') or
         data_model == 'Zahirovic_etal_2022_GDJ' or
         '1.8ga' in data_model.lower() or
@@ -285,6 +338,13 @@ if data_model.startswith('Global_Model_WD_Internal_Release'):
     ridge_file = os.path.join(data_model, 'StaticGeometries', 'AgeGridInput', 'Global_EarthByte_GeeK07_Ridges.gpml')
     isochron_file = os.path.join(data_model, 'StaticGeometries', 'AgeGridInput', 'Global_EarthByte_GeeK07_Isochrons.gpml')
     isocob_file = os.path.join(data_model, 'StaticGeometries', 'AgeGridInput', 'Global_EarthByte_GeeK07_IsoCOB.gpml')
+elif data_model == 'Merdith_etal_plate_model_1Ga-present_rev6-2':
+    # There are no static geometries (besides coastlines) for this data model.
+    # These files are only used when fracture zones are enabled (they're currently disabled),
+    # so point at files that exist in the root 'data/' directory (so the data loader doesn't fail).
+    ridge_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_Ridges.gpml'
+    isochron_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_Isochrons.gpmlz'
+    isocob_file = 'Global_EarthByte_230-0Ma_GK07_AREPS_IsoCOB.gpml'
 elif (data_model == 'Global_1000-0_Model_2017' or
       data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
       data_model == 'Zahirovic_etal_2022_GDJ' or
@@ -350,6 +410,7 @@ def get_net_rotation_params(age):
     
     if (data_model == 'Global_1000-0_Model_2017' or
         data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
+        data_model.startswith('Merdith_etal_plate_model') or
         data_model.startswith('Global_Model_WD_Internal_Release') or
         data_model == 'Zahirovic_etal_2022_GDJ' or
         '1.8ga' in data_model.lower() or
@@ -482,6 +543,7 @@ def get_trench_migration_params(age):
     
     if (data_model == 'Global_1000-0_Model_2017' or
         data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
+        data_model.startswith('Merdith_etal_plate_model') or
         data_model.startswith('Global_Model_WD_Internal_Release') or
         data_model == 'Zahirovic_etal_2022_GDJ' or
         '1.8ga' in data_model.lower() or
@@ -568,6 +630,7 @@ def get_plate_velocity_params(age):
     
     if (data_model == 'Global_1000-0_Model_2017' or
         data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
+        data_model.startswith('Merdith_etal_plate_model') or
         data_model.startswith('Global_Model_WD_Internal_Release') or
         data_model == 'Zahirovic_etal_2022_GDJ' or
         '1.8ga' in data_model.lower() or
@@ -592,8 +655,22 @@ def get_reference_params(age):
     
     If reference rotation filename is None then it means the no-net-rotation model should be used.
     """
+    #
+    # Zahirovic et al. (2022): reference plate is Africa (701, as for all the other models), but
+    # each interval's search is *seeded* from the model's paleomagnetic ("pmag") pole rather than
+    # from the previously-optimised interval. The model stores its pmag path as plate 701701
+    # (GAPWAP, Merdith et al. 2021; readme.txt: "Set the anchor plate ID to 701701 to use PMAG
+    # reference frame"). That path - the rotation of 701701 rel 000 - has been written out as a
+    # 701-rel-000 reference rotation file (generated from the model's own 701701 chain) so that
+    # the auto-calc seed (optapm.py: get_rotation(start_age, ref_plate=701, anchor=0)) returns
+    # the pmag pole. The optimisation itself still zeroes and re-optimises plate 701 in the main
+    # model; 'ref_rotation_file' only sets the search seed.
+    #
+    if data_model == 'Zahirovic_etal_2022_GDJ':
+        return 701, os.path.join(data_model, 'pmag', 'Zahirovic2022_Palaeomagnetic_Africa.rot')
     if (data_model == 'Global_1000-0_Model_2017' or
         data_model.startswith('SM2-Merdith_et_al_1_Ga_reconstruction') or
+        data_model.startswith('Merdith_etal_plate_model') or
         data_model.startswith('Global_Model_WD_Internal_Release') or
         data_model == 'Zahirovic_etal_2022_GDJ' or
         '1.8ga' in data_model.lower() or
