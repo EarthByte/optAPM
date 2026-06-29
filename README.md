@@ -15,11 +15,9 @@ The data for the 1Ga model can be obtained [here](https://www.earthbyte.org/webd
 
 The following Python packages are required:
 
-* PlateTectonicTools>=0.5
+* gplately>=1.3
 
-  > __Note:__ Until version 0.5 of PlateTectonicTools is available (on conda and pip) you'll need to install the latest version from Github:
-  >
-  > `pip install git+https://github.com/EarthByte/PlateTectonicTools`
+  > __Note:__ PlateTectonicTools is no longer required - its functionality is now fully integrated into [GPlately](https://github.com/GPlates/gplately) (as the `gplately.ptt` module).
 
 * pygplates>=1.0
 * numpy
@@ -44,7 +42,7 @@ First install dependencies that are available on `conda` (in the _conda-forge_ c
 
 ```
 conda create -n <conda-environment> -c conda-forge \
-    "pygplates>=1.0" numpy scipy platetectonictools scikit-image pandas xlrd==1.2.0 NLopt \
+    "pygplates>=1.0" "gplately>=1.3" numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
     future cartopy matplotlib ipyparallel openpyxl
 ```
 
@@ -69,13 +67,6 @@ conda install pip
 pip install pmagpy
 ```
 
-> Note: Until version 0.5 of PlateTectonicTools is available (on conda) you'll need to upgrade it from Github:
->
-> ```
-> conda install git
-> pip install --upgrade git+https://github.com/EarthByte/PlateTectonicTools
-> ```
-
 ### Install on a HPC system
 
 Installation on a High Performance Computing (HPC) system can also be done with a local installation of `conda` (and `pip`). However the exception, compared with installing on desktop, is `mpi4py`. It will likely need to be installed differently to ensure that the MPI implementation of the HPC system is used (instead of conda's MPI).
@@ -90,7 +81,7 @@ Similarly to installing on desktop, start by creating a conda environment:
 
 ```
 conda create -n <conda-environment> -c conda-forge \
-    "pygplates>=1.0" numpy scipy platetectonictools scikit-image pandas xlrd==1.2.0 NLopt \
+    "pygplates>=1.0" "gplately>=1.3" numpy scipy scikit-image pandas xlrd==1.2.0 NLopt \
     future cartopy matplotlib ipyparallel openpyxl
 ```
 
@@ -120,13 +111,6 @@ Then, similarly to installing on desktop, use `pip` to install `pmagpy` (into th
 ```
 pip install pmagpy
 ```
-
-> Note: Until version 0.5 of PlateTectonicTools is available (on conda) you'll need to upgrade it from Github:
->
-> ```
-> conda install git
-> pip install --upgrade git+https://github.com/EarthByte/PlateTectonicTools
-> ```
 
 #### Job submission script
 
@@ -168,6 +152,98 @@ All settings are now in "Optimised_config.py", such as the model name, start/end
 ### Optimisation overview
 
 Essentially the workflow optimises the absolute plate motion by perturbing the absolute rotation (pole and angle) and then calculating penalties derived from that rotation (eg, net rotation (NR), trench migration (TM) and plate velocity (PV); and a hotspot (HS) penalty for 0-80Ma). Then these penalties are scaled by their weights (eg, NR=1, TM=0.5, PV=0.5) and also internal scaling to make sure each penalty is roughly the same when the weights are all 1.0 (but that’s an implementation detail). Then the penalties are added to give one number. The optimization workflow then perturbs the rotation further to try to reduce that number. It does this many times until it settles on a local minimum (called a seed), and does this for a bunch of seeds to find global minimum.
+
+### Seed screening ("screen then polish")
+
+By default the workflow now *screens* all seeds before optimising. The objective function is evaluated once at every seed (cheap - roughly the cost of fully optimising just one or two seeds, since a full NLopt optimisation typically uses ~80-200 objective evaluations), and then only the most promising seeds are fully optimised: the `seed_screen_top_n` best-screened seeds plus `seed_screen_uniform_n` seeds spread uniformly across the search space (insurance in case screening misses a basin). Both parameters are in "Optimised_config.py".
+
+An empirical convergence study on a 1Ga global plate model found that screening 400 seeds and fully optimising the best 16 (plus 16 uniform) reproduces the full 400-seed multistart minimum to within ~0.5% cost, while reducing the per-timestep optimisation cost by roughly a factor of 10. The study also found that the optimised pole is only loosely constrained near the minimum (several near-degenerate minima can differ by 10-20 degrees in pole position while differing by less than 0.5% in cost), so the residual error introduced by screening is well below the intrinsic uncertainty of the objective function itself.
+
+Summary of the convergence study (two representative timesteps; full results in "model_output/seed_study/"):
+
+| Strategy | Full optimisations per timestep | Best cost vs 400-seed multistart | Approx. CPU cost |
+|---|---|---|---|
+| 400-seed multistart (original default) | 400 | - (reference) | 1.0x |
+| 100-seed uniform grid | 100 | -0.2% / -0.3% | 0.25x |
+| 49-seed uniform grid | 49 | +1.5% / -0.3% | 0.12x |
+| screen all 400, polish best 16 + 16 uniform | ~30 | +0.5% / +0.3% | ~0.1x |
+
+(Negative values mean the reduced strategy found a slightly *better* minimum than the full multistart - the
+multistart minimum itself is reproducible only to within ~0.5% because the optimiser converges to one of
+several near-degenerate minima.)
+
+To reproduce or extend the study (eg, for a different plate model or different seed counts), use the standalone, resumable harness "seed_study.py":
+
+```
+  python seed_study.py prep --age 100      # prepare data for one timestep (re-run until 'PREP DONE')
+  python seed_study.py probe --age 100     # time a single objective evaluation / full optimisation
+  python seed_study.py run --age 100       # run the study (resumable; re-run until 'ALL TASKS DONE')
+  python seed_study.py report --age 100    # summarise results (writes a CSV)
+```
+
+To disable screening (and fully optimise every seed, as in the original workflow), set `seed_screen_top_n = None`.
+
+The workflow also caps each NLopt (COBYLA) optimisation at `nlopt_max_eval_safety` objective evaluations (default 1000). COBYLA occasionally fails to converge and can otherwise cycle for thousands of evaluations, stalling an entire MPI rank (and hence the whole timestep, since all ranks must finish before the next timestep begins).
+
+### Trench migration scheme
+
+The original trench migration component drives trench-normal migration velocities toward zero. However, since zero net rotation also implies near-zero trench migration, that constraint is largely redundant with the net rotation minimisation. It is also at odds with observations: most trenches roll back toward the ocean basin behind them rather than advancing toward the overriding plate - across reference frames, 62-78% of trench segments retreat, with mean trench-normal velocities of +1.3-1.5 cm/yr and medians of +0.9-1.3 cm/yr (Schellart et al. 2008, Earth-Science Reviews; see also Williams et al. 2015, EPSL).
+
+The default scheme is therefore now `trench_migration_scheme = 'rollback'` (in "Optimised_config.py"): per-trench orthogonal velocities are driven toward a target of +10 mm/yr retreat, and the bounds on the *mean* orthogonal velocity are tightened to (0, 20) mm/yr - the global mean must be retreating, but at less than 2 cm/yr. Individual trenches can still advance; only the mean is required to retreat. This makes trench kinematics an independent constraint that competes with the net rotation minimisation (instead of duplicating it). Set `trench_migration_scheme = 'minimise'` (or `OPTAPM_TM_SCHEME=minimise`) to restore the original behaviour.
+
+A single-timestep validation (5 Ma) of the two schemes, showing that the rollback scheme makes trench kinematics an independent constraint (net rotation rises instead of being co-minimised, and the trench population becomes retreat-dominated as observed):
+
+| Scheme | Mean trench-normal velocity | Segments retreating | Net rotation at optimum |
+|---|---|---|---|
+| `minimise` (original) | -1.8 mm/yr (net advance) | 56% | 0.144 deg/Myr |
+| `rollback` (new default) | +1.8 mm/yr (net retreat) | 63% | 0.175 deg/Myr |
+
+The parameter choices are: target retreat of +10 mm/yr = the centre of the observed median trench-normal retreat of +0.9 to +1.3 cm/yr across reference frames (Schellart et al. 2008); mean bounds of (0, 20) mm/yr = the global mean must retreat (62-78% of segments retreat in all reference frames examined by Schellart et al. 2008) but more slowly than ~2 cm/yr (just above the observed mean retreat of +1.3-1.5 cm/yr).
+
+### Uncertainty quantification (run variants)
+
+The optimisation is dominated by the net rotation (NR) minimisation: subduction zone migration largely depends on the net rotation optimisation (it is not an independent parameter), and the same holds for limiting the speed of continents (see [Muller et al. 2022, Solid Earth](https://doi.org/10.5194/se-13-1127-2022)). Perturbing the component weights only slightly changes the outcome, so a defensible uncertainty envelope for the optimised reference frame instead consists of end-members in the net rotation bounds:
+
+1. **No-net-rotation (NNR) end-member** - zero net rotation. This rotation file is already produced by every run as "no_net_rotation_model_<model_name>.rot".
+2. **Best run** (`run_variant = 'best'`, the default) - NR bounded to (0.08, 0.20) deg/Myr: non-zero (as suggested by mantle flow models, eg, Becker 2006) but below the preferred geodynamic upper limit (Conrad & Behn 2010).
+3. **Maximum-NR end-member** (`run_variant = 'nr_max'`) - the NR upper bound relaxed to 0.30 deg/Myr *and the NR weight halved* (inverse weight 2.0). The 0.30 deg/Myr ceiling is the top of the range permitted by asthenospheric shear / seismic anisotropy constraints (Conrad & Behn 2010 derive NR < 0.26 deg/Myr for an asthenosphere 10x less viscous than the upper mantle; anisotropy proxies allow 0.2-0.3 deg/Myr); larger values approach the Pacific hotspot (HS3) frame rates (0.33-0.44 deg/Myr), which are widely considered geodynamically implausible. The weight is halved because relaxing the bounds alone is not sufficient to produce a directional end-member: the bounds are hard penalty walls that only affect timesteps where the optimum presses against the 0.20 deg/Myr ceiling (mostly in deep time), whereas inside the walls the solution is set by the smooth trade-off between the NR cost and the other components. Halving the NR weight shifts that trade-off at every timestep. Single-timestep tests (5 Ma) confirm this: relaxing the bounds alone merely selected a different near-degenerate minimum (NR 0.123 deg/Myr), whereas bounds + halved weight produced the intended systematically stronger-rollback, higher-NR solution (NR 0.177 deg/Myr, trench retreat strengthening from +1.8 to +3.2 mm/yr, 68% of segments retreating).
+
+To produce the envelope, run the workflow twice (the `nr_max` variant appends its name to the model name, so the two runs write separate output files):
+
+```
+  mpirun -np <cores> python Optimised_APM.py
+  OPTAPM_VARIANT=nr_max mpirun -np <cores> python Optimised_APM.py
+```
+
+The variant NR bounds are defined in `run_variant_nr_bounds` in "Optimised_config.py" (where further variants can be added).
+
+### Model diagnostics (summary statistics and plots)
+
+At the end of every run (if `generate_diagnostics = True`, the default), the workflow computes per-timestep summary statistics of the optimised model and writes them to "model_output/":
+
+* `<model_name>_diagnostics.csv` - per timestep: median and MAD (median absolute deviation) of the net rotation rate (deg/Myr, sampled at 1 Myr sub-steps within each timestep), and mean, median and MAD of the trench-normal migration velocities (mm/yr, positive = retreat) across all subduction zone segments, plus the percentage of segments retreating.
+* `<model_name>_net_rotation.png` - net rotation (median +/- MAD) through time, with the 0.20 deg/Myr preferred upper bound and the 0.26 deg/Myr Conrad & Behn (2010) limit marked.
+* `<model_name>_trench_migration.png` - trench-normal migration (mean +/- MAD) through time, with the observed present-day mean retreat range (+0.9 to +1.5 cm/yr, Schellart et al. 2008) marked.
+
+The same statistics and plots are also generated for the no-net-rotation model (outputs named `<model_name>_NNR_*`). This shows how subduction zone migration behaves in an NNR world (the zero-NR end-member of the uncertainty envelope), and the NNR net rotation plot doubles as a sanity check (it should be ~zero at all times).
+
+The diagnostics can be (re)generated standalone on an existing optimised model without re-running the optimisation:
+
+```
+  python model_diagnostics.py
+```
+
+(This uses the current settings in "Optimised_config.py", including any `OPTAPM_*` environment overrides, eg, `OPTAPM_VARIANT=nr_max python model_diagnostics.py` to diagnose the nr_max run.)
+
+### Quick test runs
+
+The age range, seed count, screening parameters and parallelisation can be temporarily overridden via environment variables without editing "Optimised_config.py" - useful for quick smoke tests:
+
+```
+  OPTAPM_START_AGE=5 OPTAPM_END_AGE=0 OPTAPM_MODELS=49 OPTAPM_SERIAL=1 python Optimised_APM.py
+```
+
+(`OPTAPM_SCREEN_TOP_N` and `OPTAPM_SCREEN_UNIFORM_N` override the screening parameters; a negative `OPTAPM_SCREEN_TOP_N` disables screening.)
 
 ### Plate velocity penalty
 
@@ -263,15 +339,26 @@ All these rotation files also comprise the entire optimised rotation model.
 Note that only those rotations that referenced 000 as their fixed plate will be modified (to include the optimised absolute plate motion).
 
 You can also optionally remove plates in the plate hierarchy to make it simpler (eg, plates below 701 are typically removed so that 701 directly references 000).
-This can be done using the 'remove_plate_rotations' module in Plate Tectonic Tools ( https://github.com/EarthByte/PlateTectonicTools ) For example:
+This can be done using the 'remove_plate_rotations' module in GPlately ( https://github.com/GPlates/gplately ) For example:
 
 ```
-  python -m ptt.remove_plate_rotations -u -a 0.1 5 -p 70 4 3 2 1 -o removed_70_4_3_2_1_ -- ...
+  python -m gplately.ptt.remove_plate_rotations -u -a 0.1 5 -p 70 4 3 2 1 -o removed_70_4_3_2_1_ -- ...
 ```
 
 ...where you replace `...` with all the rotation files in the optimised rotation model.
 
 ## Plotting results
 
-After running the workflow and post-processing (although you don't need to run `ptt.remove_plate_rotations` for this), you can plot the
+After running the workflow and post-processing (although you don't need to run `gplately.ptt.remove_plate_rotations` for this), you can plot the
 trench migration stats and net rotation curves for the non-optimised and any optimised models using the Jupyter notebooks in the `figures/` directory.
+
+
+## References for parameter choices
+
+* Atkins, S., & Coltice, N. (2021). Constraining the range and variation of lithospheric net rotation using geodynamic modeling. *Journal of Geophysical Research: Solid Earth*, 126, e2021JB022057. https://doi.org/10.1029/2021JB022057 - convection models produce Earth-like net rotation mostly well below 0.2 deg/Myr.
+* Becker, T. W. (2006). On the effect of temperature and strain-rate dependent viscosity on global mantle flow, net rotation, and plate-driving forces. *Geophysical Journal International*, 167, 943-957. https://doi.org/10.1111/j.1365-246X.2006.03172.x - mantle flow models suggest net rotation should be positive and non-zero (basis for the 0.08 deg/Myr lower bound).
+* Conrad, C. P., & Behn, M. D. (2010). Constraints on lithosphere net rotation and asthenospheric viscosity from global mantle flow models and seismic anisotropy. *Geochemistry, Geophysics, Geosystems*, 11, Q05W05. https://doi.org/10.1029/2009GC002970 - net rotation < 0.26 deg/Myr for an asthenosphere 10x less viscous than the upper mantle (basis for the 0.20 deg/Myr preferred and 0.30 deg/Myr maximum upper bounds).
+* Muller, R. D., et al. (2022). A tectonic-rules-based mantle reference frame since 1 billion years ago - implications for supercontinent cycles and plate-mantle system evolution. *Solid Earth*, 13, 1127-1159. https://doi.org/10.5194/se-13-1127-2022 - shows that net rotation minimisation dominates the optimisation and that trench migration is not an independent constraint under the original ('minimise') scheme (basis for the uncertainty-envelope design and the 'rollback' scheme).
+* Schellart, W. P., Stegman, D. R., & Freeman, J. (2008). Global trench migration velocities and slab migration induced upper mantle volume fluxes: Constraints to find an Earth reference frame based on minimizing viscous dissipation. *Earth-Science Reviews*, 88, 118-144. https://doi.org/10.1016/j.earscirev.2008.01.005 - 62-78% of trench segments retreat across reference frames, with mean trench-normal retreat of +1.3-1.5 cm/yr and medians of +0.9-1.3 cm/yr (basis for the +10 mm/yr rollback target and the (0, 20) mm/yr mean bounds).
+* Tetley, M. G., Williams, S. E., Gurnis, M., Flament, N., & Muller, R. D. (2019). Constraining absolute plate motions since the Triassic. *Journal of Geophysical Research: Solid Earth*, 124, 7231-7258. https://doi.org/10.1029/2019JB017442 - the original optAPM optimisation framework.
+* Williams, S., Flament, N., Muller, R. D., & Butterworth, N. (2015). Absolute plate motions since 130 Ma constrained by subduction zone kinematics. *Earth and Planetary Science Letters*, 418, 66-77. https://doi.org/10.1016/j.epsl.2015.02.026 - trench kinematic plausibility (dominantly slow retreat, minimal advance) as a primary constraint on absolute plate motion.

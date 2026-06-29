@@ -4,7 +4,7 @@ import pygplates
 import sys
 import warnings
 
-from ptt import remove_plate_rotations
+from gplately.ptt import remove_plate_rotations
 
 
 class OptimisedRotationUpdater(object):

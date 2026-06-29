@@ -102,20 +102,38 @@ class ModelSetup():
 
             no_net_rotation_file = datadir + nnr_rotfile
 
+        # Note: The ridge/isochron/isocob features are only used by the fracture zone
+        #       component of the objective function. Callers can pass None for these
+        #       files (eg, when fracture zones are disabled) to avoid loading them.
         if ridge_file:
 
             features_ri = pgp.FeatureCollection(datadir + ridge_file)
-            RidgeFile_subset = pgp.FeatureCollection()
+
+        else:
+
+            features_ri = pgp.FeatureCollection()
+
+        RidgeFile_subset = pgp.FeatureCollection()
 
         if isochron_file:
 
             features_iso = pgp.FeatureCollection(datadir + isochron_file)
-            IsochronFile_subset = pgp.FeatureCollection()
+
+        else:
+
+            features_iso = pgp.FeatureCollection()
+
+        IsochronFile_subset = pgp.FeatureCollection()
 
         if isocob_file:
 
             features_isocob = pgp.FeatureCollection(datadir + isocob_file)
-            IsoCOBFile_subset = pgp.FeatureCollection()
+
+        else:
+
+            features_isocob = pgp.FeatureCollection()
+
+        IsoCOBFile_subset = pgp.FeatureCollection()
 
         if hst_file:
 
@@ -846,40 +864,6 @@ class ModelSetup():
 
 
 
-        # Build feature subset lists
-        for feature in features_iso:
-            if feature.get_valid_time()[1] <= ref_rotation_start_age:
-                IsochronFile_subset.add(feature)
-
-        for feature in features_ri:
-            if feature.get_valid_time()[1] <= ref_rotation_start_age:
-                RidgeFile_subset.add(feature)
-
-        for feature in features_isocob:
-            if feature.get_valid_time()[1] <= ref_rotation_start_age:
-                IsoCOBFile_subset.add(feature)
-
-
-
-        # This is where intertec is actually called - note that these one line interpolates the isochrons,
-        # but does not reconstruct them
-        recon_interpolated_isochrons = []
-
-        output_features = isopolate.interpolate_isochrons(rotation_model,
-                          [RidgeFile_subset, IsochronFile_subset, IsoCOBFile_subset],
-                          interpolate=range(ref_rotation_end_age, ref_rotation_start_age + 1, interpolation_resolution),
-                          #interpolate=0.01,
-                          tessellate_threshold_radians=math.radians(0.5),
-                          output_scalar_spreading_direction=True,
-                          output_scalar_spreading_rate=True,
-                          output_scalar_spreading_asymmetry=True,
-                          output_scalar_age=True,
-                          print_debug_output=0)
-
-        # Here we do the last step that the old intertec did, reconstructing the interpolated
-        # isochrons to the selected time.
-        pgp.reconstruct(output_features, rotation_file, recon_interpolated_isochrons, ref_rotation_start_age, 0)
-
         ## Step2
         # Take the coverage that intertec produced, and use it to derive arrays of data more easily analysed using numpy commands
 
@@ -892,40 +876,80 @@ class ModelSetup():
         PID = []
         CPID = []
 
-        for recon_interpolated_isochron in recon_interpolated_isochrons:
+        # OPTIMISATION: The interpolated isochrons (via 'isopolate') are only used by the
+        # fracture zone component of the objective function. Skip this relatively expensive
+        # step entirely when fracture zones are disabled (data_array[0] is the
+        # 'enable_fracture_zones' flag), which saves time at every timestep.
+        if data_array[0]:
 
-            tmp = recon_interpolated_isochron.get_feature()
-            tmp2 = tmp.get_geometry(coverage_return=pgp.CoverageReturn.geometry_and_scalars)
+            # Build feature subset lists
+            for feature in features_iso:
+                if feature.get_valid_time()[1] <= ref_rotation_start_age:
+                    IsochronFile_subset.add(feature)
 
-            if tmp2:
+            for feature in features_ri:
+                if feature.get_valid_time()[1] <= ref_rotation_start_age:
+                    RidgeFile_subset.add(feature)
 
-                coverage_geometry, coverage_scalars = tmp2
-                coverage_points = coverage_geometry.get_points()
-                #tmp3 = coverage_points.get_points()
+            for feature in features_isocob:
+                if feature.get_valid_time()[1] <= ref_rotation_start_age:
+                    IsoCOBFile_subset.add(feature)
 
-                for scalar in coverage_scalars.get(pgp.ScalarType.create_gpml('SpreadingDirection')):
 
-                    spreading_directions.append(scalar)
-                    #spreading_directions.append(coverage_scalars.get(pgp.ScalarType.create_gpml('SpreadingDirection')))
 
-                for scalar in coverage_scalars.get(pgp.ScalarType.create_gpml('SpreadingRate')):
+            # This is where intertec is actually called - note that these one line interpolates the isochrons,
+            # but does not reconstruct them
+            recon_interpolated_isochrons = []
 
-                    spreading_rates.append(scalar)
+            output_features = isopolate.interpolate_isochrons(rotation_model,
+                              [RidgeFile_subset, IsochronFile_subset, IsoCOBFile_subset],
+                              interpolate=range(ref_rotation_end_age, ref_rotation_start_age + 1, interpolation_resolution),
+                              #interpolate=0.01,
+                              tessellate_threshold_radians=math.radians(0.5),
+                              output_scalar_spreading_direction=True,
+                              output_scalar_spreading_rate=True,
+                              output_scalar_spreading_asymmetry=True,
+                              output_scalar_age=True,
+                              print_debug_output=0)
 
-                for scalar in coverage_scalars.get(pgp.ScalarType.create_gpml('SpreadingAsymmetry')):
+            # Here we do the last step that the old intertec did, reconstructing the interpolated
+            # isochrons to the selected time.
+            pgp.reconstruct(output_features, rotation_file, recon_interpolated_isochrons, ref_rotation_start_age, 0)
 
-                    spreading_asymmetries.append(scalar)
+            for recon_interpolated_isochron in recon_interpolated_isochrons:
 
-                for scalar in coverage_scalars.get(pgp.ScalarType.create_gpml('Age')):
+                tmp = recon_interpolated_isochron.get_feature()
+                tmp2 = tmp.get_geometry(coverage_return=pgp.CoverageReturn.geometry_and_scalars)
 
-                    seafloor_ages.append(scalar)
+                if tmp2:
 
-                for point in coverage_points.get_points().to_lat_lon_array():
+                    coverage_geometry, coverage_scalars = tmp2
+                    coverage_points = coverage_geometry.get_points()
+                    #tmp3 = coverage_points.get_points()
 
-                    Lats.append(point[0])
-                    Lons.append(point[1])
-                    PID.append(tmp.get_reconstruction_plate_id())
-                    CPID.append(tmp.get_conjugate_plate_id())
+                    for scalar in coverage_scalars.get(pgp.ScalarType.create_gpml('SpreadingDirection')):
+
+                        spreading_directions.append(scalar)
+                        #spreading_directions.append(coverage_scalars.get(pgp.ScalarType.create_gpml('SpreadingDirection')))
+
+                    for scalar in coverage_scalars.get(pgp.ScalarType.create_gpml('SpreadingRate')):
+
+                        spreading_rates.append(scalar)
+
+                    for scalar in coverage_scalars.get(pgp.ScalarType.create_gpml('SpreadingAsymmetry')):
+
+                        spreading_asymmetries.append(scalar)
+
+                    for scalar in coverage_scalars.get(pgp.ScalarType.create_gpml('Age')):
+
+                        seafloor_ages.append(scalar)
+
+                    for point in coverage_points.get_points().to_lat_lon_array():
+
+                        Lats.append(point[0])
+                        Lons.append(point[1])
+                        PID.append(tmp.get_reconstruction_plate_id())
+                        CPID.append(tmp.get_conjugate_plate_id())
 
         # TRENCH MIGRATION
         # Load pre-computed migration data if needed (net rotation or trench migration)

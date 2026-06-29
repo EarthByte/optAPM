@@ -202,7 +202,12 @@ class PlateVelocityPartitioner(object):
             #
             # NOTE: We are NOT excluding contours based on perimeter/area ratio.
             #       That determination must be made by the final cost function that calculates the cost (penalty).
-            contoured_continents = self.continent_fragmentation.calculate_contoured_continents(reconstructed_continent_polygons, ref_rotation_start_age)
+            #
+            # Note: GPlately's continent contouring (which replaced PlateTectonicTools') expects each
+            #       continent polygon to be a 2-tuple (polygon, reconstructed feature geometry).
+            contoured_continents = self.continent_fragmentation.calculate_contoured_continents(
+                    list(zip(reconstructed_continent_polygons, reconstructed_feature_geometries)),
+                    ref_rotation_start_age)
             
             # Find the contoured continent (if any) containing each continent point.
             continent_point_contoured_continent_indices = [None] * len(continent_points)

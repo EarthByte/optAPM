@@ -2,7 +2,7 @@ from  collections import deque
 import math
 import os
 import os.path
-from ptt.continent_contours import ContouredContinent, ContinentContouring
+from gplately.ptt.continent_contours import ContouredContinent, ContinentContouring
 import pygplates
 import sys
 import numpy as np

@@ -50,6 +50,61 @@ else:
     model_name = "run1"
 
 
+#
+# Run variant (for uncertainty quantification).
+#
+# The optimisation is dominated by the net rotation (NR) minimisation: subduction zone
+# migration largely depends on the net rotation optimisation (it is not really an
+# independent parameter), and the same holds for limiting the speed of continents
+# (see Muller et al. 2022, Solid Earth, doi:10.5194/se-13-1127-2022).
+# So a defensible uncertainty envelope for the optimised reference frame consists of
+# end-members in the net rotation bounds rather than perturbations of the weights:
+#
+#   1. A no-net-rotation (NNR) reference frame - the zero-NR end-member. This is already
+#      produced by every run as "no_net_rotation_model_<model_name>.rot".
+#   2. The 'best' run - the default NR bounds of (0.08, 0.20) deg/Myr, ie, non-zero
+#      (as suggested by mantle flow models, eg, Becker 2006) but below the preferred
+#      geodynamic upper limit (Conrad & Behn 2010).
+#   3. The 'nr_max' run - the maximum-NR end-member, with the NR upper bound relaxed to
+#      0.30 deg/Myr: the top of the range permitted by asthenospheric shear / seismic
+#      anisotropy constraints (Conrad & Behn 2010 derive NR < 0.26 deg/Myr for an
+#      asthenosphere 10x less viscous than the upper mantle; anisotropy proxies allow
+#      0.2-0.3 deg/Myr). Beyond this, net rotations approach the Pacific hotspot (HS3)
+#      frame (0.33-0.44 deg/Myr), which is widely considered geodynamically implausible.
+#
+#      The 'nr_max' variant also *halves the net rotation weight* (inverse weight 2.0).
+#      Relaxing the bounds alone is not sufficient to produce a directional end-member:
+#      the bounds are hard penalty walls that only affect timesteps where the optimum
+#      presses against the 0.20 deg/Myr ceiling (mostly in deep time), whereas inside the
+#      walls the solution is set by the smooth trade-off between the net rotation cost and
+#      the other components. Halving the NR weight shifts that trade-off at *every*
+#      timestep, letting the trench rollback and plate velocity constraints pull harder
+#      against the net rotation minimisation (single-timestep tests confirm this produces
+#      a systematically stronger-rollback / higher-NR solution, whereas relaxing the
+#      bounds alone merely selects a different near-degenerate minimum).
+#
+# Select the variant here (or via the OPTAPM_VARIANT environment variable, eg,
+# "OPTAPM_VARIANT=nr_max mpirun -np 16 python Optimised_APM.py").
+# The variant name (other than 'best') is appended to the model name, so each variant
+# writes its own set of output files.
+#
+run_variant_nr_bounds = {
+    'best':   (0.08, 0.20),  # deg/Myr
+    'nr_max': (0.08, 0.30),  # deg/Myr
+}
+# Inverse weights (the NR cost is *multiplied* by "1.0 / weight").
+run_variant_nr_weight = {
+    'best':   1.0,  # full NR weight
+    'nr_max': 2.0,  # half NR weight
+}
+run_variant = os.environ.get('OPTAPM_VARIANT', 'best')
+if run_variant not in run_variant_nr_bounds:
+    raise RuntimeError('Unknown run variant {0!r} - choose one of {1}'.format(
+            run_variant, sorted(run_variant_nr_bounds.keys())))
+if run_variant != 'best':
+    model_name = model_name + '_' + run_variant
+
+
 # Start age.
 if data_model == 'Zahirovic_etal_2022_GDJ':
     start_age = 410
@@ -299,15 +354,78 @@ def get_net_rotation_params(age):
         data_model == 'Zahirovic_etal_2022_GDJ' or
         '1.8ga' in data_model.lower() or
         data_model == "Global_2000-540"):
-        nr_bounds = (0.08, 0.20)
+        # Net rotation bounds and weight depend on the run variant (see 'run_variant' above).
+        nr_bounds = run_variant_nr_bounds[run_variant]
+        nr_weight = run_variant_nr_weight[run_variant]
         if age <= 80:
-            return  True, 1.0, cost_function, nr_bounds  # Weight is always 1.0 for 0-80Ma
+            return  True, nr_weight, cost_function, nr_bounds
         else:
-            return  True, 1.0, cost_function, nr_bounds  # 1.0 gives a *multiplicative* weight of 1.0
+            return  True, nr_weight, cost_function, nr_bounds  # NOTE: Inverse weight (cost is multiplied by "1.0 / weight").
     else:
         return True, 1.0, cost_function, None
 
+#
+# Trench migration scheme.
+#
+# 'minimise' - the original behaviour: drive trench-normal migration velocities toward zero
+#              (mean absolute orthogonal velocity + standard deviation), with loose bounds
+#              of (-30, 30) mm/yr on the mean orthogonal velocity.
+#
+# 'rollback' - prefer slow trench *retreat* (rollback). Observations show that most trenches
+#              roll back toward the ocean basin behind them rather than advancing toward the
+#              overriding plate: across reference frames, 62-78% of trench segments retreat,
+#              with mean trench-normal velocities of +1.3-1.5 cm/yr and medians of
+#              +0.9-1.3 cm/yr (Schellart et al. 2008, Earth-Science Reviews,
+#              doi:10.1016/j.earscirev.2008.01.005; see also Williams et al. 2015, EPSL,
+#              doi:10.1016/j.epsl.2015.02.026). This scheme drives the per-trench orthogonal
+#              velocities toward a target of +10 mm/yr (positive = retreat; the target value
+#              is hardcoded inside the cost function below because cost functions are
+#              serialised by code object only and cannot capture config variables), and
+#              tightens the bounds on the *mean* orthogonal velocity to (0, 20) mm/yr,
+#              ie, the global mean must be retreating but at less than 2 cm/yr.
+#              Individual trenches can still advance (eg, Izu-Bonin-Mariana-style segments);
+#              only the global mean is required to be retreating.
+#
+#              Because zero net rotation also implies near-zero trench migration, the original
+#              'minimise' scheme is largely redundant with net rotation minimisation. The
+#              'rollback' scheme makes trench kinematics an independent constraint that
+#              competes with the net rotation minimisation.
+#
+trench_migration_scheme = 'rollback'
+
 def get_trench_migration_params(age):
+    if trench_migration_scheme == 'rollback':
+        # Cost function - see "objective_function.py" for definition of function arguments...
+        def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
+            # NOTE: Import any modules used in this function here
+            #       (since this function's code might be serialised over the network to remote nodes).
+            #
+            # NOTE: Any constants must be hardcoded here (not read from the config) since only
+            #       this function's *code* is serialised (closures/globals are not preserved).
+            import numpy as np
+
+            # Target trench-normal migration velocity in mm/yr (positive = retreat/rollback).
+            # The median trench-normal retreat is +0.9-1.3 cm/yr across reference frames
+            # (Schellart et al. 2008), so we target +10 mm/yr (= +1.0 cm/yr).
+            tm_target = 10.0
+
+            # Mean absolute deviation of per-trench orthogonal velocities from the rollback
+            # target, plus the standard deviation (to penalise large spread), with the same
+            # overall scaling as the 'minimise' scheme so the component weights are comparable.
+            return (np.mean(np.abs(tm_vel_orth - tm_target)) + np.std(tm_vel_orth)) * 3
+
+        # Bounds on the *mean* orthogonal velocity (mm/yr): must be retreating, but slower
+        # than 2 cm/yr. (Note: Use units of mm/yr - same as km/Myr.)
+        tm_bounds = [0, 20]
+
+        if age <= 80:
+            return True, 1.0, cost_function, tm_bounds  # Weight is always 1.0 for 0-80Ma
+        else:
+            # NOTE: These are inverse weights (ie, the constraint costs are *multiplied* by "1.0 / weight").
+            return True, 2.0, cost_function, tm_bounds  # 2.0 gives a *multiplicative* weight of 0.5
+
+    # trench_migration_scheme == 'minimise' (the original scheme) ...
+
     # Cost function - see "objective_function.py" for definition of function arguments...
     def cost_function(trench_vel, trench_obl, tm_vel_orth, tm_mean_vel_orth, tm_mean_abs_vel_orth):
         # NOTE: Import any modules used in this function here
@@ -506,6 +624,38 @@ def get_reference_params(age):
     return ref_rotation_plate_id, ref_rotation_file
 
 
+#
+# Seed screening ("screen then polish").
+#
+# The objective function is first evaluated once at every seed (cheap screening), and then
+# only the most promising seeds are fully optimised with NLopt. A full NLopt optimisation
+# typically uses ~80-200 objective evaluations, so screening all seeds costs roughly the
+# same as fully optimising just one or two seeds - while identifying where the low-cost
+# basins are. An empirical convergence study (see 'seed_study.py') found that fully
+# optimising the best ~16 screened seeds plus a small uniformly-distributed backstop
+# reproduces the full 400-seed multistart minimum to within ~0.5% cost at ~10-25x less CPU.
+#
+# Set 'seed_screen_top_n' to None to disable screening (original behaviour: fully optimise every seed).
+seed_screen_top_n = 16      # Fully optimise the N best-screened seeds.
+seed_screen_uniform_n = 16  # Also fully optimise this many seeds spread uniformly across the
+                            # search space (insurance in case screening misses a basin -
+                            # eg, when a poor seed would have converged to the global minimum).
+
+# Safety cap on NLopt objective evaluations per seed (only used when model_stop_condition == 'threshold').
+# COBYLA occasionally fails to converge (it can cycle for thousands of evaluations, stalling
+# an entire MPI rank and hence the whole timestep). The vast majority of optimisations
+# converge in well under 200 evaluations, so this generous cap only affects pathological cases.
+# Set to None to disable the cap.
+nlopt_max_eval_safety = 1000
+
+
+# Whether to generate post-run diagnostics at the end of the optimisation run:
+# per-timestep net rotation (median +/- MAD) and trench-normal migration (mean +/- MAD)
+# statistics (CSV) and plots (PNG) written to 'model_output/' - see "model_diagnostics.py".
+# The diagnostics can also be (re)generated standalone: "python model_diagnostics.py".
+generate_diagnostics = True
+
+
 search = "Initial"
 # If True then temporarily expand search radius to 180 whenever the reference plate changes.
 # Normally the reference plate stays constant at Africa (701), but does switch to 101 for the 1Ga model.
@@ -569,6 +719,33 @@ interpolated_hotspots = 'interpolated_hotspot_chains_5Myr.xlsx'
 # Don't plot in this workflow.
 # This is so it can be run on an HPC cluster with no visualisation node.
 plot = False
+
+
+#
+# Environment variable overrides (useful for quick test runs without editing this file).
+#
+# OPTAPM_START_AGE / OPTAPM_END_AGE : Override the age range (eg, to run a single timestep).
+# OPTAPM_MODELS                     : Override the number of seed models.
+# OPTAPM_SERIAL=1                   : Disable parallelisation (eg, to run/debug on a desktop without MPI).
+#
+if 'OPTAPM_START_AGE' in os.environ:
+    start_age = int(os.environ['OPTAPM_START_AGE'])
+if 'OPTAPM_END_AGE' in os.environ:
+    end_age = actual_end_age = int(os.environ['OPTAPM_END_AGE'])
+if 'OPTAPM_MODELS' in os.environ:
+    models = int(os.environ['OPTAPM_MODELS'])
+if 'OPTAPM_SCREEN_TOP_N' in os.environ:
+    seed_screen_top_n = int(os.environ['OPTAPM_SCREEN_TOP_N'])
+    if seed_screen_top_n < 0:  # negative disables screening
+        seed_screen_top_n = None
+if 'OPTAPM_SCREEN_UNIFORM_N' in os.environ:
+    seed_screen_uniform_n = int(os.environ['OPTAPM_SCREEN_UNIFORM_N'])
+if 'OPTAPM_TM_SCHEME' in os.environ:
+    trench_migration_scheme = os.environ['OPTAPM_TM_SCHEME']
+    if trench_migration_scheme not in ('minimise', 'rollback'):
+        raise RuntimeError("OPTAPM_TM_SCHEME must be 'minimise' or 'rollback'")
+if os.environ.get('OPTAPM_SERIAL') == '1':
+    use_parallel = None
 
 
 #

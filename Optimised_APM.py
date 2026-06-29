@@ -347,8 +347,13 @@ if __name__ == '__main__':
                 # --------------------------------------------------------------------
 
                 # Load all data
-                data = ms.dataLoader(datadir, rotfile, ref_rotation_file, tm_file=tm_file, pv_file=pv_file, nnr_rotfile=nnr_rotfile, 
-                                    ridge_file=ridge_file, isochron_file=isochron_file, isocob_file=isocob_file, 
+                #
+                # OPTIMISATION: The ridge/isochron/isocob files are only used by the fracture zone
+                # component, so don't load them when fracture zones are disabled (saves time at every timestep).
+                data = ms.dataLoader(datadir, rotfile, ref_rotation_file, tm_file=tm_file, pv_file=pv_file, nnr_rotfile=nnr_rotfile,
+                                    ridge_file=ridge_file if enable_fracture_zones else None,
+                                    isochron_file=isochron_file if enable_fracture_zones else None,
+                                    isocob_file=isocob_file if enable_fracture_zones else None,
                                     hst_file=hst_file, hs_file=hs_file, interpolated_hotspots=interpolated_hotspots)
 
                 # Calculate starting conditions
@@ -451,12 +456,13 @@ if __name__ == '__main__':
             # --------------------------------------------------------------------
             # Function to run optimisation routine
 
-            def run_optimisation(x, opt_n, N, lb, ub, model_stop_condition, max_iter, interval, rotation_file, 
-                                no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions, 
+            def run_optimisation(x, opt_n, N, lb, ub, model_stop_condition, max_iter, interval, rotation_file,
+                                no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions,
                                 spreading_asymmetries, seafloor_ages, PID, CPID,
                                 data_array, weights_array, cost_func_code_string_array, bounds_array,
                                 trench_migration_file, plate_velocity_file, ref_rotation_end_age, ref_rotation_plate_id,
-                                reformArray, trail_data, use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method):
+                                reformArray, trail_data, use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method,
+                                max_eval_safety=None):
 
                 # Make sure remote nodes/cores also import these modules (when running code in parallel).
                 #
@@ -473,19 +479,29 @@ if __name__ == '__main__':
                 import sys
                 import types
 
-                # Turn cost function code strings back into functions.
-                cost_func_array = [types.FunctionType(marshal.loads(cost_func_code_string), globals(), 'cost_func')
-                                for cost_func_code_string in cost_func_code_string_array]
+                # OPTIMISATION: Cache the ObjectiveFunction in the current process so that
+                # constructing it (which loads rotation/trench/velocity files) only happens once
+                # per process per timestep, instead of once per seed.
+                obj_f_cache = globals().setdefault('_optapm_objective_function_cache', {})
+                obj_f_cache_key = (rotation_file, ref_rotation_start_age, ref_rotation_end_age)
+                obj_f = obj_f_cache.get(obj_f_cache_key)
+                if obj_f is None:
+                    # Turn cost function code strings back into functions.
+                    cost_func_array = [types.FunctionType(marshal.loads(cost_func_code_string), globals(), 'cost_func')
+                                    for cost_func_code_string in cost_func_code_string_array]
 
-                # Load up the object function object once (eg, load rotation files).
-                # NLopt will then call it multiple times.
-                # NLopt will call this as 'obj_f(x, grad)' because 'obj_f' has a '__call__' method.
-                obj_f = ObjectiveFunction(
-                        interval, rotation_file, no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions,
-                        spreading_asymmetries, seafloor_ages, PID, CPID, data_array, weights_array, cost_func_array, bounds_array,
-                        trench_migration_file, plate_velocity_file, ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
-                        use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method)
-                
+                    # Load up the object function object once (eg, load rotation files).
+                    # NLopt will then call it multiple times.
+                    # NLopt will call this as 'obj_f(x, grad)' because 'obj_f' has a '__call__' method.
+                    obj_f = ObjectiveFunction(
+                            interval, rotation_file, no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions,
+                            spreading_asymmetries, seafloor_ages, PID, CPID, data_array, weights_array, cost_func_array, bounds_array,
+                            trench_migration_file, plate_velocity_file, ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
+                            use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method)
+                    # Only keep the cached objective function for the current timestep.
+                    obj_f_cache.clear()
+                    obj_f_cache[obj_f_cache_key] = obj_f
+
                 opt = nlopt.opt(nlopt.LN_COBYLA, opt_n)
                 opt.set_min_objective(obj_f)
                 opt.set_lower_bounds(lb)
@@ -500,6 +516,13 @@ if __name__ == '__main__':
 
                     opt.set_ftol_rel(1e-6)
                     opt.set_xtol_rel(1e-8)
+
+                    # Safety cap: COBYLA occasionally fails to converge (it can cycle for
+                    # thousands of evaluations, stalling an entire process and hence the whole
+                    # timestep). The vast majority of optimisations converge in well under
+                    # 200 evaluations, so a generous cap only affects pathological cases.
+                    if max_eval_safety:
+                        opt.set_maxeval(max_eval_safety)
 
                 xopt = opt.optimize(x)
                 minf = opt.last_optimum_value()
@@ -526,16 +549,137 @@ if __name__ == '__main__':
             # Start optimisation
 
             # Wrap 'run_optimisation()' by passing all the constant parameters (ie, everything except 'x').
-            runopt = partial(run_optimisation, opt_n=opt_n, N=N, lb=lb, ub=ub, 
+            runopt = partial(run_optimisation, opt_n=opt_n, N=N, lb=lb, ub=ub,
                             model_stop_condition=model_stop_condition, max_iter=max_iter, interval=interval, rotation_file=rotation_file,
-                            no_net_rotation_file=no_net_rotation_file, ref_rotation_start_age=ref_rotation_start_age, 
+                            no_net_rotation_file=no_net_rotation_file, ref_rotation_start_age=ref_rotation_start_age,
                             Lats=Lats, Lons=Lons, spreading_directions=spreading_directions, spreading_asymmetries=spreading_asymmetries,
                             seafloor_ages=seafloor_ages, PID=PID, CPID=CPID,
                             data_array=data_array, weights_array=weights_array, cost_func_code_string_array=cost_func_code_string_array, bounds_array=bounds_array,
                             trench_migration_file=trench_migration_file, plate_velocity_file=plate_velocity_file,
                             ref_rotation_end_age=ref_rotation_end_age, ref_rotation_plate_id=ref_rotation_plate_id,
                             reformArray=reformArray, trail_data=trail_data, use_trail_age_uncertainty=use_trail_age_uncertainty,
-                            trail_age_uncertainty_ellipse=trail_age_uncertainty_ellipse, tm_method=tm_method)
+                            trail_age_uncertainty_ellipse=trail_age_uncertainty_ellipse, tm_method=tm_method,
+                            max_eval_safety=nlopt_max_eval_safety)
+
+
+            # --------------------------------------------------------------------
+            # --------------------------------------------------------------------
+            # Optionally screen the seeds (a single objective function evaluation per seed)
+            # and then only fully optimise the most promising ones ("screen then polish").
+            #
+            # A full NLopt optimisation typically uses ~80-200 objective evaluations, so
+            # screening all seeds costs roughly the same as fully optimising one or two seeds.
+
+            if seed_screen_top_n is not None:
+
+                # Function to evaluate the objective function once at a seed.
+                # Self-contained (all imports inside) so it can run on remote nodes/cores.
+                def run_seed_screening(x, opt_n, N, lb, ub, model_stop_condition, max_iter, interval, rotation_file,
+                                    no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions,
+                                    spreading_asymmetries, seafloor_ages, PID, CPID,
+                                    data_array, weights_array, cost_func_code_string_array, bounds_array,
+                                    trench_migration_file, plate_velocity_file, ref_rotation_end_age, ref_rotation_plate_id,
+                                    reformArray, trail_data, use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method,
+                                    max_eval_safety=None):
+
+                    from objective_function import ObjectiveFunction
+                    import marshal
+                    import types
+
+                    # Share the per-process ObjectiveFunction cache with 'run_optimisation()'.
+                    obj_f_cache = globals().setdefault('_optapm_objective_function_cache', {})
+                    obj_f_cache_key = (rotation_file, ref_rotation_start_age, ref_rotation_end_age)
+                    obj_f = obj_f_cache.get(obj_f_cache_key)
+                    if obj_f is None:
+                        cost_func_array = [types.FunctionType(marshal.loads(cost_func_code_string), globals(), 'cost_func')
+                                        for cost_func_code_string in cost_func_code_string_array]
+                        obj_f = ObjectiveFunction(
+                                interval, rotation_file, no_net_rotation_file, ref_rotation_start_age, Lats, Lons, spreading_directions,
+                                spreading_asymmetries, seafloor_ages, PID, CPID, data_array, weights_array, cost_func_array, bounds_array,
+                                trench_migration_file, plate_velocity_file, ref_rotation_end_age, ref_rotation_plate_id, reformArray, trail_data,
+                                use_trail_age_uncertainty, trail_age_uncertainty_ellipse, tm_method)
+                        obj_f_cache.clear()
+                        obj_f_cache[obj_f_cache_key] = obj_f
+
+                    return obj_f(x, None)
+
+                runscreen = partial(run_seed_screening, opt_n=opt_n, N=N, lb=lb, ub=ub,
+                                model_stop_condition=model_stop_condition, max_iter=max_iter, interval=interval, rotation_file=rotation_file,
+                                no_net_rotation_file=no_net_rotation_file, ref_rotation_start_age=ref_rotation_start_age,
+                                Lats=Lats, Lons=Lons, spreading_directions=spreading_directions, spreading_asymmetries=spreading_asymmetries,
+                                seafloor_ages=seafloor_ages, PID=PID, CPID=CPID,
+                                data_array=data_array, weights_array=weights_array, cost_func_code_string_array=cost_func_code_string_array, bounds_array=bounds_array,
+                                trench_migration_file=trench_migration_file, plate_velocity_file=plate_velocity_file,
+                                ref_rotation_end_age=ref_rotation_end_age, ref_rotation_plate_id=ref_rotation_plate_id,
+                                reformArray=reformArray, trail_data=trail_data, use_trail_age_uncertainty=use_trail_age_uncertainty,
+                                trail_age_uncertainty_ellipse=trail_age_uncertainty_ellipse, tm_method=tm_method)
+
+                # Select the seeds to fully optimise: the 'top_n' best-screened seeds plus
+                # 'uniform_n' seeds spread uniformly across the search space (the latter is
+                # insurance in case a poorly-screened seed would have converged to the global
+                # minimum). Note that the uniform subset is selected by striding the seed list,
+                # which is in grid order and hence spatially spread out.
+                def select_polish_seeds(seeds, costs, top_n, uniform_n):
+                    selected_indices = set(np.argsort(costs)[:top_n].tolist())
+                    if uniform_n:
+                        stride = max(1, len(seeds) // uniform_n)
+                        selected_indices.update(range(0, len(seeds), stride))
+                    return [seeds[index] for index in sorted(selected_indices)]
+
+                if use_parallel == IPYPARALLEL:
+
+                    screen_costs = dview.map(runscreen, x)
+                    x = select_polish_seeds(x, screen_costs, seed_screen_top_n, seed_screen_uniform_n)
+                    print("Screened {0} seeds; fully optimising {1} of them.".format(len(screen_costs), len(x)))
+                    sys.stdout.flush()
+
+                elif use_parallel == MPI4PY:
+
+                    # Each process screens the seeds it received from the root process.
+                    screen_costs = [runscreen(x_item) for x_item in x]
+
+                    # Gather all screened costs and seeds into the root (0) process.
+                    all_screen_costs = mpi_comm.gather(screen_costs, root=0)
+                    all_screen_seeds = mpi_comm.gather(x, root=0)
+
+                    if mpi_rank == 0:
+                        # Flatten the list of lists into a single list.
+                        all_screen_costs = list(itertools.chain.from_iterable(all_screen_costs))
+                        all_screen_seeds = list(itertools.chain.from_iterable(all_screen_seeds))
+
+                        polish_seeds = select_polish_seeds(
+                                all_screen_seeds, all_screen_costs, seed_screen_top_n, seed_screen_uniform_n)
+
+                        print("Screened {0} seeds; fully optimising {1} of them (best {2} plus {3} uniformly spread).".format(
+                                len(all_screen_seeds), len(polish_seeds), seed_screen_top_n, seed_screen_uniform_n))
+                        sys.stdout.flush()
+
+                        # Divide the polish seeds among the processes (same way as the original seeds).
+                        if len(polish_seeds) < mpi_size:
+                            polish_seed_lists = [[polish_seed] for polish_seed in polish_seeds]
+                            polish_seed_lists.extend([[]] * (mpi_size - len(polish_seeds)))
+                        else:
+                            num_seeds_per_rank = len(polish_seeds) // mpi_size
+                            polish_seed_lists = []
+                            for mpi_index in range(mpi_size):
+                                seed_index = mpi_index * num_seeds_per_rank
+                                polish_seed_lists.append(polish_seeds[seed_index : seed_index + num_seeds_per_rank])
+                            for seed_index in range(mpi_size * num_seeds_per_rank, len(polish_seeds)):
+                                polish_seed_lists[seed_index - mpi_size * num_seeds_per_rank].append(polish_seeds[seed_index])
+                    else:
+                        polish_seed_lists = None
+
+                    # Scatter the polish seeds across all processes (from root process).
+                    x = mpi_comm.scatter(polish_seed_lists, root=0)
+
+                else:
+
+                    # Calculate serially.
+                    screen_costs = [runscreen(x_item) for x_item in x]
+                    x = select_polish_seeds(x, screen_costs, seed_screen_top_n, seed_screen_uniform_n)
+                    print("Screened {0} seeds; fully optimising {1} of them.".format(len(screen_costs), len(x)))
+                    sys.stdout.flush()
+
 
             # Start timer for current time step.
             #start = time.time()
@@ -664,7 +808,21 @@ if __name__ == '__main__':
             
             # Save the final optimised model back to the original rotation files (or copies of them).
             optimised_rotation_updater.save_to_rotation_files()
-            
+
+            # Generate post-run diagnostics: net rotation (median +/- MAD) and trench-normal
+            # migration (mean +/- MAD) through time, written as CSV and plots to 'model_output/'.
+            if generate_diagnostics:
+                from model_diagnostics import generate_model_diagnostics
+                generate_model_diagnostics(
+                        datadir,
+                        rotfile,
+                        no_net_rotation_model.get_no_net_rotation_filename(),
+                        trench_resolver,
+                        age_range,
+                        interval,
+                        get_reference_params,
+                        model_name)
+
             main_end_time = round(time.time() - main_start, 10)
             main_sec = timedelta(seconds = float(main_end_time))
             main_dt = datetime(1,1,1) + main_sec
