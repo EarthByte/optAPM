@@ -102,9 +102,17 @@ files actually live (PMM, for example, stores them in `Rotations/` and `Topologi
 ## Configuration
 
 All settings live in [`Optimised_config.py`](Optimised_config.py). The most important is `data_model`
-(the model sub-directory in `data/`). The config also sets the model name (suffixed onto output
-filenames), the start/end ages and interval, the number of seeds, the per-component weights/bounds,
-and the reference-plate / seed scheme. Most other knobs have sensible defaults.
+(the model sub-directory in `data/`). It is the **primary user input** and can be selected on the
+command line without editing the config, via the `OPTAPM_DATA_MODEL` environment variable:
+
+```
+OPTAPM_DATA_MODEL=Zahirovic_etal_2022_GDJ python Optimised_APM.py
+OPTAPM_DATA_MODEL=Global_2000-540 mpiexec -n 8 python Optimised_APM.py
+```
+
+The chosen `data_model` drives everything else through per-model branches in the config: the model name
+(suffixed onto output filenames), the start/end ages and interval, the rotation/topology file lists, the
+continental polygons, and the reference-plate / seed scheme. Most other knobs have sensible defaults.
 
 ### Seed screening ("screen then polish") - the ~10x speedup
 
@@ -236,16 +244,69 @@ Override the age range, seed count and parallelisation via environment variables
 OPTAPM_START_AGE=5 OPTAPM_END_AGE=0 OPTAPM_MODELS=49 OPTAPM_SERIAL=1 python Optimised_APM.py
 ```
 
+`OPTAPM_DATA_MODEL` selects the plate model (`OPTAPM_MODEL_NAME` names the outputs);
+`OPTAPM_REF_PLATE_ID` / `OPTAPM_REF_ROTATION_FILE` set the reference plate and seed;
 `OPTAPM_SCREEN_TOP_N` / `OPTAPM_SCREEN_UNIFORM_N` override the screening counts (a negative
-`OPTAPM_SCREEN_TOP_N` disables screening); `OPTAPM_VARIANT` selects the run variant;
-`OPTAPM_TM_SCHEME` selects the trench scheme.
+`OPTAPM_SCREEN_TOP_N` disables screening); `OPTAPM_VARIANT` selects the run variant; `OPTAPM_TM_SCHEME`
+selects the trench scheme.
 
 ## Running the optimisation
+
+### Quick start: `run_optapm.sh`
+
+The simplest way to run the full uncertainty envelope is the [`run_optapm.sh`](run_optapm.sh) launcher,
+which runs both the `best` and `nr_max` variants and their diagnostics in one command (the
+no-net-rotation frame is produced automatically by each run):
+
+```
+./run_optapm.sh <model> [cores] [start_age] [end_age]
+```
+
+`<model>` is **either** the name of a model already under `data/` (e.g. `Zahirovic_etal_2022_GDJ`)
+**or a path to a plate-model directory anywhere on disk**:
+
+```
+./run_optapm.sh Zahirovic_etal_2022_GDJ 8           # a model already under data/
+./run_optapm.sh /data/plate_models/MyModel 16 600 0 # any model directory (e.g. not in the PMM)
+```
+
+A directory that is not already under `data/` is symlinked into it automatically, and its rotation
+(`.rot`) and topology (`.gpml`/`.gpmlz`) files are **auto-discovered** (searched recursively), so no
+editing of `Optimised_config.py` is needed for a new model. Give `start_age` for any model without a
+built-in default age.
+
+Auto-discovered models optimise Africa (plate 701), seeded from the previous optimised interval. The
+reference frame is also selectable from the command line (no config edit) via two environment variables,
+inherited by `run_optapm.sh`:
+
+```
+OPTAPM_REF_PLATE_ID=101 ./run_optapm.sh /data/plate_models/MyModel 8 1000 0
+OPTAPM_REF_ROTATION_FILE=MyModel/pmag/seed.rot ./run_optapm.sh /data/plate_models/MyModel 8 1000 0
+```
+
+`OPTAPM_REF_PLATE_ID` sets the plate whose absolute motion is optimised; `OPTAPM_REF_ROTATION_FILE` sets
+the per-interval search seed (`optimised` — the default, `nnr`, or a rotation file path relative to
+`data/` whose pole at the start age seeds the search).
+
+If a model stores its paleomagnetic path on a plate you would *anchor* to get the pmag frame (e.g. the
+Zahirovic 2022 model's plate 701701), generate a standalone pmag seed file from it with
+[`make_pmag_seed.py`](make_pmag_seed.py), then point `OPTAPM_REF_ROTATION_FILE` at it:
+
+```
+python make_pmag_seed.py --pmag-plate 701701 --ref-plate 701 --output data/MyModel/pmag/seed.rot
+OPTAPM_REF_ROTATION_FILE=MyModel/pmag/seed.rot ./run_optapm.sh /data/plate_models/MyModel 8 600 0
+```
+
+### Running manually
 
 Each run produces the optimised rotation file
 `data/<data_model>/optimisation/optimised_rotation_model_<model_name>.rot` (a single file containing the
 entire optimised rotation model) plus the no-net-rotation file
 `no_net_rotation_model_<model_name>.rot`.
+
+Every run also mirrors its console output to a log file `model_output/<model_name>_run.log` automatically
+(written by the driver process; the `nr_max` variant gets its own log via the `_nr_max` model-name
+suffix), so you don't need to redirect output yourself.
 
 **Serial** (set `use_parallel = None` in the config, or `OPTAPM_SERIAL=1`):
 
