@@ -101,8 +101,36 @@ if __name__ == '__main__':
             mpi_comm = MPI.COMM_WORLD
             mpi_size = mpi_comm.Get_size()
             mpi_rank = mpi_comm.Get_rank()
-        
+
         # else serial
+
+        # Mirror all console output to a per-run log file in 'model_output/' (driver process only:
+        # the sole process when serial, or rank 0 under MPI). The filename includes 'model_name', so
+        # the 'best' and 'nr_max' runs write separate logs (eg, 'model_output/<model_name>_run.log').
+        if use_parallel != MPI4PY or mpi_rank == 0:
+            _log_dir = 'model_output'
+            if not os.path.isdir(_log_dir):
+                os.makedirs(_log_dir)
+            _log_path = os.path.join(_log_dir, '{0}_run.log'.format(model_name))
+
+            class _Tee(object):
+                """Write to the original stream and to the log file simultaneously."""
+                def __init__(self, stream, fileobj):
+                    self._stream = stream
+                    self._file = fileobj
+                def write(self, data):
+                    self._stream.write(data)
+                    self._file.write(data)
+                    self._file.flush()
+                def flush(self):
+                    self._stream.flush()
+                    self._file.flush()
+
+            _log_file = open(_log_path, 'w')
+            sys.stdout = _Tee(sys.stdout, _log_file)
+            sys.stderr = _Tee(sys.stderr, _log_file)
+            print('Data model: {0}   (run variant: {1})'.format(data_model, run_variant))
+            print('Run log:    {0}'.format(_log_path))
 
         # The age range to optimise over.
         #
